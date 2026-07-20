@@ -8,3 +8,4 @@ pub mod errors;
 pub mod inventory;
 pub mod platform;
 pub mod scanner;
+pub mod util;
