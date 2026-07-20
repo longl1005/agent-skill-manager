@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use crate::modules::adapter::{ScanIssue, ScanIssuePhase, ScanIssueSeverity};
+use crate::modules::adapter::{IssuePhase, IssueSeverity, ScanIssue};
 
 #[derive(Debug)]
 pub struct SkillCandidate {
@@ -39,8 +39,8 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, V
         Err(e) => {
             issues.push(ScanIssue {
                 code: "ROOT_NOT_FOUND".into(),
-                severity: ScanIssueSeverity::Warning,
-                phase: ScanIssuePhase::Enumeration,
+                severity: IssueSeverity::Warning,
+                phase: IssuePhase::Enumeration,
                 path: Some(input.root.to_path_buf()),
                 message: e.to_string(),
                 recoverable: true,
@@ -67,8 +67,8 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, V
             Err(e) => {
                 issues.push(ScanIssue {
                     code: "PERMISSION_DENIED".into(),
-                    severity: ScanIssueSeverity::Warning,
-                    phase: ScanIssuePhase::Enumeration,
+                    severity: IssueSeverity::Warning,
+                    phase: IssuePhase::Enumeration,
                     path: Some(dir_path),
                     message: e.to_string(),
                     recoverable: true,
@@ -88,8 +88,8 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, V
             Err(_) => {
                 issues.push(ScanIssue {
                     code: "ENTRY_MISSING".into(),
-                    severity: ScanIssueSeverity::Warning,
-                    phase: ScanIssuePhase::Enumeration,
+                    severity: IssueSeverity::Warning,
+                    phase: IssuePhase::Enumeration,
                     path: Some(dir_path.clone()),
                     message: format!("missing {}", input.entry_filename),
                     recoverable: true,
@@ -101,8 +101,8 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, V
         if !entry_meta.is_file() {
             issues.push(ScanIssue {
                 code: "ENTRY_NOT_A_FILE".into(),
-                severity: ScanIssueSeverity::Warning,
-                phase: ScanIssuePhase::Enumeration,
+                severity: IssueSeverity::Warning,
+                phase: IssuePhase::Enumeration,
                 path: Some(entry_path.clone()),
                 message: format!("{} is not a regular file", input.entry_filename),
                 recoverable: true,

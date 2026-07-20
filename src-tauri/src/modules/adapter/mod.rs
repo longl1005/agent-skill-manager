@@ -24,8 +24,8 @@ pub struct AgentId(pub String);
 #[derive(Debug, Clone)]
 pub struct ScanIssue {
     pub code: String,
-    pub severity: ScanIssueSeverity,
-    pub phase: ScanIssuePhase,
+    pub severity: IssueSeverity,
+    pub phase: IssuePhase,
     pub path: Option<PathBuf>,
     pub message: String,
     pub recoverable: bool,
@@ -33,7 +33,7 @@ pub struct ScanIssue {
 
 /// 问题严重程度。占位实现，T5 补齐。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScanIssueSeverity {
+pub enum IssueSeverity {
     Info,
     Warning,
     Error,
@@ -41,7 +41,7 @@ pub enum ScanIssueSeverity {
 
 /// 问题所处扫描阶段。占位实现，T5 补齐。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScanIssuePhase {
+pub enum IssuePhase {
     Detect,
     RootResolution,
     Enumeration,
