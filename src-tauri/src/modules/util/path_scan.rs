@@ -122,15 +122,18 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, V
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn tempdir() -> PathBuf {
-        let base = std::env::temp_dir();
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let pid = std::process::id();
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = base.join(format!("asm-ps-{}-{}", pid, nanos));
+        let p = std::env::temp_dir().join(format!("asm-ps-{}-{}-{}", pid, nanos, n));
         fs::create_dir_all(&p).unwrap();
         p
     }

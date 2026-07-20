@@ -408,15 +408,18 @@ fn build_installation_full(
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn tempdir() -> PathBuf {
-        let base = std::env::temp_dir();
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let pid = std::process::id();
         let nanos = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = base.join(format!("asm-cc-{}-{}", pid, nanos));
+        let p = std::env::temp_dir().join(format!("asm-cc-{}-{}-{}", pid, nanos, n));
         fs::create_dir_all(&p).unwrap();
         p
     }
@@ -700,8 +703,12 @@ mod tests {
             scope: RootScope::User,
         };
         let r = run_scan(&ClaudeCodeAdapter, &root);
-        // good 应当入选，broken 因 YAML 解析失败可能成功（fallback 到 dir name）也可能失败
-        // 主要断言：issue 被收集
-        assert!(!r.issues.is_empty() || r.installations.len() == 2);
+        // good 应当入选，broken 因 YAML 解析失败应当触发 FRONTMATTER_INVALID
+        // issue（spec §6.3 / 扫描实现）并 fallback 到 dir name 入选。
+        assert!(
+            r.issues.iter().any(|i| i.code == "FRONTMATTER_INVALID"),
+            "expected FRONTMATTER_INVALID issue, got: {:?}",
+            r.issues
+        );
     }
 }
