@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { PingResponse } from "./types";
+import type { PingResponse, ScanReport } from "./types";
 
 /**
  * 与 Rust 端 `commands::ping` 对应。
@@ -7,4 +7,12 @@ import type { PingResponse } from "./types";
  */
 export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
+}
+
+/**
+ * 与 Rust 端 `commands::scan_agents` 对应。
+ * 同步阻塞: 76 个 Skill ~50ms。
+ */
+export async function scanAgents(): Promise<ScanReport> {
+  return invoke<ScanReport>("scan_agents");
 }

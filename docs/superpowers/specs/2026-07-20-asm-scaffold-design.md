@@ -135,6 +135,8 @@ agent-skill-manager/
 
 刻意推迟：`rusqlite`/`sqlx`、`notify`（文件监听）、`blake3`/`sha2`（哈希）、`tokio`（异步运行时——只有 Scanner 真正需要时才引入）、`clap`（不在范围内的 CLI）。这些依赖随使用它们的模块一起加入。
 
+**M0 (Claude Code Adapter) 引入 by commit 7230247 起：**`dirs 5` / `serde_yml 0.0.12` / `sha2 0.10` / `walkdir 2` / `uuid 1` (含 v4) — 见 [Claude Code Adapter spec](../specs/2026-07-20-claude-code-adapter-design.md) §4。
+
 ### 4.3 `tsconfig.json`
 
 - `target: ES2022`
