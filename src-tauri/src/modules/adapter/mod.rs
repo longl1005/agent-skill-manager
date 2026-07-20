@@ -1,27 +1,225 @@
 //! Agent Adapter 注册与统一契约。
 //!
-//! 契约见 ADAPTER_SPEC.md §3。MVP 仅 `detect` 和 `scan` 为必实现。
-//! M0 阶段：定义 trait 骨架，提供 Claude Code / Codex 两个空实现占位。
-//! 本文件为占位骨架，crate 内尚未使用，允许 dead_code。
+//! 契约见 ADAPTER_SPEC.md §3-§7。MVP 仅 `detect` 和 `scan` 为必实现。
+//! 本文件含完整 DTO + 6 方法 trait；M0 阶段 ClaudeCodeAdapter 实现全部方法，
+//! CodexAdapter 仍为 stub。
+//! 本文件保留 dead_code allow，因 CodexAdapter 占位导致 pub use 触发警告。
 #![allow(dead_code, unused_imports)]
 
 mod claude_code;
 mod codex;
 
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+// ============================================================
+// 身份
+// ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct AgentId(pub String);
 
-// --- T4 stub - to be replaced in T5 ---
-// T5 will expand these into the full ScanIssue contract (adding #[derive(Serialize)]
-// and any additional variants). Field/variant names here match T5's plan so
-// util::path_scan and its tests compile against a stable shape.
+// ============================================================
+// Trait
+// ============================================================
 
-/// 扫描过程中记录的问题。占位实现，T5 补齐完整契约。
-#[derive(Debug, Clone)]
+pub trait AgentAdapter {
+    fn id(&self) -> AgentId;
+    fn descriptor(&self) -> AgentDescriptor;
+    fn capabilities(&self) -> CapabilitySet;
+    fn detect(&self, ctx: &DetectContext) -> DetectionResult;
+    fn skill_roots(&self, det: &DetectionResult) -> Vec<SkillRoot>;
+    fn scan(&self, ctx: &ScanContext) -> ScanResult;
+}
+
+// ============================================================
+// Descriptor & capabilities
+// ============================================================
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AgentDescriptor {
+    pub agent_id: AgentId,
+    pub adapter_id: String,
+    pub display_name: String,
+    pub supported_platforms: Vec<Platform>,
+    pub documentation_url: Option<String>,
+    pub adapter_version: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum Platform {
+    MacOs,
+    Linux,
+    Windows,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CapabilitySet {
+    pub detect: SupportLevel,
+    pub scan: SupportLevel,
+    pub compare_content: CompareConfidence,
+    pub watch: SupportLevel,
+    pub install_planning: SupportLevel,
+    pub uninstall_planning: SupportLevel,
+    pub update_planning: SupportLevel,
+    pub sync_planning: SupportLevel,
+    pub supported_platforms: Vec<Platform>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum SupportLevel {
+    Unsupported,
+    Planned,
+    Supported,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum CompareConfidence {
+    None,
+    Partial,
+    Reliable,
+}
+
+// ============================================================
+// Detection path
+// ============================================================
+
+pub struct DetectContext<'a> {
+    pub platform: &'a PlatformContext,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlatformContext {
+    pub platform: Platform,
+    pub home_dir: PathBuf,
+    pub cwd: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillRoot {
+    pub root_id: String,
+    pub display_path: PathBuf,
+    pub canonical_path: PathBuf,
+    pub scope: RootScope,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum RootScope {
+    User,
+    Project,
+    Custom,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DetectionResult {
+    pub agent: AgentId,
+    pub status: DetectionStatus,
+    pub roots: Vec<SkillRoot>,
+    pub issues: Vec<ScanIssue>,
+    pub observed_at: SystemTime,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum DetectionStatus {
+    Detected,
+    Unavailable,
+    Partial,
+    Unsupported,
+    Failed,
+}
+
+// ============================================================
+// Scan path
+// ============================================================
+
+pub struct ScanContext<'a> {
+    pub scan_id: ScanId,
+    pub agent: AgentId,
+    pub roots: &'a [SkillRoot],
+    pub platform: &'a PlatformContext,
+    pub started_at: SystemTime,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ScanId(pub Uuid);
+
+impl ScanId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillInstallation {
+    pub agent_id: AgentId,
+    pub adapter_id: String,
+    pub root_id: String,
+    pub location: LocationDescriptor,
+    pub format: SkillFormatDescriptor,
+    pub identity: SkillIdentityEvidence,
+    pub entry: EntryDescriptor,
+    pub metadata: NormalizedSkillMetadata,
+    pub content_fingerprint: Option<ContentFingerprint>,
+    pub comparison_confidence: CompareConfidence,
+    pub observed_at: SystemTime,
+    pub diagnostics: Vec<ScanIssue>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocationDescriptor {
+    pub display_path: PathBuf,
+    pub canonical_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillFormatDescriptor {
+    pub id: String,
+    pub display_name: String,
+    pub entry_file: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillIdentityEvidence {
+    pub normalized_name: String,
+    pub declared_name: Option<String>,
+    pub source: IdentitySource,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum IdentitySource {
+    FrontmatterName,
+    DirectoryName,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EntryDescriptor {
+    pub path: PathBuf,
+    pub size: u64,
+    pub modified: SystemTime,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NormalizedSkillMetadata {
+    pub name: String,
+    pub description: String,
+    pub license: Option<String>,
+    pub raw_metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContentFingerprint {
+    pub algorithm: &'static str,
+    pub version: u32,
+    pub scope: &'static str,
+    pub digest: String,
+    pub file_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ScanIssue {
     pub code: String,
     pub severity: IssueSeverity,
@@ -31,16 +229,14 @@ pub struct ScanIssue {
     pub recoverable: bool,
 }
 
-/// 问题严重程度。占位实现，T5 补齐。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub enum IssueSeverity {
     Info,
     Warning,
     Error,
 }
 
-/// 问题所处扫描阶段。占位实现，T5 补齐。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub enum IssuePhase {
     Detect,
     RootResolution,
@@ -49,19 +245,33 @@ pub enum IssuePhase {
     Parse,
     Fingerprint,
 }
-// --- end T4 stub ---
 
-/// 占位的检测结果。M0 真正实现时替换为完整 DetectionResult。
 #[derive(Debug, Clone, Serialize)]
-pub struct DetectionResult {
-    pub agent: AgentId,
-    pub detected: bool,
+pub struct ScanResult {
+    pub scan_id: ScanId,
+    pub agent_id: AgentId,
+    pub outcome: ScanOutcome,
+    pub completeness: ScanCompleteness,
+    pub installations: Vec<SkillInstallation>,
+    pub issues: Vec<ScanIssue>,
+    pub started_at: SystemTime,
+    pub completed_at: SystemTime,
 }
 
-/// MVP 阶段所有适配器必须实现的最小契约。
-/// 完整方法（`detect` / `scan` / `capabilities` / `skill_roots`）在 M0 实现时补齐。
-pub trait AgentAdapter {
-    fn id(&self) -> AgentId;
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum ScanOutcome {
+    Completed,
+    CompletedWithIssues,
+    Partial,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+pub enum ScanCompleteness {
+    Complete,
+    Partial,
+    Unknown,
 }
 
 pub use claude_code::ClaudeCodeAdapter;
