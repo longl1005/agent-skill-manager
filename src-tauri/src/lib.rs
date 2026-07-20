@@ -4,6 +4,8 @@
 
 mod commands;
 mod modules;
+#[path = "modules/util/mod.rs"]
+mod util;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

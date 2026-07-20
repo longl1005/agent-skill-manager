@@ -16,3 +16,12 @@ use std::path::PathBuf;
 pub fn app_data_dir() -> PathBuf {
     todo!("platform::app_data_dir 在 M0 实现阶段补齐")
 }
+
+/// 用户主目录解析。
+///
+/// 用 `dirs` crate 跨平台取 `$HOME` / `%USERPROFILE%` / `xdg_home`。
+/// 返回 `None` 时整个 scan 返回 Failed 状态（spec §8.1）。
+/// **禁止** hard-code `~` / `/Users` / `C:\Users`（spec §6.2）。
+pub fn user_home_dir() -> Option<std::path::PathBuf> {
+    dirs::home_dir()
+}
