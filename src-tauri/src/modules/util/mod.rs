@@ -14,3 +14,4 @@ mod path_scan;
 
 pub use fingerprint::{compute_fingerprint, FingerprintError, FingerprintInput};
 pub use frontmatter::{parse_frontmatter, FrontmatterError, ParsedFrontmatter};
+pub use path_scan::*;

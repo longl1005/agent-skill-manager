@@ -8,10 +8,48 @@
 mod claude_code;
 mod codex;
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct AgentId(pub String);
+
+// --- T4 stub - to be replaced in T5 ---
+// T5 will expand these into the full ScanIssue contract (adding #[derive(Serialize)]
+// and any additional variants). Field/variant names here match T5's plan so
+// util::path_scan and its tests compile against a stable shape.
+
+/// 扫描过程中记录的问题。占位实现，T5 补齐完整契约。
+#[derive(Debug, Clone)]
+pub struct ScanIssue {
+    pub code: String,
+    pub severity: ScanIssueSeverity,
+    pub phase: ScanIssuePhase,
+    pub path: Option<PathBuf>,
+    pub message: String,
+    pub recoverable: bool,
+}
+
+/// 问题严重程度。占位实现，T5 补齐。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanIssueSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// 问题所处扫描阶段。占位实现，T5 补齐。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanIssuePhase {
+    Detect,
+    RootResolution,
+    Enumeration,
+    Read,
+    Parse,
+    Fingerprint,
+}
+// --- end T4 stub ---
 
 /// 占位的检测结果。M0 真正实现时替换为完整 DetectionResult。
 #[derive(Debug, Clone, Serialize)]
