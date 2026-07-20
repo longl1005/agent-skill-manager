@@ -1,10 +1,5 @@
 //! 枚举 Skill 根下的子目录，检测每个是否是合法 Skill 安装。
 //! 见 docs/superpowers/specs/2026-07-20-claude-code-adapter-design.md §6.3。
-//!
-//! 本文件类型/函数由 T5+ 的 ClaudeCodeAdapter 消费；当前 crate 内尚未使用，
-//! 允许 dead_code 以通过 `-D warnings`。
-
-#![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -24,6 +19,8 @@ pub struct EnumerationInput {
     pub root: &'static Path,
     pub entry_filename: &'static str,
     pub skip_hidden: bool,
+    // 当前 enumerate_skill_dirs 直接 read_dir；max_depth 是为未来递归预留的 API 字段。
+    #[allow(dead_code)]
     pub max_depth: usize,
 }
 
@@ -138,9 +135,8 @@ mod tests {
         p
     }
 
-    // 标 #[ignore] 直到 T5 引入 ScanIssue 类型
+    // 标 T4 时缺 ScanIssue，T5 后已就绪
     #[test]
-    #[ignore = "needs ScanIssue from T5"]
     fn enumerate_skips_dotfiles() {
         let tmp = tempdir();
         fs::create_dir(tmp.join(".hidden")).unwrap();
@@ -159,7 +155,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs ScanIssue from T5"]
     fn enumerate_requires_skill_md() {
         let tmp = tempdir();
         fs::create_dir(tmp.join("no_entry")).unwrap();
@@ -188,7 +183,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs ScanIssue from T5"]
     fn enumerate_handles_permission_error() {
         // 我们只保证 "出错不 panic"。创建一个有效 Skill 即可。
         let tmp = tempdir();

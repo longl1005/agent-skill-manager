@@ -1,10 +1,5 @@
 //! YAML frontmatter 解析，输出 ParsedFrontmatter。
 //! 见 docs/superpowers/specs/2026-07-20-claude-code-adapter-design.md §6.1。
-//!
-//! 本文件类型/函数由 T5+ 的 ClaudeCodeAdapter 消费；当前 crate 内尚未使用，
-//! 允许 dead_code 以通过 `-D warnings`。
-
-#![allow(dead_code)]
 
 use serde::Serialize;
 use thiserror::Error;

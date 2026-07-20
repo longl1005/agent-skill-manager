@@ -2,11 +2,6 @@
 //! 见 docs/superpowers/specs/2026-07-20-claude-code-adapter-design.md §6.2。
 //!
 //! 拼 manifest: "<rel_path>\0<size>\0<sha256_hex>\n" 排序后整体 sha256。
-//!
-//! 本文件类型/函数由 T5+ 的 ClaudeCodeAdapter 消费；当前 crate 内尚未使用，
-//! 允许 dead_code 以通过 `-D warnings`。
-
-#![allow(dead_code)]
 
 use std::path::PathBuf;
 use thiserror::Error;
