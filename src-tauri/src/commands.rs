@@ -1,14 +1,254 @@
 //! Tauri 命令薄壳。命令体内只做参数转发和结果映射，业务逻辑全部下沉到 `modules/`。
 
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use serde::Serialize;
+
+use crate::modules::adapter::{
+    AgentAdapter, AgentId, ClaudeCodeAdapter, DetectContext, Platform, PlatformContext,
+    ScanContext, ScanId, ScanIssue, ScanResult,
+};
+
+/// 整个 app 共享的 state。
+#[derive(Default)]
+pub struct AppState {
+    pub last_report: Mutex<Option<ScanReport>>,
+}
+
+// ============================================================
+// ping 命令（脚手架阶段留下）
+// ============================================================
 
 #[derive(Serialize)]
 pub struct PingResponse {
     pub message: &'static str,
 }
 
-/// 健康检查命令，验证 IPC 通畅。
 #[tauri::command]
 pub fn ping() -> PingResponse {
     PingResponse { message: "pong" }
+}
+
+// ============================================================
+// scan_agents 命令（M0 新增）
+// ============================================================
+
+#[derive(Clone, Serialize)]
+pub struct ScanReport {
+    pub scan_id: String,
+    pub started_at: u64,
+    pub completed_at: u64,
+    pub agents: Vec<AgentReport>,
+    pub total_skills: usize,
+    pub total_issues: usize,
+}
+
+#[derive(Clone, Serialize)]
+pub struct AgentReport {
+    pub agent_id: String,
+    pub display_name: String,
+    pub detection_status: String,
+    pub roots: Vec<RootReport>,
+    pub skills: Vec<SkillReport>,
+    pub issues: Vec<IssueReport>,
+    pub outcome: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RootReport {
+    pub root_id: String,
+    pub scope: String,
+    pub display_path: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct SkillReport {
+    pub name: String,
+    pub description: String,
+    pub license: Option<String>,
+    pub location: String,
+    pub fingerprint_short: String,
+    pub file_count: usize,
+    pub issues: Vec<IssueReport>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct IssueReport {
+    pub code: String,
+    pub severity: String,
+    pub phase: String,
+    pub path: Option<String>,
+    pub message: String,
+}
+
+#[tauri::command]
+pub fn scan_agents(state: tauri::State<'_, AppState>) -> ScanReport {
+    let started_at = SystemTime::now();
+
+    // 构造 platform context
+    let home = crate::modules::platform::user_home_dir().unwrap_or_else(|| PathBuf::from("/"));
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+    let platform_ctx = PlatformContext {
+        platform: Platform::MacOs, // 简化: host 平台由 OS 自动决定, T1 阶段 UI 暂未消费 platform 字段
+        home_dir: home,
+        cwd,
+    };
+    let platform: &'static PlatformContext = Box::leak(Box::new(platform_ctx));
+
+    // 注册的 adapter 列表（M0 仅 ClaudeCodeAdapter）
+    let adapters: Vec<Box<dyn AgentAdapter>> = vec![Box::new(ClaudeCodeAdapter)];
+
+    let mut agent_reports: Vec<AgentReport> = Vec::new();
+    let mut total_skills = 0usize;
+    let mut total_issues = 0usize;
+
+    for adapter in &adapters {
+        let det = adapter.detect(&DetectContext { platform });
+        let roots = adapter.skill_roots(&det);
+        let descriptor = adapter.descriptor();
+
+        // 把 roots 转 DTO
+        let mut root_reports: Vec<RootReport> = roots
+            .iter()
+            .map(|r| RootReport {
+                root_id: r.root_id.clone(),
+                scope: format!("{:?}", r.scope),
+                display_path: r.display_path.to_string_lossy().into_owned(),
+            })
+            .collect();
+
+        let scan_id = ScanId::new();
+        let scan_result: ScanResult = if roots.is_empty() {
+            // 跳过 scan, 但报告里仍带 issues (detect 的)
+            ScanResult {
+                scan_id,
+                agent_id: adapter.id(),
+                outcome: match det.status {
+                    crate::modules::adapter::DetectionStatus::Failed => {
+                        crate::modules::adapter::ScanOutcome::Failed
+                    }
+                    crate::modules::adapter::DetectionStatus::Unavailable => {
+                        crate::modules::adapter::ScanOutcome::Completed
+                    }
+                    _ => crate::modules::adapter::ScanOutcome::Completed,
+                },
+                completeness: crate::modules::adapter::ScanCompleteness::Complete,
+                installations: vec![],
+                issues: det.issues.clone(),
+                started_at,
+                completed_at: SystemTime::now(),
+            }
+        } else {
+            let scan_ctx = ScanContext {
+                scan_id,
+                agent: adapter.id(),
+                roots: &roots,
+                platform,
+                started_at,
+            };
+            adapter.scan(&scan_ctx)
+        };
+
+        // 收集 detect + scan 的 issues
+        let mut all_issues: Vec<&ScanIssue> = det.issues.iter().collect();
+        all_issues.extend(scan_result.issues.iter());
+
+        let skill_reports: Vec<SkillReport> = scan_result
+            .installations
+            .iter()
+            .map(|inst| SkillReport {
+                name: inst.identity.normalized_name.clone(),
+                description: inst.metadata.description.clone(),
+                license: inst.metadata.license.clone(),
+                location: inst.location.display_path.to_string_lossy().into_owned(),
+                fingerprint_short: inst
+                    .content_fingerprint
+                    .as_ref()
+                    .map(|f| f.digest.chars().take(8).collect())
+                    .unwrap_or_default(),
+                file_count: inst
+                    .content_fingerprint
+                    .as_ref()
+                    .map(|f| f.file_count)
+                    .unwrap_or(0),
+                issues: inst.diagnostics.iter().map(issue_to_report).collect(),
+            })
+            .collect();
+
+        total_skills += skill_reports.len();
+        total_issues += all_issues.len();
+
+        // 排序 issues: Error > Warning > Info
+        let mut sorted_issues: Vec<IssueReport> =
+            all_issues.iter().map(|i| issue_to_report(i)).collect();
+        sorted_issues.sort_by_key(|a| severity_rank(&a.severity));
+
+        agent_reports.push(AgentReport {
+            agent_id: agent_id_to_str(&adapter.id()),
+            display_name: descriptor.display_name,
+            detection_status: format!("{:?}", det.status),
+            roots: std::mem::take(&mut root_reports),
+            skills: skill_reports,
+            issues: sorted_issues,
+            outcome: format!("{:?}", scan_result.outcome),
+        });
+    }
+
+    let completed = SystemTime::now();
+    let report = ScanReport {
+        scan_id: UuidWrapper::new(),
+        started_at: unix_millis(started_at),
+        completed_at: unix_millis(completed),
+        agents: agent_reports,
+        total_skills,
+        total_issues,
+    };
+
+    // 存到 state
+    if let Ok(mut guard) = state.last_report.lock() {
+        *guard = Some(report.clone());
+    }
+
+    report
+}
+
+fn issue_to_report(i: &ScanIssue) -> IssueReport {
+    IssueReport {
+        code: i.code.clone(),
+        severity: format!("{:?}", i.severity),
+        phase: format!("{:?}", i.phase),
+        path: i.path.as_ref().map(|p| p.to_string_lossy().into_owned()),
+        message: i.message.clone(),
+    }
+}
+
+fn severity_rank(s: &str) -> u8 {
+    match s {
+        "Error" => 0,
+        "Warning" => 1,
+        "Info" => 2,
+        _ => 3,
+    }
+}
+
+fn agent_id_to_str(id: &AgentId) -> String {
+    // AgentId 是 pub struct AgentId(pub String); 从 id.0 读真实值（与 ClaudeCodeAdapter::id() 一致）
+    id.0.clone()
+}
+
+fn unix_millis(t: SystemTime) -> u64 {
+    t.duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+// 简易 uuid 包装, 避免在 commands.rs 引入 uuid::Uuid 的额外 import
+struct UuidWrapper;
+impl UuidWrapper {
+    #[allow(clippy::new_ret_no_self)]
+    fn new() -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
 }
