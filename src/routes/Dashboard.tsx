@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { scanAgents } from "../ipc/commands";
+import { useScanStore } from "../stores/scanStore";
 import type { ScanReport, IssueReport } from "../ipc/types";
 
 function formatTime(unixMillis: number): string {
@@ -28,22 +27,7 @@ function sortedIssues(issues: IssueReport[]): IssueReport[] {
 }
 
 export default function Dashboard() {
-  const [report, setReport] = useState<ScanReport | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const onScan = async () => {
-    setScanning(true);
-    setError(null);
-    try {
-      const r = await scanAgents();
-      setReport(r);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setScanning(false);
-    }
-  };
+  const { report, scanning, error, scan } = useScanStore();
 
   const homeFromAgent = (r: ScanReport | null): string => {
     // 尝试从 agent roots 推断 home: 找以 /Users/<name>/.claude/skills 结尾的路径
@@ -86,7 +70,7 @@ export default function Dashboard() {
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8 }}>
         <button
           className="btn primary"
-          onClick={onScan}
+          onClick={scan}
           disabled={scanning}
         >
           {scanning ? "Scanning..." : "Scan now"}
