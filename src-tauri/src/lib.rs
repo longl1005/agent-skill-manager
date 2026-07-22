@@ -2,7 +2,7 @@
 //!
 //! 装配 Tauri Builder、注册命令、挂载模块。模块实现见 `modules/`。
 
-mod commands;
+pub(crate) mod commands;
 mod modules;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

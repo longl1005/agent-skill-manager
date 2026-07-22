@@ -15,6 +15,7 @@ use crate::modules::adapter::{
 #[derive(Default)]
 pub struct AppState {
     pub last_report: Mutex<Option<ScanReport>>,
+    pub last_inventory: Mutex<Option<crate::modules::inventory::Inventory>>,
 }
 
 // ============================================================
@@ -210,6 +211,9 @@ pub fn scan_agents(state: tauri::State<'_, AppState>) -> Result<ScanReport, Stri
     // 存到 state
     if let Ok(mut guard) = state.last_report.lock() {
         *guard = Some(report.clone());
+    }
+    if let Ok(mut guard) = state.last_inventory.lock() {
+        *guard = Some(crate::modules::inventory::project(&report));
     }
 
     Ok(report)
