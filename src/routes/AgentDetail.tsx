@@ -11,7 +11,7 @@ export default function AgentDetail() {
 
   if (!agent) {
     return (
-      <section className="page">
+      <section className="page agent-detail" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
         <h1>Agent not found</h1>
         <p className="empty-hint">The requested agent is not available in this scan.</p>
         <Link className="back-link" to="/agents">Back to Agents</Link>
@@ -25,7 +25,7 @@ export default function AgentDetail() {
   const primaryRoot = agent.roots[0]?.display_path ?? "No skill root detected";
 
   return (
-    <section className="page agent-detail">
+    <section className="page agent-detail" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
       <Link className="back-link" to="/agents">← Back to Agents</Link>
 
       <header className="skill-workspace-header">

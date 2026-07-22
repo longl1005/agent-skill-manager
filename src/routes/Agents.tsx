@@ -5,12 +5,12 @@ export default function Agents() {
   const { report, scanning, scan } = useScanStore();
 
   if (scanning && report === null) {
-    return <section className="page agents-console"><p className="empty-hint">Scanning your local environment…</p></section>;
+    return <section className="page agents-console" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}><p className="empty-hint">Scanning your local environment…</p></section>;
   }
 
   if (report === null) {
     return (
-      <section className="page agents-console">
+      <section className="page agents-console" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
         <p className="environment-label">LOCAL ENVIRONMENT</p>
         <h1>Agents · 0</h1>
         <p className="empty-hint">Run a scan to discover the skill workspaces available on this machine.</p>
@@ -24,7 +24,7 @@ export default function Agents() {
   );
 
   return (
-    <section className="page agents-console">
+    <section className="page agents-console" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
       <header className="agents-console-header">
         <div>
           <p className="environment-label">LOCAL ENVIRONMENT</p>
