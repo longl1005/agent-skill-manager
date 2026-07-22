@@ -3,6 +3,7 @@ import Dashboard from "./routes/Dashboard";
 import Library from "./routes/Library";
 import AgentMatrix from "./routes/AgentMatrix";
 import Agents from "./routes/Agents";
+import AgentDetail from "./routes/AgentDetail";
 import ScanHistory from "./routes/ScanHistory";
 import Settings from "./routes/Settings";
 
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/library" element={<Library />} />
             <Route path="/matrix" element={<AgentMatrix />} />
             <Route path="/agents" element={<Agents />} />
+            <Route path="/agents/:agentId" element={<AgentDetail />} />
             <Route path="/history" element={<ScanHistory />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

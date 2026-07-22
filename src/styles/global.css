@@ -324,6 +324,59 @@ html, body, #root {
   border-radius: 8px;
   padding: 14px;
   background: #fff;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.agent-card:hover {
+  border-color: var(--accent);
+}
+
+.agent-icon {
+  align-items: center;
+  background: #ddf4ff;
+  border-radius: 8px;
+  color: #0969da;
+  display: inline-flex;
+  font-size: 22px;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.agent-card-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-card-copy strong {
+  font-size: 15px;
+}
+
+.agent-card-copy span,
+.agent-arrow {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.agent-arrow {
+  margin-left: auto;
+  font-size: 18px;
+}
+
+.back-link {
+  color: var(--accent);
+  display: inline-block;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
 }
 
 .agent-card h2 {
