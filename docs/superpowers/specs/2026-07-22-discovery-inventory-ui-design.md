@@ -1,86 +1,86 @@
-# Discovery Inventory UI (M0) Design
+# Discovery Inventory UI（M0）设计
 
-**Date:** 2026-07-22  
-**Status:** Approved design; awaiting review of this written specification  
-**Scope:** Complete the usable, in-memory discovery flow: scan Claude Code Skills once and present the same normalized result in Dashboard, Library, Agent Matrix, and Agents.
+**日期：**2026-07-22  
+**状态：**设计已确认，等待书面 Spec 审阅  
+**范围：**完成可用的内存态发现闭环：扫描一次 Claude Code Skills，并在 Dashboard、Library、Agent Matrix 和 Agents 中展示同一份归一化结果。
 
-## Goal
+## 目标
 
-Turn the existing one-page scan demo into a coherent Discovery MVP without adding persistence, write operations, or another agent adapter.
+在不引入持久化、写操作或新的 Agent adapter 的前提下，将现有的单页面扫描演示升级为完整的 Discovery MVP。
 
-## Boundaries
+## 边界
 
-Included:
+本次包含：
 
-- Resolve the host platform at runtime/compile target instead of assuming macOS.
-- Remove all production `Box::leak` usage from scanning.
-- Normalize a scan report into a read-only in-memory inventory.
-- Share the latest scan report through a frontend store.
-- Render real data in Dashboard, Library, Agent Matrix, and Agents.
+- 根据运行/编译目标解析宿主平台，不再默认 macOS。
+- 移除生产扫描路径中的全部 `Box::leak`。
+- 将扫描报告归一化为只读的内存态 Inventory。
+- 通过前端 store 共享最新扫描报告。
+- 在 Dashboard、Library、Agent Matrix 和 Agents 中展示真实数据。
 
-Excluded:
+本次不包含：
 
-- SQLite, scan history, filesystem watching, migration code, or a database dependency.
-- Codex implementation, synchronization planning, installation, updating, deletion, or any write to agent-owned files.
-- Changes to the Skill recognition/fingerprint algorithm already covered by the Claude Code adapter tests.
+- SQLite、扫描历史、文件监听、迁移代码或数据库依赖。
+- Codex adapter 实现、同步计划、安装、更新、删除，或任何针对 Agent 所有文件的写入。
+- 修改已有 Claude Code adapter 已测试覆盖的 Skill 识别和指纹算法。
 
-## Architecture
+## 架构
 
-The Rust command remains the boundary that calls registered adapters. It owns short-lived `PlatformContext`, root, and scan-context values and passes ordinary borrows into adapter methods. `Platform::current()` maps `cfg!(target_os)` to `MacOs`, `Linux`, or `Windows`; unsupported targets use an explicit command error rather than an invented platform.
+Rust command 仍是调用已注册 adapter 的边界。它持有短生命周期的 `PlatformContext`、根目录和扫描上下文，并向 adapter 方法传递普通借用。`Platform::current()` 使用 `cfg!(target_os)` 映射到 `MacOs`、`Linux` 或 `Windows`；不支持的平台返回明确的 command 错误，而不是伪造平台值。
 
-`modules::inventory` gains a pure, in-memory projection function. It consumes `ScanReport` and produces a normalized inventory with three views: skills, agents, and matrix cells. The command retains `last_report` only as the latest raw report; it does not introduce database semantics. The Tauri response continues to be `ScanReport`, keeping the IPC contract small and compatible with the existing dashboard.
+`modules::inventory` 新增纯内存投影函数。它消费 `ScanReport`，生成包含 Skills、Agents 和 Matrix cells 的归一化 Inventory。command 仅在 `last_report` 中保存最新的原始报告，不赋予其数据库语义。Tauri 仍返回 `ScanReport`，以保持 IPC 契约精简并兼容现有 Dashboard。
 
-On the frontend, a Zustand scan store owns `{ report, scanning, error, scan() }`. The App shell mounts all routes under that store. No route calls Tauri directly: Dashboard triggers `scan()`, while all four data pages select the same `report` and render a consistent empty/loading/error state.
+前端使用 Zustand scan store，状态为 `{ report, scanning, error, scan() }`。App shell 下的所有路由共享该 store。页面不再直接调用 Tauri：Dashboard 触发 `scan()`，四个数据页面读取同一份 `report`，并展示一致的空、加载与错误状态。
 
-## Domain Projection
+## 领域投影
 
-The backend inventory projection derives:
+后端 Inventory 投影产生：
 
-| View | Identity | Contents |
+| 视图 | 标识 | 内容 |
 | --- | --- | --- |
-| Skill | exact `SkillReport.name` | name, description, installations, distinct agents, distinct fingerprints |
-| Agent | `AgentReport.agent_id` | detection status, roots, skills, issues, outcome |
-| Matrix cell | `(skill name, agent id)` | `Missing`, `Present`, or `Conflict` |
+| Skill | 精确的 `SkillReport.name` | 名称、描述、安装记录、去重后的 Agents、去重后的指纹 |
+| Agent | `AgentReport.agent_id` | 检测状态、根目录、Skills、Issues、结果状态 |
+| Matrix cell | `(skill name, agent id)` | `Missing`、`Present` 或 `Conflict` |
 
-`Present` means exactly one fingerprint for that agent/skill pair. `Conflict` means more than one distinct non-empty fingerprint for the pair; this anticipates user- and project-scope duplicates. A missing fingerprint is displayed as `Unknown` metadata, not treated as a conflict. At this stage, identical names are the explicit grouping key; cross-name semantic matching is deferred.
+`Present` 表示同一个 agent/skill 对恰好有一个指纹。`Conflict` 表示同一个 agent/skill 对存在多个不同且非空的指纹，用于预判用户级和项目级副本不一致。缺失指纹显示为 `Unknown` 元数据，而不视为冲突。此阶段以相同名称为明确分组键，跨名称的语义匹配后置。
 
-The frontend can derive equivalent display data from `ScanReport`, but Rust owns the canonical projection and tests its grouping rules. The IPC response is not expanded until pages require aggregate fields unavailable from the raw report.
+前端可以从 `ScanReport` 推导等价的展示数据，但 Rust 持有规范化投影并测试分组规则。IPC 响应在页面确实需要原始报告无法提供的聚合字段前不扩展。
 
-## Page Behaviour
+## 页面行为
 
 ### Dashboard
 
-Keep the existing scan button, timing, agent sections, skills table, and issue list. Replace local component state with the shared store so its data remains visible after navigating away and back.
+保留现有的扫描按钮、耗时、Agent 分区、Skills 表格和 Issues 列表。将本地组件状态替换为共享 store，使用户离开并返回页面时仍能看到扫描结果。
 
 ### Library
 
-Show one row per skill name. Each row displays description, number of agents, number of installations, and status: `Consistent`, `Conflict`, or `Unknown`. Selecting a row is out of scope; no routing or detail page is added.
+每个 Skill 名称对应一行。每行展示描述、Agent 数量、安装数量和状态：`Consistent`、`Conflict` 或 `Unknown`。本次不增加行选择、详情路由或详情页。
 
 ### Agent Matrix
 
-Show a table with skill names as rows and detected agents as columns. Cells show `—` for missing, `✓` for present, and `!` for conflict. With no scan, show the existing scan prompt. With a scan but no skills, show an explicit “No Skills found” state.
+以 Skill 名称为行、检测到的 Agents 为列展示表格。单元格分别显示 `—`（缺失）、`✓`（存在）和 `!`（冲突）。首次扫描前显示扫描提示；扫描完成但未发现 Skill 时，明确显示“未发现 Skills”。
 
 ### Agents
 
-Show one card per registered/scanned agent: display name, detection status, outcome, root count, skill count, and issue count. Expandable detail is deferred; roots are listed inline beneath each card.
+每个已注册/扫描 Agent 显示一张卡片：显示名称、检测状态、结果状态、根目录数量、Skill 数量和 Issue 数量。可展开详情不在本次范围内；根目录直接列在卡片下方。
 
-## Errors and Empty States
+## 错误与空状态
 
-- Command invocation failure sets one shared error message; existing scan data stays rendered.
-- A scan with unavailable agents is successful discovery and shows each adapter’s issues; it is not a frontend exception.
-- Before the first scan, every data page prompts the user to scan.
-- While scanning, Dashboard disables the button and all data pages retain the previous report (or show a loading prompt when none exists).
+- command 调用失败时设置一个共享错误消息，已有扫描数据仍保留展示。
+- Agent 不可用的扫描仍是成功的发现结果，应展示该 adapter 的 Issues，而不是作为前端异常。
+- 首次扫描前，每个数据页面都提示用户执行扫描。
+- 扫描期间，Dashboard 禁用按钮；所有数据页面保留上次报告，若没有报告则显示加载提示。
 
-## Testing and Acceptance
+## 测试与验收
 
-Rust unit tests cover:
+Rust 单元测试覆盖：
 
-1. Host-platform mapping on the compiled platform.
-2. Inventory grouping across two agents.
-3. A same-agent duplicate with different fingerprints produces `Conflict`.
-4. Empty fingerprints do not create a false conflict.
+1. 当前编译平台的宿主平台映射。
+2. 跨两个 Agents 的 Inventory 分组。
+3. 同一 Agent 中同名但指纹不同的副本产生 `Conflict`。
+4. 空指纹不会误判为冲突。
 
-Frontend type checking and production build must pass. The release gate is:
+前端类型检查和生产构建必须通过。发布门禁为：
 
 ```bash
 pnpm build
@@ -89,11 +89,11 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 ```
 
-Manual acceptance: after one scan, navigating among Dashboard, Library, Agent Matrix, and Agents shows the same scan timestamp and data-derived counts without initiating another scan.
+手工验收：执行一次扫描后，在 Dashboard、Library、Agent Matrix 和 Agents 之间切换，四个页面展示同一份扫描时间戳及由数据推导的数量，且不再次触发扫描。
 
-## Decisions
+## 决策
 
-- Use the recommended in-memory-first approach; persistence is intentionally a separate milestone.
-- Do not add a generic async scanner yet. The existing adapter scan is fast and synchronous; the frontend’s `scanning` state prevents duplicate invocations.
-- Do not add dependencies for this scope.
-- Keep existing raw `ScanReport` IPC fields to avoid a speculative API redesign.
+- 采用推荐的内存态优先方案；持久化作为独立里程碑处理。
+- 本次不引入通用异步 scanner。现有 adapter 扫描快速且同步，前端 `scanning` 状态可防止重复调用。
+- 本次不增加任何依赖。
+- 维持原始 `ScanReport` IPC 字段，避免过早重构 API。
