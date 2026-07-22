@@ -56,6 +56,20 @@ pub enum Platform {
     Windows,
 }
 
+impl Platform {
+    pub fn current() -> Option<Self> {
+        if cfg!(target_os = "macos") {
+            Some(Self::MacOs)
+        } else if cfg!(target_os = "linux") {
+            Some(Self::Linux)
+        } else if cfg!(target_os = "windows") {
+            Some(Self::Windows)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct CapabilitySet {
     pub detect: SupportLevel,
@@ -276,3 +290,18 @@ pub enum ScanCompleteness {
 
 pub use claude_code::ClaudeCodeAdapter;
 pub use codex::CodexAdapter;
+
+#[cfg(test)]
+mod tests {
+    use super::Platform;
+
+    #[test]
+    fn current_platform_matches_compile_target() {
+        #[cfg(target_os = "macos")]
+        assert_eq!(Platform::current(), Some(Platform::MacOs));
+        #[cfg(target_os = "linux")]
+        assert_eq!(Platform::current(), Some(Platform::Linux));
+        #[cfg(target_os = "windows")]
+        assert_eq!(Platform::current(), Some(Platform::Windows));
+    }
+}

@@ -154,11 +154,9 @@ impl AgentAdapter for ClaudeCodeAdapter {
         let mut issues = Vec::new();
 
         for root in ctx.roots {
-            let canonical: &'static Path = Box::leak(Box::new(root.canonical_path.clone()));
-            let entry_filename_static: &'static str = ENTRY_FILENAME;
             let input = EnumerationInput {
-                root: canonical,
-                entry_filename: entry_filename_static,
+                root: &root.canonical_path,
+                entry_filename: ENTRY_FILENAME,
                 skip_hidden: true,
                 max_depth: 1,
             };

@@ -84,18 +84,17 @@ pub struct IssueReport {
 }
 
 #[tauri::command]
-pub fn scan_agents(state: tauri::State<'_, AppState>) -> ScanReport {
+pub fn scan_agents(state: tauri::State<'_, AppState>) -> Result<ScanReport, String> {
     let started_at = SystemTime::now();
 
     // 构造 platform context
     let home = crate::modules::platform::user_home_dir().unwrap_or_else(|| PathBuf::from("/"));
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
     let platform_ctx = PlatformContext {
-        platform: Platform::MacOs, // 简化: host 平台由 OS 自动决定, T1 阶段 UI 暂未消费 platform 字段
+        platform: Platform::current().ok_or("unsupported platform")?,
         home_dir: home,
         cwd,
     };
-    let platform: &'static PlatformContext = Box::leak(Box::new(platform_ctx));
 
     // 注册的 adapter 列表（M0 仅 ClaudeCodeAdapter）
     let adapters: Vec<Box<dyn AgentAdapter>> = vec![Box::new(ClaudeCodeAdapter)];
@@ -105,7 +104,9 @@ pub fn scan_agents(state: tauri::State<'_, AppState>) -> ScanReport {
     let mut total_issues = 0usize;
 
     for adapter in &adapters {
-        let det = adapter.detect(&DetectContext { platform });
+        let det = adapter.detect(&DetectContext {
+            platform: &platform_ctx,
+        });
         let roots = adapter.skill_roots(&det);
         let descriptor = adapter.descriptor();
 
@@ -145,7 +146,7 @@ pub fn scan_agents(state: tauri::State<'_, AppState>) -> ScanReport {
                 scan_id,
                 agent: adapter.id(),
                 roots: &roots,
-                platform,
+                platform: &platform_ctx,
                 started_at,
             };
             adapter.scan(&scan_ctx)
@@ -211,7 +212,7 @@ pub fn scan_agents(state: tauri::State<'_, AppState>) -> ScanReport {
         *guard = Some(report.clone());
     }
 
-    report
+    Ok(report)
 }
 
 fn issue_to_report(i: &ScanIssue) -> IssueReport {

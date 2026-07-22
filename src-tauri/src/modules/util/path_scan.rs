@@ -15,9 +15,9 @@ pub struct SkillCandidate {
 }
 
 #[derive(Debug)]
-pub struct EnumerationInput {
-    pub root: &'static Path,
-    pub entry_filename: &'static str,
+pub struct EnumerationInput<'a> {
+    pub root: &'a Path,
+    pub entry_filename: &'a str,
     pub skip_hidden: bool,
     // 当前 enumerate_skill_dirs 直接 read_dir；max_depth 是为未来递归预留的 API 字段。
     #[allow(dead_code)]
@@ -25,7 +25,7 @@ pub struct EnumerationInput {
 }
 
 /// 枚举 root 下符合规格的子目录。不创建任何目录。
-pub fn enumerate_skill_dirs(input: &EnumerationInput) -> (Vec<SkillCandidate>, Vec<ScanIssue>) {
+pub fn enumerate_skill_dirs(input: &EnumerationInput<'_>) -> (Vec<SkillCandidate>, Vec<ScanIssue>) {
     use std::fs;
 
     let mut candidates = Vec::new();
