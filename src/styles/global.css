@@ -1161,7 +1161,10 @@ input:focus-visible {
 .agent-detail__breadcrumb a,
 .agent-detail-recovery,
 .agent-detail__recovery-link {
+  align-items: center;
   color: var(--accent);
+  display: inline-flex;
+  min-block-size: 44px;
   text-decoration: none;
 }
 
@@ -1346,6 +1349,71 @@ input:focus-visible {
 
 .agent-detail--missing h1 { font-size: 18px; margin: 0 0 6px; }
 .agent-detail--missing p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+
+.agent-detail__recovery-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.agent-scan-recovery {
+  max-width: 640px;
+}
+
+.agent-scan-error {
+  background: color-mix(in srgb, var(--surface) 84%, #5d252d);
+  border: 1px solid #70313b;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  margin: 0 0 16px;
+  padding: 14px;
+}
+
+.agent-scan-error h1,
+.agent-scan-error p {
+  margin: 0;
+}
+
+.agent-scan-error h1 {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.agent-scan-error__detail {
+  color: var(--muted);
+  margin-top: 6px !important;
+}
+
+.agent-scan-recovery-button {
+  align-items: center;
+  background: var(--surface-hover);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  justify-content: center;
+  min-block-size: 44px;
+  padding: 0 14px;
+}
+
+.agent-scan-recovery-button:hover:not(:disabled) {
+  background: #192033;
+  border-color: var(--accent);
+}
+
+.agent-scan-recovery-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.agent-scan-recovery-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 
 /* Preserve baseline readability for the remaining views on the shared dark canvas. */
 .skills-table th,

@@ -24,15 +24,35 @@ function StatusWithDot({ status }: { status: string }) {
 
 export default function AgentDetail() {
   const { agentId } = useParams();
-  const report = useScanStore((state) => state.report);
+  const { report, error, scanning, scan } = useScanStore();
   const agent = report?.agents.find((item) => item.agent_id === agentId);
 
   if (!agent) {
     return (
       <section className="page agent-detail agent-detail--missing">
-        <h1>Agent not found</h1>
-        <p>The requested agent is not available in this scan.</p>
-        <Link className="agent-detail__recovery-link" to="/agents">All Agents</Link>
+        {error ? (
+          <>
+            <div className="agent-scan-error" role="alert">
+              <strong>Latest scan failed.</strong> The agent directory may be incomplete.
+              <p className="agent-scan-error__detail">{error}</p>
+            </div>
+            <h1>Agent unavailable</h1>
+            <p>Try scanning again to restore the agent directory.</p>
+          </>
+        ) : (
+          <>
+            <h1>Agent not found</h1>
+            <p>The requested agent is not available in this scan.</p>
+          </>
+        )}
+        <div className="agent-detail__recovery-actions">
+          <Link className="agent-detail-recovery agent-detail__recovery-link" to="/agents">All Agents</Link>
+          {error && (
+            <button className="agent-scan-recovery-button" disabled={scanning} onClick={() => void scan()} type="button">
+              Rescan agents
+            </button>
+          )}
+        </div>
       </section>
     );
   }
@@ -41,11 +61,18 @@ export default function AgentDetail() {
 
   return (
     <section className="page agent-detail">
-      <nav aria-label="Breadcrumb" className="agent-detail__breadcrumb">
+      <nav aria-label="Breadcrumb" className="agent-breadcrumb agent-detail__breadcrumb">
         <Link to="/agents">Discovered Agents</Link>
         <BreadcrumbSeparator />
         <span aria-current="page">{agent.display_name}</span>
       </nav>
+
+      {error && (
+        <div className="agent-scan-error" role="alert">
+          <strong>Latest scan failed.</strong> You can continue viewing this previously loaded agent workspace.
+          <p className="agent-scan-error__detail">{error}</p>
+        </div>
+      )}
 
       <header className="agent-detail__header">
         <AgentIdentityMark agentId={agent.agent_id} />

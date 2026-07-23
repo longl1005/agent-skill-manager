@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import type { ScanReport } from "../ipc/types";
@@ -62,5 +62,29 @@ describe("AgentDetail", () => {
     renderDetail("/agents/unknown");
 
     expect(screen.getByRole("link", { name: "All Agents" })).toHaveAttribute("href", "/agents");
+  });
+
+  it("shows a non-destructive scan error while preserving the selected Agent", () => {
+    useScanStore.setState({ report: reportFixture, error: "The scanner is unavailable" });
+
+    renderDetail("/agents/claude-code");
+
+    expect(screen.getByRole("heading", { name: "Claude Code" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(/latest scan failed/i);
+  });
+
+  it("offers all-agents and rescan recovery when a scan failure leaves no Agent report", () => {
+    const scan = vi.fn().mockResolvedValue(undefined);
+    useScanStore.setState({ report: null, error: "The scanner is unavailable", scan });
+
+    renderDetail("/agents/claude-code");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/latest scan failed/i);
+    expect(screen.getByRole("link", { name: "All Agents" })).toHaveAttribute("href", "/agents");
+
+    const retry = screen.getByRole("button", { name: /rescan agents/i });
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    expect(scan).toHaveBeenCalledOnce();
   });
 });

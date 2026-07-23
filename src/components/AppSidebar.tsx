@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 
+import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
 
 type NavigationIcon = "dashboard" | "library" | "install" | "agents" | "settings";
@@ -51,7 +52,7 @@ function SidebarLink({
 
 export default function AppSidebar() {
   const report = useScanStore((state) => state.report);
-  const detectedAgents = report?.agents.filter((agent) => agent.detection_status !== "Missing") ?? [];
+  const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
 
   return (
     <aside className="sidebar">

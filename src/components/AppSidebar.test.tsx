@@ -7,7 +7,13 @@ import AppSidebar from "./AppSidebar";
 
 const reportFixture = {
   scan_id: "scan-1", started_at: 0, completed_at: 1, total_skills: 14, total_issues: 0,
-  agents: [{ agent_id: "codex", display_name: "Codex", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "Success" }],
+  agents: [
+    { agent_id: "codex", display_name: "Codex", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "Success" },
+    { agent_id: "claude", display_name: "Claude Code", detection_status: "Partial", roots: [], skills: [], issues: [], outcome: "Success" },
+    { agent_id: "unavailable", display_name: "Unavailable Agent", detection_status: "Unavailable", roots: [], skills: [], issues: [], outcome: "Failure" },
+    { agent_id: "unsupported", display_name: "Unsupported Agent", detection_status: "Unsupported", roots: [], skills: [], issues: [], outcome: "Failure" },
+    { agent_id: "failed", display_name: "Failed Agent", detection_status: "Failed", roots: [], skills: [], issues: [], outcome: "Failure" },
+  ],
 };
 
 beforeEach(() => useScanStore.setState({ report: reportFixture, scanning: false, error: null }));
@@ -33,5 +39,19 @@ describe("AppSidebar", () => {
     );
 
     expect(screen.getByRole("link", { name: /All Agents/i })).toHaveClass("is-selected");
+  });
+
+  it("shows only detected and partial Agents in the discovered group", () => {
+    render(
+      <MemoryRouter initialEntries={["/agents"]}>
+        <AppSidebar />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Codex" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Claude Code" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Unavailable Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Unsupported Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Failed Agent" })).not.toBeInTheDocument();
   });
 });

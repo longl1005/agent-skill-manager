@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import type { ScanReport } from "../ipc/types";
@@ -54,5 +54,20 @@ describe("Agents", () => {
 
     expect(screen.getByRole("region", { busy: true })).toHaveAttribute("aria-busy", "true");
     expect(screen.getAllByTestId("agent-directory-skeleton")).toHaveLength(3);
+  });
+
+  it("shows scan recovery instead of an empty directory after the initial scan fails", () => {
+    const scan = vi.fn().mockResolvedValue(undefined);
+    useScanStore.setState({ error: "The scanner is unavailable", report: null, scan });
+
+    render(<MemoryRouter><Agents /></MemoryRouter>);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/unable to scan agents/i);
+    expect(screen.queryByRole("heading", { name: /no agents discovered/i })).not.toBeInTheDocument();
+
+    const retry = screen.getByRole("button", { name: /rescan agents/i });
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    expect(scan).toHaveBeenCalledOnce();
   });
 });

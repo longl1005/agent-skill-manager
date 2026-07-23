@@ -1,4 +1,5 @@
 import AgentCard from "../components/AgentCard";
+import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
 
 function DirectorySkeleton() {
@@ -6,7 +7,7 @@ function DirectorySkeleton() {
 }
 
 export default function Agents() {
-  const { report, scanning } = useScanStore();
+  const { report, scanning, error, scan } = useScanStore();
 
   if (scanning && report === null) {
     return (
@@ -20,9 +21,22 @@ export default function Agents() {
     );
   }
 
-  const detectedAgents = report?.agents.filter((agent) =>
-    agent.detection_status === "Detected" || agent.detection_status === "Partial",
-  ) ?? [];
+  if (error && report === null) {
+    return (
+      <section className="page agent-directory agent-scan-recovery">
+        <div className="agent-scan-error" role="alert">
+          <h1>Unable to scan agents</h1>
+          <p>The agent scan did not complete. Try scanning again to load the available skill workspaces.</p>
+          <p className="agent-scan-error__detail">{error}</p>
+        </div>
+        <button className="agent-scan-recovery-button" disabled={scanning} onClick={() => void scan()} type="button">
+          Rescan agents
+        </button>
+      </section>
+    );
+  }
+
+  const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
 
   return (
     <section className="page agent-directory">
@@ -31,6 +45,16 @@ export default function Agents() {
         <p>{detectedAgents.length} detected</p>
         <p className="empty-hint">Skill workspaces discovered on this machine.</p>
       </header>
+
+      {error && (
+        <div className="agent-scan-error" role="alert">
+          <p><strong>Latest scan failed.</strong> Showing the last available results.</p>
+          <p className="agent-scan-error__detail">{error}</p>
+          <button className="agent-scan-recovery-button" disabled={scanning} onClick={() => void scan()} type="button">
+            Rescan agents
+          </button>
+        </div>
+      )}
 
       {detectedAgents.length > 0 ? (
         <div className="agent-cards agent-directory-grid">
