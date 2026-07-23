@@ -1,4 +1,5 @@
-import { HashRouter, Routes, Route, NavLink } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import AppSidebar from "./components/AppSidebar";
 import Dashboard from "./routes/Dashboard";
 import Library from "./routes/Library";
 import AgentMatrix from "./routes/AgentMatrix";
@@ -7,38 +8,16 @@ import AgentDetail from "./routes/AgentDetail";
 import ScanHistory from "./routes/ScanHistory";
 import Settings from "./routes/Settings";
 
-const NAV = [
-  { to: "/", label: "Dashboard" },
-  { to: "/library", label: "Library" },
-  { to: "/matrix", label: "Agent Matrix" },
-  { to: "/agents", label: "Agents" },
-  { to: "/history", label: "Scan History" },
-  { to: "/settings", label: "Settings" },
-];
-
 export default function App() {
   return (
     <HashRouter>
       <div className="app-shell">
-        <aside className="sidebar">
-          <h1 className="brand">ASM</h1>
-          <nav>
-            {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.to === "/"}
-                className={({ isActive }) => (isActive ? "active" : undefined)}
-              >
-                {n.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+        <AppSidebar />
         <main className="content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/library" element={<Library />} />
+            <Route path="/install" element={<Library />} />
             <Route path="/matrix" element={<AgentMatrix />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/:agentId" element={<AgentDetail />} />
