@@ -1,17 +1,25 @@
 :root {
-  --bg: #fafafa;
-  --fg: #1f2328;
-  --muted: #6e7681;
-  --border: #d0d7de;
-  --accent: #0969da;
-  --agents-canvas: #10131a;
-  --agents-surface: #171d27;
-  --agents-border: #2b3a51;
-  --agents-text: #edf1f7;
-  --agents-muted: #91a0b4;
-  --agents-primary: #3b82f6;
-  --agents-primary-hover: #2563eb;
+  --canvas: #0c0c0f;
+  --surface: #121217;
+  --surface-hover: #181820;
+  --sidebar: #0e0e12;
+  --line: #212128;
+  --text: #e1e1e9;
+  --muted: #8b8b97;
+  --accent: #73a7ff;
+  --success: #18d697;
+  --warning: #e8c05d;
   --sidebar-w: 240px;
+  --bg: var(--canvas);
+  --fg: var(--text);
+  --border: var(--line);
+  --agents-canvas: var(--canvas);
+  --agents-surface: var(--surface);
+  --agents-border: var(--line);
+  --agents-text: var(--text);
+  --agents-muted: var(--muted);
+  --agents-primary: var(--accent);
+  --agents-primary-hover: #6197f2;
 }
 
 * { box-sizing: border-box; }
@@ -816,4 +824,594 @@ html, body, #root {
   .skill-cards--list .skill-card-content { display: block; }
   .skill-cards--list .skill-card-content > p { margin: 13px 0 16px; }
   .skill-cards--list .skill-card-actions { border-left: 0; border-top: 1px solid var(--agents-border); }
+}
+
+/* ===== Agents workspace: restrained dark directory ===== */
+
+html,
+body,
+#root {
+  background: var(--canvas);
+  color: var(--text);
+}
+
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  background: var(--canvas);
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.sidebar {
+  background: var(--sidebar);
+  border-color: var(--line);
+  color: var(--text);
+  gap: 12px;
+  min-width: 0;
+  padding: 18px 12px;
+}
+
+.brand {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 24px;
+  margin: 0 8px 14px;
+}
+
+.sidebar nav {
+  gap: 3px;
+}
+
+.sidebar nav[aria-label="Discovered Agents"] {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 14px;
+}
+
+.sidebar-group-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin: 0 8px 7px;
+  text-transform: uppercase;
+}
+
+.sidebar nav a {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  display: flex;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 9px;
+  min-height: 44px;
+  padding: 9px 10px;
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.sidebar nav a svg {
+  flex: none;
+}
+
+.sidebar nav a:hover {
+  background: var(--surface-hover);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.sidebar nav a.active,
+.sidebar nav a.is-selected {
+  background: #192033;
+  border-color: #26395e;
+  color: var(--text);
+}
+
+.sidebar nav[aria-label="Discovered Agents"] a:not(:first-of-type) {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 38px;
+  padding-left: 34px;
+}
+
+.sidebar nav[aria-label="Discovered Agents"] a:not(:first-of-type).active,
+.sidebar nav[aria-label="Discovered Agents"] a:not(:first-of-type).is-selected {
+  color: var(--text);
+}
+
+.content {
+  background: var(--canvas);
+  color: var(--text);
+  min-width: 0;
+  padding: 28px 36px 48px;
+}
+
+.page {
+  margin: 0 auto;
+  max-width: 1280px;
+  min-width: 0;
+}
+
+.page h1,
+.page h2,
+.page h3 {
+  color: var(--text);
+}
+
+.empty-hint,
+.muted {
+  color: var(--muted);
+}
+
+.agent-directory,
+.agent-detail,
+.agent-detail-page {
+  max-width: 1280px;
+}
+
+.agent-directory-header {
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 20px;
+  padding: 2px 0 16px;
+}
+
+.agent-directory-header h1 {
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.agent-directory-header p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.agent-directory-header .empty-hint {
+  flex-basis: 100%;
+  margin-top: -2px;
+}
+
+.agent-directory-grid,
+.agent-cards.agent-directory-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.agent-directory-card,
+.agent-card.agent-directory-card {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  min-height: 88px;
+  padding: 14px;
+  text-decoration: none;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.agent-directory-card:hover,
+.agent-directory-card:focus-visible {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.agent-directory-card .agent-card-copy {
+  gap: 4px;
+  min-width: 0;
+}
+
+.agent-directory-card .agent-card-copy strong {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-directory-counts {
+  color: var(--muted);
+  display: flex;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  gap: 8px;
+}
+
+.agent-directory-counts span + span::before {
+  color: #51515b;
+  content: "·";
+  margin-right: 8px;
+}
+
+.agent-directory-chevron,
+.agent-arrow {
+  color: var(--muted);
+  margin-left: 0;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.agent-directory-card:hover .agent-directory-chevron,
+.agent-directory-card:focus-visible .agent-directory-chevron {
+  color: var(--accent);
+  transform: translateX(2px);
+}
+
+.agent-identity {
+  flex: none;
+}
+
+.agent-status {
+  align-items: center;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 650;
+  gap: 5px;
+  line-height: 1.25;
+}
+
+.agent-directory-card .agent-status::before {
+  background: currentColor;
+  border-radius: 50%;
+  content: "";
+  height: 6px;
+  width: 6px;
+}
+
+.agent-status--detected {
+  color: var(--success) !important;
+}
+
+.agent-status--partial {
+  color: var(--warning) !important;
+}
+
+.agent-status--not-detected {
+  color: var(--muted) !important;
+}
+
+.agent-directory-skeleton {
+  background: linear-gradient(100deg, var(--surface) 30%, #1b1b24 48%, var(--surface) 66%);
+  background-size: 220% 100%;
+  min-height: 88px;
+  pointer-events: none;
+  animation: agent-skeleton-shimmer 1.15s linear infinite;
+}
+
+@keyframes agent-skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -120% 0; }
+}
+
+.agents-empty-panel,
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed #35353f;
+  border-radius: 10px;
+  color: var(--muted);
+  margin-top: 20px;
+  padding: 24px;
+}
+
+.agents-empty-panel h2,
+.empty-state h2 {
+  color: var(--text);
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.agents-empty-panel p,
+.empty-state p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.agent-detail,
+.agent-detail-page {
+  padding-bottom: 36px;
+}
+
+.agent-breadcrumb,
+.agent-detail__breadcrumb {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.agent-breadcrumb a,
+.agent-detail__breadcrumb a,
+.agent-detail-recovery,
+.agent-detail__recovery-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.agent-breadcrumb a:hover,
+.agent-detail__breadcrumb a:hover,
+.agent-detail-recovery:hover,
+.agent-detail__recovery-link:hover {
+  text-decoration: underline;
+}
+
+.agent-detail__breadcrumb-separator {
+  color: #5d5d68;
+  flex: none;
+}
+
+.agent-detail-header,
+.agent-detail__header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 13px;
+  padding: 0 0 20px;
+}
+
+.agent-detail__header > svg {
+  flex: none;
+  height: 38px;
+  width: 38px;
+}
+
+.agent-detail__identity {
+  min-width: 0;
+}
+
+.agent-detail-header h1,
+.agent-detail__header h1 {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.agent-detail-root,
+.agent-detail__root {
+  color: var(--muted);
+  display: block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  margin-top: 5px;
+  max-width: min(72vw, 680px);
+}
+
+.agent-detail__root--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-detail__status {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.agent-detail__status-dot {
+  color: var(--muted);
+  flex: none;
+}
+
+.agent-detail__status:has(.agent-status--detected) .agent-detail__status-dot { color: var(--success); }
+.agent-detail__status:has(.agent-status--partial) .agent-detail__status-dot { color: var(--warning); }
+
+.agent-detail-stats,
+.agent-detail__summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 20px 0 28px;
+}
+
+.agent-detail-stats > div,
+.agent-detail__summary > div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.agent-detail-stats dt,
+.agent-detail__summary dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.agent-detail-stats dd,
+.agent-detail__summary dd {
+  color: var(--text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 4px 0 0;
+}
+
+.agent-detail-skills,
+.agent-detail__skills {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.agent-detail-skills h2,
+.agent-detail__skills h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.agent-detail__skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.agent-skill-item,
+.agent-detail__skill {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 8px;
+  min-height: 62px;
+  padding: 11px 13px;
+}
+
+.agent-skill-item h3,
+.agent-detail__skill h3 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.agent-detail__skill-description {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 3px 0 0;
+}
+
+.agent-detail__skill-description--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-detail__skill > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.agent-detail__empty-skills {
+  background: var(--surface);
+  border: 1px dashed #35353f;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+  padding: 18px;
+}
+
+.agent-detail--missing {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-top: 4px;
+  padding: 24px;
+}
+
+.agent-detail--missing h1 { font-size: 18px; margin: 0 0 6px; }
+.agent-detail--missing p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+
+/* Preserve baseline readability for the remaining views on the shared dark canvas. */
+.skills-table th,
+.inventory-table thead th,
+.matrix-table thead th {
+  background: var(--surface);
+}
+
+.skills-table tr:hover td,
+.inventory-table tbody tr:hover td,
+.matrix-table tbody tr:hover td,
+.matrix-table tbody tr:hover th {
+  background: var(--surface-hover);
+}
+
+.agent-card:not(.agent-directory-card),
+.btn {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.btn:hover { background: var(--surface-hover); }
+
+@media (max-width: 1024px) {
+  .agent-directory-grid,
+  .agent-cards.agent-directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .content {
+    overflow-x: hidden;
+    padding: 20px 16px 32px;
+  }
+
+  .agent-directory-grid,
+  .agent-cards.agent-directory-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agent-directory-header {
+    margin-bottom: 16px;
+  }
+
+  .agent-detail-stats,
+  .agent-detail__summary {
+    gap: 8px;
+  }
+
+  .agent-detail-stats > div,
+  .agent-detail__summary > div {
+    padding: 10px;
+  }
+
+  .agent-detail__root {
+    max-width: calc(100vw - 92px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
