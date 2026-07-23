@@ -147,3 +147,10 @@ src-tauri/target/
 src-tauri/gen/
 dist/
 .DS_Store
+
+# Local IDE and assistant-session artifacts
+.idea/
+.superpowers/
+
+# Local Rust dependency resolution state
+src-tauri/Cargo.lock
