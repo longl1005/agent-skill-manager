@@ -16,4 +16,8 @@ export default defineConfig({
     minify: "esbuild",
     sourcemap: false,
   },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+  },
 });
