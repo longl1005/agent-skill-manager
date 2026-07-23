@@ -1,121 +1,96 @@
-import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+
+import { AgentIdentityMark, AgentStatus } from "../components/AgentVisual";
 import { useScanStore } from "../stores/scanStore";
+
+function BreadcrumbSeparator() {
+  return (
+    <svg aria-hidden="true" className="agent-detail__breadcrumb-separator" fill="none" height="16" viewBox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">
+      <path d="m6 3 5 5-5 5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function StatusWithDot({ status }: { status: string }) {
+  return (
+    <span className="agent-detail__status">
+      <svg aria-hidden="true" className="agent-detail__status-dot" fill="currentColor" height="8" viewBox="0 0 8 8" width="8" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="4" cy="4" r="3" />
+      </svg>
+      <AgentStatus status={status} />
+    </span>
+  );
+}
 
 export default function AgentDetail() {
   const { agentId } = useParams();
-  const { report, scanning, scan } = useScanStore();
+  const report = useScanStore((state) => state.report);
   const agent = report?.agents.find((item) => item.agent_id === agentId);
-  const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   if (!agent) {
     return (
-      <section className="page agent-detail" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
+      <section className="page agent-detail agent-detail--missing">
         <h1>Agent not found</h1>
-        <p className="empty-hint">The requested agent is not available in this scan.</p>
-        <Link className="back-link" to="/agents">Back to Agents</Link>
+        <p>The requested agent is not available in this scan.</p>
+        <Link className="agent-detail__recovery-link" to="/agents">All Agents</Link>
       </section>
     );
   }
 
-  const filteredSkills = agent.skills.filter((skill) =>
-    `${skill.name} ${skill.description}`.toLowerCase().includes(query.toLowerCase()),
-  );
   const primaryRoot = agent.roots[0]?.display_path ?? "No skill root detected";
 
   return (
-    <section className="page agent-detail" style={{ backgroundColor: "var(--agents-surface)", accentColor: "var(--agents-primary)" }}>
-      <Link className="back-link" to="/agents">← Back to Agents</Link>
+    <section className="page agent-detail">
+      <nav aria-label="Breadcrumb" className="agent-detail__breadcrumb">
+        <Link to="/agents">Discovered Agents</Link>
+        <BreadcrumbSeparator />
+        <span aria-current="page">{agent.display_name}</span>
+      </nav>
 
-      <header className="skill-workspace-header">
-        <div className="workspace-heading">
-          <span className="workspace-agent-icon" aria-hidden="true">✦</span>
-          <div>
-            <div className="workspace-title-row">
-              <h1>{agent.display_name}</h1>
-              <span className="skill-count-badge">{agent.skills.length} skills</span>
-            </div>
-            <code className="workspace-root" title={primaryRoot}>{primaryRoot}</code>
-            <p className="workspace-summary">
-              <strong>{agent.skills.length}</strong> skills <span aria-hidden="true">/</span>{" "}
-              <strong>{agent.issues.length}</strong> issues
-            </p>
-          </div>
-        </div>
-
-        <div className="workspace-controls">
-          <label className="skill-search">
-            <span className="sr-only">Search installed skills</span>
-            <span aria-hidden="true">⌕</span>
-            <input
-              type="search"
-              placeholder="Search installed skills"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <button className="btn workspace-refresh" onClick={scan} disabled={scanning}>
-            {scanning ? "Refreshing…" : "Refresh"}
-          </button>
-          <div className="view-switcher" role="group" aria-label="Skill view">
-            <button
-              type="button"
-              className={viewMode === "grid" ? "is-active" : undefined}
-              aria-pressed={viewMode === "grid"}
-              onClick={() => setViewMode("grid")}
-            >
-              Grid
-            </button>
-            <button
-              type="button"
-              className={viewMode === "list" ? "is-active" : undefined}
-              aria-pressed={viewMode === "list"}
-              onClick={() => setViewMode("list")}
-            >
-              List
-            </button>
-          </div>
-          <button className="add-skill-button" type="button">Add Skill</button>
+      <header className="agent-detail__header">
+        <AgentIdentityMark agentId={agent.agent_id} />
+        <div className="agent-detail__identity">
+          <h1>{agent.display_name}</h1>
+          <code className="agent-detail__root agent-detail__root--truncate" title={primaryRoot}>{primaryRoot}</code>
+          <StatusWithDot status={agent.detection_status} />
         </div>
       </header>
 
-      <div className="skill-workspace-section-heading">
+      <dl className="agent-detail__summary">
         <div>
-          <p className="eyebrow">Installed skills</p>
-          <h2>{query ? `${filteredSkills.length} matching skills` : "Your local capability set"}</h2>
+          <dt>Skills</dt>
+          <dd>{agent.skills.length}</dd>
         </div>
-        <span className="local-readonly-note">Read-only inventory</span>
-      </div>
+        <div>
+          <dt>Roots</dt>
+          <dd>{agent.roots.length}</dd>
+        </div>
+        <div>
+          <dt>Issues</dt>
+          <dd>{agent.issues.length}</dd>
+        </div>
+      </dl>
 
-      {filteredSkills.length > 0 ? (
-        <div className={`skill-cards skill-cards--${viewMode}`}>
-          {filteredSkills.map((skill) => (
-            <article className="skill-card" key={skill.location + skill.name}>
-              <div className="skill-card-content">
-                <div className="skill-card-title-row">
+      <section aria-labelledby="installed-skills-heading" className="agent-detail__skills">
+        <h2 id="installed-skills-heading">Installed Skills</h2>
+        {agent.skills.length > 0 ? (
+          <ul className="agent-detail__skill-list">
+            {agent.skills.map((skill) => (
+              <li className="agent-detail__skill" key={skill.location + skill.name}>
+                <div>
                   <h3>{skill.name}</h3>
-                  <span className="local-skill-tag">Local only</span>
+                  <p className="agent-detail__skill-description agent-detail__skill-description--truncate" title={skill.description || "No description provided"}>
+                    {skill.description || "No description provided"}
+                  </p>
                 </div>
-                <p title={skill.description || "No description provided"}>
-                  {skill.description || "No description provided"}
-                </p>
-                <span className="skill-file-count">{skill.file_count} files</span>
-              </div>
-              <footer className="skill-card-actions">
-                <button type="button" disabled title="同步功能尚未实现">Import</button>
-                <button type="button" disabled title="同步功能尚未实现">Delete</button>
-              </footer>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="skill-empty-state">
-          <span aria-hidden="true">⌕</span>
-          <h2>{query ? "No matching skills" : "No installed skills yet"}</h2>
-          <p>{query ? "Try a different search term." : "Add a Skill from the central library when sync is available."}</p>
-        </div>
-      )}
+                <span>{skill.file_count} files</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="agent-detail__empty-skills">No installed skills.</p>
+        )}
+      </section>
     </section>
   );
 }
