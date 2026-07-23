@@ -9,6 +9,7 @@
   --accent: #73a7ff;
   --success: #18d697;
   --warning: #e8c05d;
+  --danger: #ff8a8f;
   --sidebar-w: 240px;
   --bg: var(--canvas);
   --fg: var(--text);
@@ -177,10 +178,10 @@ html, body, #root {
   min-width: 60px;
 }
 .issue-row .severity.warning {
-  color: #9a6700;
+  color: var(--warning);
 }
 .issue-row .severity.error {
-  color: #cf222e;
+  color: var(--danger);
 }
 .issue-row .severity.info {
   color: var(--muted);
@@ -199,9 +200,9 @@ html, body, #root {
 }
 
 .scan-error {
-  color: #cf222e;
-  background: #ffebe9;
-  border: 1px solid #ffcecb;
+  color: var(--danger);
+  background: #31171c;
+  border: 1px solid #70313b;
   padding: 8px 12px;
   border-radius: 6px;
   margin-top: 12px;
@@ -297,18 +298,18 @@ html, body, #root {
 }
 
 .status-badge.consistent {
-  color: #1a7f37;
-  background: #dafbe1;
+  color: var(--success);
+  background: #102a23;
 }
 
 .status-badge.conflict {
-  color: #cf222e;
-  background: #ffebe9;
+  color: var(--danger);
+  background: #31171c;
 }
 
 .status-badge.unknown {
-  color: #6e7681;
-  background: #f6f8fa;
+  color: var(--warning);
+  background: #332b18;
 }
 
 .matrix-table th:not(:first-child),
@@ -323,9 +324,9 @@ html, body, #root {
 }
 
 .matrix-cell.missing { color: var(--muted); }
-.matrix-cell.present { color: #1a7f37; }
-.matrix-cell.conflict { color: #cf222e; }
-.matrix-cell.unknown { color: #9a6700; }
+.matrix-cell.present { color: var(--success); }
+.matrix-cell.conflict { color: var(--danger); }
+.matrix-cell.unknown { color: var(--warning); }
 
 .agent-cards {
   display: grid;
@@ -924,7 +925,7 @@ input:focus-visible {
 .sidebar nav[aria-label="Discovered Agents"] a:not(:first-of-type) {
   color: var(--muted);
   font-size: 12px;
-  min-height: 38px;
+  min-height: 44px;
   padding-left: 34px;
 }
 
@@ -1036,7 +1037,8 @@ input:focus-visible {
   white-space: nowrap;
 }
 
-.agent-directory-counts {
+.agent-directory-card .agent-directory-counts,
+.agent-directory-card .agent-directory-counts span {
   color: var(--muted);
   display: flex;
   font-size: 11px;
@@ -1063,11 +1065,19 @@ input:focus-visible {
   transform: translateX(2px);
 }
 
-.agent-identity {
+.agent-directory-card > [role="img"],
+.agent-detail__header > [role="img"] {
+  display: block;
   flex: none;
 }
 
-.agent-status {
+.agent-directory-card > [role="img"] {
+  height: 32px;
+  width: 32px;
+}
+
+.agent-status,
+.agent-directory-card .agent-status {
   align-items: center;
   display: inline-flex;
   font-size: 11px;
@@ -1096,7 +1106,7 @@ input:focus-visible {
   color: var(--muted) !important;
 }
 
-.agent-directory-skeleton {
+.agent-card.agent-directory-card.agent-directory-skeleton {
   background: linear-gradient(100deg, var(--surface) 30%, #1b1b24 48%, var(--surface) 66%);
   background-size: 220% 100%;
   min-height: 88px;
@@ -1176,7 +1186,7 @@ input:focus-visible {
   padding: 0 0 20px;
 }
 
-.agent-detail__header > svg {
+.agent-detail__header > [role="img"] {
   flex: none;
   height: 38px;
   width: 38px;
@@ -1377,7 +1387,6 @@ input:focus-visible {
   }
 
   .content {
-    overflow-x: hidden;
     padding: 20px 16px 32px;
   }
 
