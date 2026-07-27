@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import InstallSkills from "./InstallSkills";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
-import { fetchSkillsShDirectory } from "../api/skillsShApi";
+import { searchGlobalSkills } from "../api/globalSkillsSearch";
 
 vi.mock("../stores/masterRepoStore", () => ({
   useMasterRepoStore: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock("../stores/scanStore", () => ({
   useScanStore: vi.fn(),
 }));
 
-vi.mock("../api/skillsShApi", () => ({
-  fetchSkillsShDirectory: vi.fn(),
+vi.mock("../api/globalSkillsSearch", () => ({
+  searchGlobalSkills: vi.fn(),
 }));
 
 describe("InstallSkills Route", () => {
@@ -25,17 +25,24 @@ describe("InstallSkills Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(fetchSkillsShDirectory).mockResolvedValue([
-      {
-        id: "facebook/react-agent/react-agent",
-        name: "react-agent",
-        ownerRepo: "facebook/react-agent",
-        description: "React agent helper skill",
-        installsText: "⚡ 709.5K",
-        skillsShUrl: "https://skills.sh/facebook/react-agent/react-agent",
-        githubUrl: "https://github.com/facebook/react-agent",
-      },
-    ]);
+    vi.mocked(searchGlobalSkills).mockResolvedValue({
+      items: [
+        {
+          id: "facebook/react-agent/react-agent",
+          name: "react-agent",
+          ownerRepo: "facebook/react-agent",
+          description: "React agent helper skill",
+          installsText: "⚡ 709.5K",
+          repoUrl: "https://github.com/facebook/react-agent",
+          skillsShUrl: "https://skills.sh/facebook/react-agent/react-agent",
+          isVerifiedSkillsSh: true,
+        },
+      ],
+      totalCount: 45,
+      page: 1,
+      pageSize: 20,
+    });
+
     vi.mocked(useMasterRepoStore).mockReturnValue({
       skills: [
         {
@@ -72,6 +79,7 @@ describe("InstallSkills Route", () => {
 
     expect(screen.getByRole("heading", { name: /安装技能|Install Skills/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /热门技能市场|Marketplace/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /全网 11,900\+ 技能库|Global 11,900\+ Registry/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Git \/ GitHub|Git \/ URL/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /本地目录|Local Import/i })).toBeInTheDocument();
   });
@@ -203,31 +211,71 @@ describe("InstallSkills Route", () => {
     });
   });
 
-  it("switches to online search tab and renders online search results from skills.sh", async () => {
+  it("switches to online search tab and renders online search results from mega search engine", async () => {
     render(
       <MemoryRouter>
         <InstallSkills />
       </MemoryRouter>
     );
 
-    const onlineTabBtn = screen.getByRole("tab", { name: /skills\.sh 官方全量库|skills\.sh Directory/i });
+    const onlineTabBtn = screen.getByRole("tab", { name: /全网 11,900\+ 技能库|Global 11,900\+ Registry/i });
     fireEvent.click(onlineTabBtn);
 
     expect(screen.getByTestId("online-content")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(fetchSkillsShDirectory).toHaveBeenCalledWith("");
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "stars" });
       expect(screen.getByText("react-agent")).toBeInTheDocument();
       expect(screen.getByText("facebook/react-agent")).toBeInTheDocument();
       expect(screen.getByText("⚡ 709.5K")).toBeInTheDocument();
-      expect(screen.getByText("skills.sh ↗")).toBeInTheDocument();
+      expect(screen.getByText("skills.sh Verified")).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/搜索 skills\.sh|Search skills\.sh/i);
+    const searchInput = screen.getByPlaceholderText(/搜索全网 11,900\+ 技能|Search 11,900\+/i);
     fireEvent.change(searchInput, { target: { value: "python" } });
 
     await waitFor(() => {
-      expect(fetchSkillsShDirectory).toHaveBeenCalledWith("python");
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "python", page: 1, sortBy: "stars" });
+    });
+  });
+
+  it("supports sorting tab switching and pagination buttons on online search tab", async () => {
+    render(
+      <MemoryRouter>
+        <InstallSkills />
+      </MemoryRouter>
+    );
+
+    const onlineTabBtn = screen.getByRole("tab", { name: /全网 11,900\+ 技能库|Global 11,900\+ Registry/i });
+    fireEvent.click(onlineTabBtn);
+
+    await waitFor(() => {
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "stars" });
+    });
+
+    // Switch sort order to updated
+    const updatedSortBtn = screen.getByTestId("sort-updated-btn");
+    fireEvent.click(updatedSortBtn);
+
+    await waitFor(() => {
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "updated" });
+    });
+
+    // Click next page
+    const nextBtn = screen.getByTestId("page-next-btn");
+    fireEvent.click(nextBtn);
+
+    await waitFor(() => {
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 2, sortBy: "updated" });
+    });
+
+    // Click prev page
+    const prevBtn = screen.getByTestId("page-prev-btn");
+    fireEvent.click(prevBtn);
+
+    await waitFor(() => {
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "updated" });
     });
   });
 });
+

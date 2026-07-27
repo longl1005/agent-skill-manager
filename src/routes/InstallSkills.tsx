@@ -7,7 +7,7 @@ import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/feature
 import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
-import { fetchSkillsShDirectory, type SkillsShItem } from "../api/skillsShApi";
+import { searchGlobalSkills, type GlobalSkillItem } from "../api/globalSkillsSearch";
 
 export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
@@ -23,7 +23,10 @@ export default function InstallSkills() {
   const [localPath, setLocalPath] = useState("");
 
   const [onlineQuery, setOnlineQuery] = useState("");
-  const [onlineResults, setOnlineResults] = useState<SkillsShItem[]>([]);
+  const [onlinePage, setOnlinePage] = useState(1);
+  const [onlineSortBy, setOnlineSortBy] = useState<"stars" | "updated">("stars");
+  const [onlineResults, setOnlineResults] = useState<GlobalSkillItem[]>([]);
+  const [totalOnlineCount, setTotalOnlineCount] = useState(0);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
 
   useEffect(() => {
@@ -33,16 +36,18 @@ export default function InstallSkills() {
     setIsSearchingOnline(true);
 
     const timer = setTimeout(() => {
-      fetchSkillsShDirectory(onlineQuery)
+      searchGlobalSkills({ query: onlineQuery, page: onlinePage, sortBy: onlineSortBy })
         .then((res) => {
           if (isMounted) {
-            setOnlineResults(res);
+            setOnlineResults(res.items);
+            setTotalOnlineCount(res.totalCount);
             setIsSearchingOnline(false);
           }
         })
         .catch(() => {
           if (isMounted) {
             setOnlineResults([]);
+            setTotalOnlineCount(0);
             setIsSearchingOnline(false);
           }
         });
@@ -52,7 +57,7 @@ export default function InstallSkills() {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [activeTab, onlineQuery]);
+  }, [activeTab, onlineQuery, onlinePage, onlineSortBy]);
 
   // Target Agent Distribution Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -256,15 +261,44 @@ export default function InstallSkills() {
       {/* Tab: Online Search */}
       {activeTab === "online" && (
         <div className="install-tab-content" data-testid="online-content">
-          <div className="install-online-search-box">
-            <input
-              type="text"
-              className="install-online-input"
-              placeholder={t("installSkills.searchOnlinePlaceholder", lang)}
-              value={onlineQuery}
-              onChange={(e) => setOnlineQuery(e.target.value)}
-              aria-label="Online skill search query"
-            />
+          <div className="install-online-controls">
+            <div className="install-online-search-box">
+              <input
+                type="text"
+                className="install-online-input"
+                placeholder={t("installSkills.searchOnlinePlaceholder", lang)}
+                value={onlineQuery}
+                onChange={(e) => {
+                  setOnlineQuery(e.target.value);
+                  setOnlinePage(1);
+                }}
+                aria-label="Online skill search query"
+              />
+            </div>
+            <div className="install-sort-group" role="group" aria-label="Sort order">
+              <button
+                type="button"
+                className={`install-sort-btn ${onlineSortBy === "stars" ? "is-active" : ""}`}
+                onClick={() => {
+                  setOnlineSortBy("stars");
+                  setOnlinePage(1);
+                }}
+                data-testid="sort-stars-btn"
+              >
+                {t("installSkills.sortByStars", lang)}
+              </button>
+              <button
+                type="button"
+                className={`install-sort-btn ${onlineSortBy === "updated" ? "is-active" : ""}`}
+                onClick={() => {
+                  setOnlineSortBy("updated");
+                  setOnlinePage(1);
+                }}
+                data-testid="sort-updated-btn"
+              >
+                {t("installSkills.sortByUpdated", lang)}
+              </button>
+            </div>
           </div>
 
           {isSearchingOnline ? (
@@ -272,55 +306,88 @@ export default function InstallSkills() {
               <span>{t("installSkills.searching", lang)}</span>
             </div>
           ) : (
-            <div className="install-card-grid" data-testid="online-card-grid">
-              {onlineResults.map((skill: SkillsShItem) => {
-                const isInstalled = installedSkillNames.has(skill.name);
-                return (
-                  <div className="install-card" key={skill.id} data-testid={`online-card-${skill.name}`}>
-                    <div className="install-card-header">
-                      <div className="install-card-title-group">
-                        <h3 className="install-card-title">{skill.name}</h3>
-                        {skill.ownerRepo && (
-                          <span className="install-card-owner-repo">{skill.ownerRepo}</span>
+            <>
+              <div className="install-card-grid" data-testid="online-card-grid">
+                {onlineResults.map((skill: GlobalSkillItem) => {
+                  const isInstalled = installedSkillNames.has(skill.name);
+                  return (
+                    <div className="install-card" key={skill.id} data-testid={`online-card-${skill.name}`}>
+                      <div className="install-card-header">
+                        <div className="install-card-title-group">
+                          <h3 className="install-card-title">{skill.name}</h3>
+                          {skill.ownerRepo && (
+                            <span className="install-card-owner-repo">{skill.ownerRepo}</span>
+                          )}
+                        </div>
+                        {skill.isVerifiedSkillsSh ? (
+                          <span className="skills-sh-badge">skills.sh Verified</span>
+                        ) : (
+                          <span className="github-badge">GitHub</span>
                         )}
                       </div>
-                      {skill.skillsShUrl && (
-                        <a
-                          href={skill.skillsShUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="skills-sh-badge"
-                          style={{ textDecoration: "none" }}
-                        >
-                          skills.sh ↗
-                        </a>
-                      )}
-                    </div>
-                    <p className="install-card-desc">{skill.description}</p>
-                    <div className="install-card-footer">
-                      <div className="install-card-meta">
-                        {skill.installsText && (
-                          <span className="skills-sh-installs">{skill.installsText}</span>
+                      <p className="install-card-desc">{skill.description}</p>
+                      <div className="install-card-footer">
+                        <div className="install-card-meta">
+                          {skill.installsText && (
+                            <span className="skills-sh-installs">{skill.installsText}</span>
+                          )}
+                          {(skill.repoUrl || skill.skillsShUrl) && (
+                            <a
+                              href={skill.repoUrl || skill.skillsShUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="muted"
+                              style={{ textDecoration: "none", fontSize: "12px" }}
+                            >
+                              🔗 ↗
+                            </a>
+                          )}
+                        </div>
+                        {isInstalled ? (
+                          <span className="installed-badge" data-testid={`installed-badge-${skill.name}`}>
+                            {t("installSkills.installed", lang)}
+                          </span>
+                        ) : (
+                          <button
+                            className="btn primary install-btn"
+                            onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl || skill.skillsShUrl)}
+                            data-testid={`install-btn-${skill.name}`}
+                          >
+                            {t("nav.install", lang)}
+                          </button>
                         )}
                       </div>
-                      {isInstalled ? (
-                        <span className="installed-badge" data-testid={`installed-badge-${skill.name}`}>
-                          {t("installSkills.installed", lang)}
-                        </span>
-                      ) : (
-                        <button
-                          className="btn primary install-btn"
-                          onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.skillsShUrl)}
-                          data-testid={`install-btn-${skill.name}`}
-                        >
-                          {t("nav.install", lang)}
-                        </button>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              <div className="install-pagination" data-testid="online-pagination">
+                <button
+                  type="button"
+                  className="btn install-page-btn"
+                  disabled={onlinePage <= 1 || isSearchingOnline}
+                  onClick={() => setOnlinePage((p) => Math.max(1, p - 1))}
+                  data-testid="page-prev-btn"
+                >
+                  {t("installSkills.pagePrev", lang)}
+                </button>
+                <span className="install-page-info">
+                  {lang === "zh"
+                    ? `第 ${onlinePage} 页 (共 ${totalOnlineCount.toLocaleString()} 个技能)`
+                    : `Page ${onlinePage} (${totalOnlineCount.toLocaleString()} skills)`}
+                </span>
+                <button
+                  type="button"
+                  className="btn install-page-btn"
+                  disabled={onlinePage * 20 >= totalOnlineCount || isSearchingOnline}
+                  onClick={() => setOnlinePage((p) => p + 1)}
+                  data-testid="page-next-btn"
+                >
+                  {t("installSkills.pageNext", lang)}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

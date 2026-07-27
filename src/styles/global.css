@@ -3533,12 +3533,23 @@ a.agent-detail__skill-card,
   accent-color: var(--accent);
 }
 
+.install-online-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
 .install-online-search-box {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 280px;
   max-width: 640px;
-  margin-top: 12px;
 }
 
 .install-online-input {
@@ -3556,6 +3567,70 @@ a.agent-detail__skill-card,
   border-color: var(--accent);
 }
 
+.install-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.install-sort-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.install-sort-btn:hover {
+  color: var(--fg);
+}
+
+.install-sort-btn.is-active {
+  background: var(--surface-hover);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.github-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.install-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 12px 0;
+}
+
+.install-page-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+.install-page-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .install-online-spinner {
   display: flex;
   align-items: center;
@@ -3564,5 +3639,6 @@ a.agent-detail__skill-card,
   font-size: 14px;
   padding: 24px 0;
 }
+
 
 
