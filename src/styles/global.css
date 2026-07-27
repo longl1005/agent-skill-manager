@@ -3533,4 +3533,36 @@ a.agent-detail__skill-card,
   accent-color: var(--accent);
 }
 
+.install-online-search-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 12px;
+}
+
+.install-online-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--fg);
+  outline: none;
+}
+
+.install-online-input:focus {
+  border-color: var(--accent);
+}
+
+.install-online-spinner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 24px 0;
+}
+
 

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import InstallSkills from "./InstallSkills";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
+import { searchOnlineSkills } from "../api/onlineSkillsApi";
 
 vi.mock("../stores/masterRepoStore", () => ({
   useMasterRepoStore: vi.fn(),
@@ -13,12 +14,28 @@ vi.mock("../stores/scanStore", () => ({
   useScanStore: vi.fn(),
 }));
 
+vi.mock("../api/onlineSkillsApi", () => ({
+  searchOnlineSkills: vi.fn(),
+}));
+
 describe("InstallSkills Route", () => {
   const mockToggleAgentSkill = vi.fn().mockResolvedValue(true);
   const mockImportToMaster = vi.fn().mockResolvedValue({ type: "success" });
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(searchOnlineSkills).mockResolvedValue([
+      {
+        id: "101",
+        name: "react-agent",
+        ownerRepo: "facebook/react-agent",
+        description: "React agent helper skill",
+        stars: 1250,
+        repoUrl: "https://github.com/facebook/react-agent",
+        installsText: "★ 1.3K",
+      },
+    ]);
     vi.mocked(useMasterRepoStore).mockReturnValue({
       skills: [
         {
@@ -183,6 +200,33 @@ describe("InstallSkills Route", () => {
     await waitFor(() => {
       expect(mockToggleAgentSkill).toHaveBeenCalledWith("claude-code", "ui-ux-pro-max", true);
       expect(mockToggleAgentSkill).toHaveBeenCalledWith("cursor", "ui-ux-pro-max", true);
+    });
+  });
+
+  it("switches to online search tab and renders online search results", async () => {
+    render(
+      <MemoryRouter>
+        <InstallSkills />
+      </MemoryRouter>
+    );
+
+    const onlineTabBtn = screen.getByRole("tab", { name: /全网 11,000\+ 技能检索|Live Online Search/i });
+    fireEvent.click(onlineTabBtn);
+
+    expect(screen.getByTestId("online-content")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(searchOnlineSkills).toHaveBeenCalledWith("");
+      expect(screen.getByText("react-agent")).toBeInTheDocument();
+      expect(screen.getByText("facebook/react-agent")).toBeInTheDocument();
+      expect(screen.getByText("★ 1.3K")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/输入关键词搜索全网|Search 11,000\+/i);
+    fireEvent.change(searchInput, { target: { value: "python" } });
+
+    await waitFor(() => {
+      expect(searchOnlineSkills).toHaveBeenCalledWith("python");
     });
   });
 });

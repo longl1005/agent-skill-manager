@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
@@ -7,8 +7,9 @@ import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/feature
 import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
+import { searchOnlineSkills, type OnlineSkillResult } from "../api/onlineSkillsApi";
 
-export type InstallTab = "marketplace" | "url" | "local";
+export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
 
 export default function InstallSkills() {
@@ -20,6 +21,38 @@ export default function InstallSkills() {
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
   const [urlInput, setUrlInput] = useState("");
   const [localPath, setLocalPath] = useState("");
+
+  const [onlineQuery, setOnlineQuery] = useState("");
+  const [onlineResults, setOnlineResults] = useState<OnlineSkillResult[]>([]);
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "online") return;
+
+    let isMounted = true;
+    setIsSearchingOnline(true);
+
+    const timer = setTimeout(() => {
+      searchOnlineSkills(onlineQuery)
+        .then((res) => {
+          if (isMounted) {
+            setOnlineResults(res);
+            setIsSearchingOnline(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setOnlineResults([]);
+            setIsSearchingOnline(false);
+          }
+        });
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [activeTab, onlineQuery]);
 
   // Target Agent Distribution Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -121,6 +154,14 @@ export default function InstallSkills() {
         </button>
         <button
           role="tab"
+          aria-selected={activeTab === "online"}
+          className={`install-tab-btn ${activeTab === "online" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("online")}
+        >
+          {t("installSkills.tabOnline", lang)}
+        </button>
+        <button
+          role="tab"
           aria-selected={activeTab === "url"}
           className={`install-tab-btn ${activeTab === "url" ? "is-active" : ""}`}
           onClick={() => setActiveTab("url")}
@@ -209,6 +250,78 @@ export default function InstallSkills() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Tab: Online Search */}
+      {activeTab === "online" && (
+        <div className="install-tab-content" data-testid="online-content">
+          <div className="install-online-search-box">
+            <input
+              type="text"
+              className="install-online-input"
+              placeholder={t("installSkills.searchOnlinePlaceholder", lang)}
+              value={onlineQuery}
+              onChange={(e) => setOnlineQuery(e.target.value)}
+              aria-label="Online skill search query"
+            />
+          </div>
+
+          {isSearchingOnline ? (
+            <div className="install-online-spinner" data-testid="online-spinner">
+              <span>{t("installSkills.searching", lang)}</span>
+            </div>
+          ) : (
+            <div className="install-card-grid" data-testid="online-card-grid">
+              {onlineResults.map((skill: OnlineSkillResult) => {
+                const isInstalled = installedSkillNames.has(skill.name);
+                return (
+                  <div className="install-card" key={skill.id} data-testid={`online-card-${skill.name}`}>
+                    <div className="install-card-header">
+                      <div className="install-card-title-group">
+                        <h3 className="install-card-title">{skill.name}</h3>
+                        {skill.ownerRepo && (
+                          <span className="install-card-owner-repo">{skill.ownerRepo}</span>
+                        )}
+                      </div>
+                      {skill.repoUrl && (
+                        <a
+                          href={skill.repoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="skills-sh-badge"
+                          style={{ textDecoration: "none" }}
+                        >
+                          GitHub ↗
+                        </a>
+                      )}
+                    </div>
+                    <p className="install-card-desc">{skill.description}</p>
+                    <div className="install-card-footer">
+                      <div className="install-card-meta">
+                        {skill.installsText && (
+                          <span className="skills-sh-installs">{skill.installsText}</span>
+                        )}
+                      </div>
+                      {isInstalled ? (
+                        <span className="installed-badge" data-testid={`installed-badge-${skill.name}`}>
+                          {t("installSkills.installed", lang)}
+                        </span>
+                      ) : (
+                        <button
+                          className="btn primary install-btn"
+                          onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl)}
+                          data-testid={`install-btn-${skill.name}`}
+                        >
+                          {t("nav.install", lang)}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
