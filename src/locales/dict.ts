@@ -36,6 +36,22 @@ export const dict = {
     "settings.paths.placeholder": "输入自定义绝对路径",
     "settings.paths.save": "保存",
     "settings.paths.reset": "重置",
+    // Master Skill Library
+    "skillLibrary.title": "Master 技能仓库",
+    "skillLibrary.subtitle": "~/.asm/skills 集中存储与 Agent 软链接分发矩阵",
+    "skillLibrary.searchPlaceholder": "搜索 Master 技能名称或描述...",
+    "skillLibrary.filterAll": "全部",
+    "skillLibrary.filterLinked": "已链接",
+    "skillLibrary.filterUnlinked": "未链接",
+    "skillLibrary.copyPath": "复制路径",
+    "skillLibrary.copied": "已复制",
+    "skillLibrary.noDescription": "(暂无描述)",
+    "skillLibrary.agentMatrixTitle": "Agent 软链接分发矩阵",
+    "skillLibrary.linked": "已链接",
+    "skillLibrary.unlinked": "未链接",
+    "skillLibrary.emptyHint": "在 ~/.asm/skills 中未找到 Master 技能。",
+    "skillLibrary.emptySearch": "没有符合筛选条件的 Master 技能。",
+    "skillLibrary.refresh": "刷新",
   },
   en: {
     // Navigation
@@ -45,6 +61,23 @@ export const dict = {
     "nav.allAgents": "All Agents",
     "nav.discoveredAgents": "Discovered Agents",
     "nav.settings": "Settings",
+
+    // Master Skill Library
+    "skillLibrary.title": "Master Skill Repository",
+    "skillLibrary.subtitle": "Canonical storage in ~/.asm/skills & Agent link distribution matrix",
+    "skillLibrary.searchPlaceholder": "Search master skills...",
+    "skillLibrary.filterAll": "All",
+    "skillLibrary.filterLinked": "Linked",
+    "skillLibrary.filterUnlinked": "Unlinked",
+    "skillLibrary.copyPath": "Copy Path",
+    "skillLibrary.copied": "Copied!",
+    "skillLibrary.noDescription": "(No description)",
+    "skillLibrary.agentMatrixTitle": "Agent Link Distribution Matrix",
+    "skillLibrary.linked": "Linked",
+    "skillLibrary.unlinked": "Unlinked",
+    "skillLibrary.emptyHint": "No master skills found in ~/.asm/skills.",
+    "skillLibrary.emptySearch": "No master skills match your filter.",
+    "skillLibrary.refresh": "Refresh",
 
     // Settings
     "settings.title": "Settings",
