@@ -439,24 +439,56 @@ export default function InstallSkills() {
       {modalOpen && (
         <div className="modal-overlay" data-testid="target-agent-modal">
           <div className="modal-content install-target-modal">
-            <h2>{t("installSkills.targetModalTitle", lang)}</h2>
-            <p className="modal-subtitle">
-              Target Skill: <strong>{targetSkillName}</strong>
-            </p>
+            <div className="modal-header-row">
+              <div>
+                <h2>{t("installSkills.targetModalTitle", lang)}</h2>
+                <p className="modal-subtitle">
+                  Target Skill: <code className="target-skill-chip">{targetSkillName}</code>
+                </p>
+              </div>
+              <div className="modal-select-actions">
+                <button
+                  type="button"
+                  className="modal-text-btn"
+                  onClick={() => {
+                    const all: Record<string, boolean> = {};
+                    availableAgents.forEach((a) => (all[a.id] = true));
+                    setSelectedAgents(all);
+                  }}
+                >
+                  {lang === "zh" ? "全选" : "Select All"}
+                </button>
+                <span className="divider">•</span>
+                <button
+                  type="button"
+                  className="modal-text-btn"
+                  onClick={() => setSelectedAgents({})}
+                >
+                  {lang === "zh" ? "清空" : "Clear"}
+                </button>
+              </div>
+            </div>
 
-            <div className="target-agent-list">
+            <div className="target-agent-grid">
               {availableAgents.map((agent) => {
                 const isSelected = Boolean(selectedAgents[agent.id]);
                 return (
-                  <label key={agent.id} className={`target-agent-item ${isSelected ? "is-selected" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleAgentSelection(agent.id)}
-                    />
-                    <AgentIdentityMark agentId={agent.id} />
-                    <span className="agent-name">{agent.name}</span>
-                  </label>
+                  <div
+                    key={agent.id}
+                    className={`target-agent-card ${isSelected ? "is-selected" : ""}`}
+                    onClick={() => toggleAgentSelection(agent.id)}
+                    role="checkbox"
+                    aria-checked={isSelected}
+                    tabIndex={0}
+                  >
+                    <div className="target-agent-card-left">
+                      <AgentIdentityMark agentId={agent.id} />
+                      <span className="agent-name">{agent.name}</span>
+                    </div>
+                    <span className={`target-check-indicator ${isSelected ? "is-active" : ""}`}>
+                      {isSelected ? "✓" : ""}
+                    </span>
+                  </div>
                 );
               })}
             </div>
@@ -464,7 +496,7 @@ export default function InstallSkills() {
             <div className="modal-actions">
               <button
                 type="button"
-                className="btn"
+                className="btn secondary"
                 onClick={() => setModalOpen(false)}
                 disabled={installing}
               >
@@ -472,12 +504,12 @@ export default function InstallSkills() {
               </button>
               <button
                 type="button"
-                className="btn primary"
+                className="btn primary confirm-btn"
                 onClick={handleConfirmInstall}
                 disabled={installing}
                 data-testid="confirm-install-btn"
               >
-                {installing ? "Installing..." : t("installSkills.targetModalConfirm", lang)}
+                {installing ? "Installing..." : `✨ ${t("installSkills.targetModalConfirm", lang)}`}
               </button>
             </div>
           </div>

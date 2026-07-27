@@ -3499,45 +3499,133 @@ a.agent-detail__skill-card,
 }
 
 .install-target-modal {
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  max-width: 520px;
+  border-radius: 20px;
+  max-width: 580px;
   width: 100%;
-  padding: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  padding: 28px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
   position: relative;
   z-index: 1001;
 }
 
-.target-agent-list {
+.modal-header-row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 18px 0 24px;
-  max-height: 380px;
-  overflow-y: auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.target-agent-item {
+.modal-header-row h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: var(--fg);
+}
+
+.target-skill-chip {
+  display: inline-block;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.modal-select-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.modal-text-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
   transition: all 0.15s ease;
 }
 
-.target-agent-item.is-selected {
-  border-color: var(--accent);
+.modal-text-btn:hover {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.target-agent-item input[type="checkbox"] {
-  accent-color: var(--accent);
+.modal-select-actions .divider {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.target-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.target-agent-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.target-agent-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  transform: translateY(-1px);
+}
+
+.target-agent-card.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.target-agent-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.target-agent-card-left .agent-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.target-check-indicator {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: transparent;
+  transition: all 0.15s ease;
+}
+
+.target-check-indicator.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 .install-online-controls {
