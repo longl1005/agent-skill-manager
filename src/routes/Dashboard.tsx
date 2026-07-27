@@ -1,148 +1,155 @@
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useScanStore } from "../stores/scanStore";
-import type { ScanReport, IssueReport } from "../ipc/types";
+import { useMasterRepoStore } from "../stores/masterRepoStore";
+import { isDiscoveredAgent } from "../agentDiscovery";
+import { AgentIdentityMark, AgentStatus } from "../components/AgentVisual";
 
 function formatTime(unixMillis: number): string {
-  if (unixMillis === 0) return "—";
+  if (!unixMillis) return "—";
   const d = new Date(unixMillis);
   return d.toLocaleTimeString();
 }
 
-function shortenPath(p: string, home: string): string {
-  if (home && p.startsWith(home)) {
-    return "~" + p.slice(home.length);
-  }
-  return p;
-}
-
-const SEVERITY_RANK: Record<string, number> = {
-  Error: 0,
-  Warning: 1,
-  Info: 2,
-};
-
-function sortedIssues(issues: IssueReport[]): IssueReport[] {
-  return [...issues].sort(
-    (a, b) => (SEVERITY_RANK[a.severity] ?? 3) - (SEVERITY_RANK[b.severity] ?? 3),
-  );
-}
-
 export default function Dashboard() {
-  const { report, scanning, error, scan } = useScanStore();
+  const { report, scanning, error } = useScanStore();
+  const { skills: masterSkills, fetchMasterSkills } = useMasterRepoStore();
 
-  const homeFromAgent = (r: ScanReport | null): string => {
-    // 尝试从 agent roots 推断 home: 找以 /Users/<name>/.claude/skills 结尾的路径
-    if (!r) return "";
-    for (const a of r.agents) {
-      for (const root of a.roots) {
-        const m = root.display_path.match(/^(.*?)\/\.claude\/skills$/);
-        if (m) return m[1];
+  useEffect(() => {
+    fetchMasterSkills();
+  }, [fetchMasterSkills]);
+
+  const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
+
+  // Calculate Symlink Coverage across all detected agents
+  let totalAgentSkills = 0;
+  let linkedAgentSkills = 0;
+
+  detectedAgents.forEach((agent) => {
+    agent.skills.forEach((skill) => {
+      totalAgentSkills++;
+      const master = masterSkills.find(
+        (m) => m.name.toLowerCase() === skill.name.toLowerCase()
+      );
+      if (master && master.linked_agents?.[agent.agent_id]) {
+        linkedAgentSkills++;
       }
-    }
-    return "";
-  };
+    });
+  });
 
-  const home = homeFromAgent(report);
-  const totalMs =
-    report ? report.completed_at - report.started_at : 0;
+  const symlinkCoveragePercent =
+    totalAgentSkills > 0
+      ? Math.round((linkedAgentSkills / totalAgentSkills) * 100)
+      : 0;
+
+  const lastUpdatedTime = report ? formatTime(report.completed_at) : "—";
 
   return (
-    <section className="page">
-      <h1>Dashboard</h1>
-
-      <div className="scan-status">
-        {report ? (
-          <>
-            <span>
-              <strong>{report.total_skills}</strong> skills
-            </span>
-            <span>·</span>
-            <span>
-              <strong>{report.agents.length}</strong> agent
-            </span>
-            <span>·</span>
-            <span>scanned <strong>{formatTime(report.started_at)}</strong> ({totalMs}ms)</span>
-          </>
-        ) : (
-          <span>No scan yet.</span>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8 }}>
-        <button
-          className="btn primary"
-          onClick={scan}
-          disabled={scanning}
-        >
-          {scanning ? "Scanning..." : "Scan now"}
-        </button>
-        {report && (
-          <span style={{ color: "var(--muted)", fontSize: 12 }}>
-            Last scan: {formatTime(report.completed_at)}
-          </span>
-        )}
+    <section className="page dashboard-page">
+      <div className="dashboard-header">
+        <div className="dashboard-header-title">
+          <h1>Dashboard</h1>
+          <p>Automated Agent & Skill Management Overview</p>
+        </div>
+        <div className="dashboard-shortcuts">
+          <Link to="/library" className="btn dashboard-shortcut-btn">
+            Master Library
+          </Link>
+          <Link to="/agents" className="btn dashboard-shortcut-btn">
+            Manage Agents
+          </Link>
+        </div>
       </div>
 
       {error && <div className="scan-error">{error}</div>}
 
-      {scanning && !report && (
-        <p className="empty-hint" style={{ marginTop: 16 }}>Scanning...</p>
-      )}
-
-      {!scanning && !report && (
-        <p className="empty-hint">Run scan to discover agents.</p>
-      )}
-
-      {report && report.agents.map((agent) => (
-        <div key={agent.agent_id} style={{ marginTop: 16 }}>
-          <div className="agent-header">
-            <strong>{agent.display_name}</strong>
-            <span className="muted">
-              {agent.detection_status} · {agent.outcome}
-            </span>
-          </div>
-
-          {agent.skills.length > 0 && (
-            <table className="skills-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Path</th>
-                  <th>Files</th>
-                  <th>FP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agent.skills.map((s) => (
-                  <tr key={s.location + s.name}>
-                    <td>{s.name}</td>
-                    <td className="desc">{s.description || <em className="muted">(no description)</em>}</td>
-                    <td className="path">{shortenPath(s.location, home)}</td>
-                    <td className="num">{s.file_count}</td>
-                    <td className="fp">{s.fingerprint_short}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {agent.issues.length > 0 && (
-            <div className="issues-section">
-              <h2>Issues</h2>
-              {sortedIssues(agent.issues).map((i, idx) => (
-                <div key={idx} className="issue-row">
-                  <span className={`severity ${i.severity.toLowerCase()}`}>
-                    {i.severity}
-                  </span>
-                  <span className="code">{i.code}</span>
-                  {i.path && <span className="path">{shortenPath(i.path, home)}</span>}
-                  <span className="msg">{i.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="dashboard-metrics-grid">
+        <div className="dashboard-metric-card">
+          <span className="metric-label">Master Skills</span>
+          <span className="metric-value">{masterSkills.length}</span>
+          <span className="metric-subtext">In ~/.asm/skills repository</span>
         </div>
-      ))}
+
+        <div className="dashboard-metric-card">
+          <span className="metric-label">Active Agents</span>
+          <span className="metric-value">{detectedAgents.length}</span>
+          <span className="metric-subtext">Detected workspaces</span>
+        </div>
+
+        <div className="dashboard-metric-card">
+          <span className="metric-label">Symlink Coverage</span>
+          <span className="metric-value">{symlinkCoveragePercent}%</span>
+          <span className="metric-subtext">
+            {linkedAgentSkills} of {totalAgentSkills} skills linked
+          </span>
+        </div>
+
+        <div className="dashboard-metric-card">
+          <span className="metric-label">Auto-Sync Status</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <span className="sync-live-dot" />
+            <span style={{ fontWeight: 600, fontSize: 16 }}>Auto-Sync Active</span>
+          </div>
+          <span className="metric-subtext" style={{ marginTop: 4 }}>
+            Last updated {lastUpdatedTime}
+          </span>
+        </div>
+      </div>
+
+      <h2 className="dashboard-section-title">Agent Health Grid</h2>
+
+      {scanning && !report ? (
+        <p className="empty-hint">Scanning agent workspaces...</p>
+      ) : detectedAgents.length === 0 ? (
+        <div className="agents-empty-panel">
+          <h2>No agents discovered</h2>
+          <p>Install an agent or check skill directory configurations.</p>
+        </div>
+      ) : (
+        <div className="dashboard-agent-grid">
+          {detectedAgents.map((agent) => {
+            const agentLinkedCount = agent.skills.filter((s) =>
+              masterSkills.some(
+                (m) =>
+                  m.name.toLowerCase() === s.name.toLowerCase() &&
+                  m.linked_agents?.[agent.agent_id]
+              )
+            ).length;
+
+            return (
+              <Link
+                key={agent.agent_id}
+                to={`/agents/${agent.agent_id}`}
+                className="dashboard-agent-card"
+              >
+                <div className="dashboard-agent-card-header">
+                  <div className="dashboard-agent-info">
+                    <AgentIdentityMark agentId={agent.agent_id} />
+                    <span className="dashboard-agent-name">{agent.display_name}</span>
+                  </div>
+                  <AgentStatus status={agent.detection_status} />
+                </div>
+
+                <div className="dashboard-agent-stats">
+                  <div className="dashboard-agent-stat-item">
+                    <span className="dashboard-agent-stat-label">Skills</span>
+                    <span className="dashboard-agent-stat-value">
+                      {agent.skills.length} {agent.skills.length === 1 ? "Skill" : "Skills"}
+                    </span>
+                  </div>
+
+                  <div className="dashboard-agent-stat-item">
+                    <span className="dashboard-agent-stat-label">Symlink Ratio</span>
+                    <span className="dashboard-agent-stat-value">
+                      {agentLinkedCount}/{agent.skills.length}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

@@ -1,8 +1,6 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { useScanStore } from "./stores/scanStore";
-import { useMasterRepoStore } from "./stores/masterRepoStore";
 
 const scanMock = vi.fn();
 const fetchMasterSkillsMock = vi.fn();
