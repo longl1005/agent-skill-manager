@@ -25,7 +25,12 @@ const report = (agents: ScanReport["agents"]): ScanReport => ({
   total_issues: 0,
 });
 
-beforeEach(() => useScanStore.setState({ report: null, scanning: false, error: null }));
+import { useI18nStore } from "../stores/i18nStore";
+
+beforeEach(() => {
+  useI18nStore.setState({ lang: "en" });
+  useScanStore.setState({ report: null, scanning: false, error: null });
+});
 
 describe("Agents", () => {
   it("lists detected and partial Agents in the directory", () => {
@@ -44,7 +49,7 @@ describe("Agents", () => {
 
     render(<MemoryRouter><Agents /></MemoryRouter>);
 
-    expect(screen.getByText(/Install an agent, then rescan/i)).toBeVisible();
+    expect(screen.getByText(/Install an agent/i)).toBeVisible();
   });
 
   it("shows a busy directory skeleton while the first scan is running", () => {

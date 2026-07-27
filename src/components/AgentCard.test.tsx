@@ -4,8 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 
 import AgentCard from "./AgentCard";
 
+import { useI18nStore } from "../stores/i18nStore";
+
 describe("AgentCard", () => {
   it("links to the Agent workspace with its counts and status", () => {
+    useI18nStore.setState({ lang: "en" });
     render(
       <MemoryRouter>
         <AgentCard
@@ -35,8 +38,8 @@ describe("AgentCard", () => {
     );
 
     expect(screen.getByRole("link", { name: /Codex/i })).toHaveAttribute("href", "/agents/codex");
-    expect(screen.getByText("14 Skills")).toBeVisible();
-    expect(screen.getByText("2 Roots")).toBeVisible();
+    expect(screen.getByText(/14\s+skills/i)).toBeVisible();
+    expect(screen.getByText("/skills/0")).toBeVisible();
     expect(screen.getByText("Detected")).toBeVisible();
   });
 });

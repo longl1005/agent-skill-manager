@@ -43,7 +43,12 @@ function renderDetail(initialEntry: string) {
   );
 }
 
-beforeEach(() => useScanStore.setState({ report: null, scanning: false, error: null }));
+import { useI18nStore } from "../stores/i18nStore";
+
+beforeEach(() => {
+  useI18nStore.setState({ lang: "en" });
+  useScanStore.setState({ report: null, scanning: false, error: null });
+});
 
 describe("AgentDetail", () => {
   it("shows the selected Agent workspace without a second directory", () => {

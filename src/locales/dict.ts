@@ -72,6 +72,24 @@ export const dict = {
     "dashboard.agentMonitorTitle": "Agent 技能运行监控与分布矩阵",
     "dashboard.skillsUnit": "个技能",
     "dashboard.managedRatio": "主库托管率",
+
+    // Agent Status
+    "agentStatus.detected": "已连接",
+    "agentStatus.partial": "部分连接",
+    "agentStatus.notDetected": "未连接",
+
+    // Agents Directory Page
+    "agents.title": "所有智能体",
+    "agents.subtitle": "当前系统上已识别的 Agent 技能工作区",
+    "agents.detectedCount": "已检测到 {count} 个 Agent",
+    "agents.emptyTitle": "未找到智能体",
+    "agents.emptyDesc": "请安装对应的 Agent 软件或在设置中配置其技能目录。",
+
+    // Agent Detail Page
+    "agentDetail.installedSkills": "已安装技能",
+    "agentDetail.noDescription": "(暂无描述)",
+    "agentDetail.emptySkills": "该 Agent 暂未安装任何技能。",
+    "agentDetail.fileCount": "{count} 个文件",
   },
   en: {
     // Navigation
@@ -144,6 +162,24 @@ export const dict = {
     "dashboard.agentMonitorTitle": "Agent Skill Monitor & Distribution Matrix",
     "dashboard.skillsUnit": "skills",
     "dashboard.managedRatio": "Managed",
+
+    // Agent Status
+    "agentStatus.detected": "Detected",
+    "agentStatus.partial": "Partial",
+    "agentStatus.notDetected": "Not detected",
+
+    // Agents Directory Page
+    "agents.title": "All Agents",
+    "agents.subtitle": "Skill workspaces discovered on this machine.",
+    "agents.detectedCount": "{count} detected",
+    "agents.emptyTitle": "No agents discovered",
+    "agents.emptyDesc": "Install an agent or check skill directory configurations.",
+
+    // Agent Detail Page
+    "agentDetail.installedSkills": "Installed Skills",
+    "agentDetail.noDescription": "(No description provided)",
+    "agentDetail.emptySkills": "No installed skills.",
+    "agentDetail.fileCount": "{count} files",
   },
 } as const;
 

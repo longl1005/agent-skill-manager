@@ -1,6 +1,8 @@
 import AgentCard from "../components/AgentCard";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
+import { useI18nStore } from "../stores/i18nStore";
+import { t } from "../locales/dict";
 
 function DirectorySkeleton() {
   return <div aria-hidden="true" className="agent-card agent-directory-card agent-directory-skeleton" data-testid="agent-directory-skeleton" />;
@@ -8,6 +10,7 @@ function DirectorySkeleton() {
 
 export default function Agents() {
   const { report, scanning, error, scan } = useScanStore();
+  const lang = useI18nStore((state) => state.lang);
 
   if (scanning && report === null) {
     return (
@@ -41,9 +44,9 @@ export default function Agents() {
   return (
     <section className="page agent-directory">
       <header className="agent-directory-header">
-        <h1>All Agents</h1>
-        <p>{detectedAgents.length} detected</p>
-        <p className="empty-hint">Skill workspaces discovered on this machine.</p>
+        <h1>{t("agents.title", lang)}</h1>
+        <p>{t("agents.detectedCount", lang).replace("{count}", String(detectedAgents.length))}</p>
+        <p className="empty-hint">{t("agents.subtitle", lang)}</p>
       </header>
 
       {error && (
@@ -62,8 +65,8 @@ export default function Agents() {
         </div>
       ) : (
         <div className="agents-empty-panel">
-          <h2>No agents discovered</h2>
-          <p>Install an agent, then rescan to make its Skill workspace available here.</p>
+          <h2>{t("agents.emptyTitle", lang)}</h2>
+          <p>{t("agents.emptyDesc", lang)}</p>
         </div>
       )}
     </section>
