@@ -10,13 +10,19 @@ import SkillDetail from "./routes/SkillDetail";
 import ScanHistory from "./routes/ScanHistory";
 import Settings from "./routes/Settings";
 import { useThemeStore } from "./stores/themeStore";
+import { useScanStore } from "./stores/scanStore";
+import { useMasterRepoStore } from "./stores/masterRepoStore";
 
 export default function App() {
   const initTheme = useThemeStore((s) => s.initTheme);
+  const scan = useScanStore((s) => s.scan);
+  const fetchMasterSkills = useMasterRepoStore((s) => s.fetchMasterSkills);
 
   useEffect(() => {
     initTheme();
-  }, [initTheme]);
+    scan();
+    fetchMasterSkills();
+  }, [initTheme, scan, fetchMasterSkills]);
 
   return (
     <HashRouter>
