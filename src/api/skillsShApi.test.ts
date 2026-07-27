@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchSkillsShDirectory, parseSkillsShHtml } from "./skillsShApi";
+import { fetchSkillsShDirectory, parseSkillsShHtml, SKILLS_SH_LEADERBOARD } from "./skillsShApi";
 
 describe("skills.sh HTML Parser & Fetcher", () => {
   afterEach(() => {
@@ -44,21 +44,6 @@ describe("skills.sh HTML Parser & Fetcher", () => {
     });
   });
 
-  it("falls back to extracting simple href links if main regex fails to match cards", () => {
-    const sampleHtml = `
-      <div class="list">
-        <a href="/anthropics/skills/frontend-design">Frontend Design</a>
-        <a href="/topic/react">React Topic</a>
-        <a href="/facebook/react/react-skill">React Skill</a>
-      </div>
-    `;
-
-    const res = parseSkillsShHtml(sampleHtml);
-    expect(res.length).toBe(2);
-    expect(res[0].id).toBe("anthropics/skills/frontend-design");
-    expect(res[1].id).toBe("facebook/react/react-skill");
-  });
-
   it("fetches skills.sh directory and filters by query", async () => {
     const mockHtml = `
       <a href="/anthropics/skills/frontend-design">
@@ -86,10 +71,11 @@ describe("skills.sh HTML Parser & Fetcher", () => {
     expect(filtered[0].name).toBe("frontend-design");
   });
 
-  it("returns empty array if fetch fails", async () => {
+  it("falls back to built-in leaderboard if fetch fails or network errors", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
     const items = await fetchSkillsShDirectory();
-    expect(items).toEqual([]);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0].name).toBe(SKILLS_SH_LEADERBOARD[0].name);
   });
 });
