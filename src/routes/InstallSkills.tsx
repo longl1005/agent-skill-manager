@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
-import { useScanStore } from "../stores/scanStore";
 import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/featuredSkills";
 import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
@@ -15,7 +14,6 @@ export type SkillCategory = "all" | "ui" | "search" | "workflow";
 export default function InstallSkills() {
   const lang = useI18nStore((s) => s.lang);
   const { skills: masterSkills, toggleAgentSkill, importToMaster } = useMasterRepoStore();
-  const { report } = useScanStore();
 
   const [activeTab, setActiveTab] = useState<InstallTab>("marketplace");
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
@@ -75,14 +73,8 @@ export default function InstallSkills() {
   }, [activeCategory]);
 
   const availableAgents = useMemo(() => {
-    if (report?.agents && report.agents.length > 0) {
-      return report.agents.map((a) => ({
-        id: a.agent_id,
-        name: a.display_name || a.agent_id,
-      }));
-    }
     return SUPPORTED_AGENTS;
-  }, [report]);
+  }, []);
 
   const handleOpenInstallModal = (skillName: string, source?: string) => {
     setTargetSkillName(skillName);
