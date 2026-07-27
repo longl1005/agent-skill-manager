@@ -2,13 +2,16 @@ import { NavLink } from "react-router-dom";
 
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
+import { useI18nStore } from "../stores/i18nStore";
+import { t, type TranslationKey } from "../locales/dict";
+import { AgentSidebarIcon } from "./AgentVisual";
 
 type NavigationIcon = "dashboard" | "library" | "install" | "agents" | "settings";
 
-const primaryDestinations: Array<{ to: string; label: string; icon: NavigationIcon }> = [
-  { to: "/", label: "Dashboard", icon: "dashboard" },
-  { to: "/library", label: "Skill Library", icon: "library" },
-  { to: "/install", label: "Install Skills", icon: "install" },
+const primaryDestinations: Array<{ to: string; labelKey: TranslationKey; icon: NavigationIcon }> = [
+  { to: "/", labelKey: "nav.dashboard", icon: "dashboard" },
+  { to: "/library", labelKey: "nav.library", icon: "library" },
+  { to: "/install", labelKey: "nav.install", icon: "install" },
 ];
 
 function NavigationGlyph({ icon }: { icon: NavigationIcon }) {
@@ -31,11 +34,13 @@ function SidebarLink({
   to,
   label,
   icon,
+  agentId,
   end = false,
 }: {
   to: string;
   label: string;
   icon?: NavigationIcon;
+  agentId?: string;
   end?: boolean;
 }) {
   return (
@@ -44,7 +49,7 @@ function SidebarLink({
       to={to}
       className={({ isActive }) => (isActive ? "is-selected active" : undefined)}
     >
-      {icon && <NavigationGlyph icon={icon} />}
+      {agentId ? <AgentSidebarIcon agentId={agentId} /> : icon ? <NavigationGlyph icon={icon} /> : null}
       <span>{label}</span>
     </NavLink>
   );
@@ -53,25 +58,33 @@ function SidebarLink({
 export default function AppSidebar() {
   const report = useScanStore((state) => state.report);
   const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
+  const lang = useI18nStore((state) => state.lang);
 
   return (
     <aside className="sidebar">
       <h1 className="brand">ASM</h1>
       <nav aria-label="Primary navigation">
         {primaryDestinations.map((destination) => (
-          <SidebarLink key={destination.to} {...destination} end={destination.to === "/"} />
+          <SidebarLink
+            key={destination.to}
+            to={destination.to}
+            label={t(destination.labelKey, lang)}
+            icon={destination.icon}
+            end={destination.to === "/"}
+          />
         ))}
       </nav>
-      <nav aria-label="Discovered Agents">
-        <p className="sidebar-group-label">Discovered Agents</p>
-        <SidebarLink icon="agents" label="All Agents" to="/agents" end />
+      <nav aria-label={t("nav.discoveredAgents", lang)}>
+        <p className="sidebar-group-label">{t("nav.discoveredAgents", lang)}</p>
+        <SidebarLink icon="agents" label={t("nav.allAgents", lang)} to="/agents" end />
         {detectedAgents.map((agent) => (
-          <SidebarLink key={agent.agent_id} label={agent.display_name} to={`/agents/${agent.agent_id}`} />
+          <SidebarLink key={agent.agent_id} label={agent.display_name} to={`/agents/${agent.agent_id}`} agentId={agent.agent_id} />
         ))}
       </nav>
-      <nav aria-label="Settings" style={{ borderTop: "1px solid var(--border)", marginTop: "auto", paddingTop: 8 }}>
-        <SidebarLink icon="settings" label="Settings" to="/settings" />
+      <nav aria-label={t("nav.settings", lang)} style={{ borderTop: "1px solid var(--border)", marginTop: "auto", paddingTop: 8 }}>
+        <SidebarLink icon="settings" label={t("nav.settings", lang)} to="/settings" />
       </nav>
     </aside>
   );
 }
+
