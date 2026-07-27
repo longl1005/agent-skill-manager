@@ -7,7 +7,7 @@ import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/feature
 import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
-import { searchOnlineSkills, type OnlineSkillResult } from "../api/onlineSkillsApi";
+import { fetchSkillsShDirectory, type SkillsShItem } from "../api/skillsShApi";
 
 export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
@@ -23,7 +23,7 @@ export default function InstallSkills() {
   const [localPath, setLocalPath] = useState("");
 
   const [onlineQuery, setOnlineQuery] = useState("");
-  const [onlineResults, setOnlineResults] = useState<OnlineSkillResult[]>([]);
+  const [onlineResults, setOnlineResults] = useState<SkillsShItem[]>([]);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function InstallSkills() {
     setIsSearchingOnline(true);
 
     const timer = setTimeout(() => {
-      searchOnlineSkills(onlineQuery)
+      fetchSkillsShDirectory(onlineQuery)
         .then((res) => {
           if (isMounted) {
             setOnlineResults(res);
@@ -273,7 +273,7 @@ export default function InstallSkills() {
             </div>
           ) : (
             <div className="install-card-grid" data-testid="online-card-grid">
-              {onlineResults.map((skill: OnlineSkillResult) => {
+              {onlineResults.map((skill: SkillsShItem) => {
                 const isInstalled = installedSkillNames.has(skill.name);
                 return (
                   <div className="install-card" key={skill.id} data-testid={`online-card-${skill.name}`}>
@@ -284,15 +284,15 @@ export default function InstallSkills() {
                           <span className="install-card-owner-repo">{skill.ownerRepo}</span>
                         )}
                       </div>
-                      {skill.repoUrl && (
+                      {skill.skillsShUrl && (
                         <a
-                          href={skill.repoUrl}
+                          href={skill.skillsShUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="skills-sh-badge"
                           style={{ textDecoration: "none" }}
                         >
-                          GitHub ↗
+                          skills.sh ↗
                         </a>
                       )}
                     </div>
@@ -310,7 +310,7 @@ export default function InstallSkills() {
                       ) : (
                         <button
                           className="btn primary install-btn"
-                          onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl)}
+                          onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.skillsShUrl)}
                           data-testid={`install-btn-${skill.name}`}
                         >
                           {t("nav.install", lang)}

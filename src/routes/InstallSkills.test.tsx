@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import InstallSkills from "./InstallSkills";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
-import { searchOnlineSkills } from "../api/onlineSkillsApi";
+import { fetchSkillsShDirectory } from "../api/skillsShApi";
 
 vi.mock("../stores/masterRepoStore", () => ({
   useMasterRepoStore: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock("../stores/scanStore", () => ({
   useScanStore: vi.fn(),
 }));
 
-vi.mock("../api/onlineSkillsApi", () => ({
-  searchOnlineSkills: vi.fn(),
+vi.mock("../api/skillsShApi", () => ({
+  fetchSkillsShDirectory: vi.fn(),
 }));
 
 describe("InstallSkills Route", () => {
@@ -25,15 +25,15 @@ describe("InstallSkills Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(searchOnlineSkills).mockResolvedValue([
+    vi.mocked(fetchSkillsShDirectory).mockResolvedValue([
       {
-        id: "101",
+        id: "facebook/react-agent/react-agent",
         name: "react-agent",
         ownerRepo: "facebook/react-agent",
         description: "React agent helper skill",
-        stars: 1250,
-        repoUrl: "https://github.com/facebook/react-agent",
-        installsText: "★ 1.3K",
+        installsText: "⚡ 709.5K",
+        skillsShUrl: "https://skills.sh/facebook/react-agent/react-agent",
+        githubUrl: "https://github.com/facebook/react-agent",
       },
     ]);
     vi.mocked(useMasterRepoStore).mockReturnValue({
@@ -203,30 +203,31 @@ describe("InstallSkills Route", () => {
     });
   });
 
-  it("switches to online search tab and renders online search results", async () => {
+  it("switches to online search tab and renders online search results from skills.sh", async () => {
     render(
       <MemoryRouter>
         <InstallSkills />
       </MemoryRouter>
     );
 
-    const onlineTabBtn = screen.getByRole("tab", { name: /全网 11,000\+ 技能检索|Live Online Search/i });
+    const onlineTabBtn = screen.getByRole("tab", { name: /skills\.sh 官方全量库|skills\.sh Directory/i });
     fireEvent.click(onlineTabBtn);
 
     expect(screen.getByTestId("online-content")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(searchOnlineSkills).toHaveBeenCalledWith("");
+      expect(fetchSkillsShDirectory).toHaveBeenCalledWith("");
       expect(screen.getByText("react-agent")).toBeInTheDocument();
       expect(screen.getByText("facebook/react-agent")).toBeInTheDocument();
-      expect(screen.getByText("★ 1.3K")).toBeInTheDocument();
+      expect(screen.getByText("⚡ 709.5K")).toBeInTheDocument();
+      expect(screen.getByText("skills.sh ↗")).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/输入关键词搜索全网|Search 11,000\+/i);
+    const searchInput = screen.getByPlaceholderText(/搜索 skills\.sh|Search skills\.sh/i);
     fireEvent.change(searchInput, { target: { value: "python" } });
 
     await waitFor(() => {
-      expect(searchOnlineSkills).toHaveBeenCalledWith("python");
+      expect(fetchSkillsShDirectory).toHaveBeenCalledWith("python");
     });
   });
 });
