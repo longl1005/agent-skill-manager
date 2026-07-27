@@ -4,6 +4,7 @@ import { t } from "../locales/dict";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
 import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/featuredSkills";
+import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
 
@@ -12,7 +13,7 @@ export type SkillCategory = "all" | "ui" | "search" | "workflow";
 
 export default function InstallSkills() {
   const lang = useI18nStore((s) => s.lang);
-  const { skills: masterSkills, toggleAgentSkill } = useMasterRepoStore();
+  const { skills: masterSkills, toggleAgentSkill, importToMaster } = useMasterRepoStore();
   const { report } = useScanStore();
 
   const [activeTab, setActiveTab] = useState<InstallTab>("marketplace");
@@ -23,6 +24,7 @@ export default function InstallSkills() {
   // Target Agent Distribution Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [targetSkillName, setTargetSkillName] = useState<string>("");
+  const [targetSkillSource, setTargetSkillSource] = useState<string>("");
   const [selectedAgents, setSelectedAgents] = useState<Record<string, boolean>>({});
   const [installing, setInstalling] = useState(false);
 
@@ -44,8 +46,9 @@ export default function InstallSkills() {
     return SUPPORTED_AGENTS;
   }, [report]);
 
-  const handleOpenInstallModal = (skillName: string) => {
+  const handleOpenInstallModal = (skillName: string, source?: string) => {
     setTargetSkillName(skillName);
+    setTargetSkillSource(source || skillName);
     const initialSelected: Record<string, boolean> = {};
     availableAgents.forEach((agent) => {
       initialSelected[agent.id] = true;
@@ -57,10 +60,11 @@ export default function InstallSkills() {
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim()) return;
-    const parts = urlInput.trim().replace(/\/+$/, "").split("/");
+    const parsedUrl = parseSkillsShInput(urlInput);
+    const parts = parsedUrl.trim().replace(/\/+$/, "").split("/");
     const repoName = parts[parts.length - 1] || "custom-skill";
     const cleanSkillName = repoName.replace(/\.git$/, "");
-    handleOpenInstallModal(cleanSkillName);
+    handleOpenInstallModal(cleanSkillName, parsedUrl);
   };
 
   const handleLocalSubmit = (path: string) => {
@@ -68,7 +72,7 @@ export default function InstallSkills() {
     const normalized = path.trim().replace(/[/\\]+$/, "");
     const parts = normalized.split(/[/\\]/);
     const folderName = parts[parts.length - 1] || "local-skill";
-    handleOpenInstallModal(folderName);
+    handleOpenInstallModal(folderName, normalized);
   };
 
   const toggleAgentSelection = (agentId: string) => {
@@ -84,6 +88,7 @@ export default function InstallSkills() {
     try {
       const targetAgentIds = Object.keys(selectedAgents).filter((id) => selectedAgents[id]);
       for (const agentId of targetAgentIds) {
+        await importToMaster(agentId, targetSkillSource || targetSkillName);
         await toggleAgentSkill(agentId, targetSkillName, true);
       }
     } finally {
@@ -91,6 +96,7 @@ export default function InstallSkills() {
       setModalOpen(false);
       setUrlInput("");
       setLocalPath("");
+      setTargetSkillSource("");
     }
   };
 
@@ -167,14 +173,24 @@ export default function InstallSkills() {
               return (
                 <div className="install-card" key={skill.id} data-testid={`featured-card-${skill.name}`}>
                   <div className="install-card-header">
-                    <h3 className="install-card-title">{skill.name}</h3>
-                    <span className="install-card-author">{skill.author}</span>
+                    <div className="install-card-title-group">
+                      <h3 className="install-card-title">{skill.name}</h3>
+                      {skill.ownerRepo && (
+                        <span className="install-card-owner-repo">{skill.ownerRepo}</span>
+                      )}
+                    </div>
+                    <span className="skills-sh-badge">skills.sh Verified</span>
                   </div>
                   <p className="install-card-desc">
                     {skill.description[lang] || skill.description["en"]}
                   </p>
                   <div className="install-card-footer">
-                    <span className="install-card-files">{skill.fileCount} files</span>
+                    <div className="install-card-meta">
+                      <span className="install-card-files">{skill.fileCount} files</span>
+                      {skill.installsText && (
+                        <span className="skills-sh-installs">⚡ {skill.installsText}</span>
+                      )}
+                    </div>
                     {isInstalled ? (
                       <span className="installed-badge" data-testid={`installed-badge-${skill.name}`}>
                         {t("installSkills.installed", lang)}
@@ -182,7 +198,7 @@ export default function InstallSkills() {
                     ) : (
                       <button
                         className="btn primary install-btn"
-                        onClick={() => handleOpenInstallModal(skill.name)}
+                        onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl)}
                         data-testid={`install-btn-${skill.name}`}
                       >
                         {t("nav.install", lang)}

@@ -15,6 +15,7 @@ vi.mock("../stores/scanStore", () => ({
 
 describe("InstallSkills Route", () => {
   const mockToggleAgentSkill = vi.fn().mockResolvedValue(true);
+  const mockImportToMaster = vi.fn().mockResolvedValue({ type: "success" });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,7 +30,7 @@ describe("InstallSkills Route", () => {
       ],
       fetchMasterSkills: vi.fn(),
       toggleAgentSkill: mockToggleAgentSkill,
-      importToMaster: vi.fn(),
+      importToMaster: mockImportToMaster,
     } as any);
 
     vi.mocked(useScanStore).mockReturnValue({
@@ -56,6 +57,18 @@ describe("InstallSkills Route", () => {
     expect(screen.getByRole("tab", { name: /热门技能市场|Marketplace/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Git \/ GitHub|Git \/ URL/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /本地目录|Local Import/i })).toBeInTheDocument();
+  });
+
+  it("renders installsText and ownerRepo on featured skills cards", () => {
+    render(
+      <MemoryRouter>
+        <InstallSkills />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText(/2\.7M installs/i)).toBeInTheDocument();
+    expect(screen.getByText("vercel-labs/skills")).toBeInTheDocument();
+    expect(screen.getAllByText("skills.sh Verified").length).toBeGreaterThan(0);
   });
 
   it("displays installed badge for skills present in master library", () => {
@@ -106,6 +119,37 @@ describe("InstallSkills Route", () => {
 
     expect(screen.getByTestId("target-agent-modal")).toBeInTheDocument();
     expect(screen.getByText("custom-skill")).toBeInTheDocument();
+  });
+
+  it("parses shorthand input like anthropics/skills and triggers skill installation", async () => {
+    render(
+      <MemoryRouter>
+        <InstallSkills />
+      </MemoryRouter>
+    );
+
+    const urlTabBtn = screen.getByRole("tab", { name: /Git \/ GitHub|Git \/ URL/i });
+    fireEvent.click(urlTabBtn);
+
+    const input = screen.getByPlaceholderText(/Git \/ GitHub/i);
+    fireEvent.change(input, { target: { value: "anthropics/skills" } });
+
+    const submitBtn = screen.getByText(/解析并安装|Fetch & Install/i);
+    fireEvent.click(submitBtn);
+
+    expect(screen.getByTestId("target-agent-modal")).toBeInTheDocument();
+    expect(screen.getByText("skills")).toBeInTheDocument();
+
+    const confirmBtn = screen.getByTestId("confirm-install-btn");
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(mockImportToMaster).toHaveBeenCalledWith(
+        "claude-code",
+        "https://github.com/anthropics/skills"
+      );
+      expect(mockToggleAgentSkill).toHaveBeenCalledWith("claude-code", "skills", true);
+    });
   });
 
   it("switches to Local import tab and handles drag/click prompt", () => {
