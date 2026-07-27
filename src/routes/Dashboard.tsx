@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useScanStore } from "../stores/scanStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
+import { useI18nStore } from "../stores/i18nStore";
+import { t } from "../locales/dict";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { AgentIdentityMark, AgentStatus } from "../components/AgentVisual";
 
@@ -14,6 +16,7 @@ function formatTime(unixMillis: number): string {
 export default function Dashboard() {
   const { report, scanning, error } = useScanStore();
   const { skills: masterSkills, fetchMasterSkills } = useMasterRepoStore();
+  const lang = useI18nStore((s) => s.lang);
 
   useEffect(() => {
     fetchMasterSkills();
@@ -48,15 +51,15 @@ export default function Dashboard() {
     <section className="page dashboard-page">
       <div className="dashboard-header">
         <div className="dashboard-header-title">
-          <h1>Dashboard</h1>
-          <p>Automated Agent & Skill Management Overview</p>
+          <h1>{t("dashboard.title", lang)}</h1>
+          <p>{t("dashboard.subtitle", lang)}</p>
         </div>
         <div className="dashboard-shortcuts">
           <Link to="/library" className="btn dashboard-shortcut-btn">
-            Master Library
+            {t("dashboard.quickLibrary", lang)}
           </Link>
           <Link to="/agents" className="btn dashboard-shortcut-btn">
-            Manage Agents
+            {t("dashboard.quickAgents", lang)}
           </Link>
         </div>
       </div>
@@ -65,38 +68,38 @@ export default function Dashboard() {
 
       <div className="dashboard-metrics-grid">
         <div className="dashboard-metric-card">
-          <span className="metric-label">Master Skills</span>
+          <span className="metric-label">{t("dashboard.metricMasterSkills", lang)}</span>
           <span className="metric-value">{masterSkills.length}</span>
-          <span className="metric-subtext">In ~/.asm/skills repository</span>
+          <span className="metric-subtext">~/.asm/skills</span>
         </div>
 
         <div className="dashboard-metric-card">
-          <span className="metric-label">Active Agents</span>
+          <span className="metric-label">{t("dashboard.metricActiveAgents", lang)}</span>
           <span className="metric-value">{detectedAgents.length}</span>
-          <span className="metric-subtext">Detected workspaces</span>
+          <span className="metric-subtext">{detectedAgents.length} Agents</span>
         </div>
 
         <div className="dashboard-metric-card">
-          <span className="metric-label">Symlink Coverage</span>
+          <span className="metric-label">{t("dashboard.metricSymlinkCoverage", lang)}</span>
           <span className="metric-value">{symlinkCoveragePercent}%</span>
           <span className="metric-subtext">
-            {linkedAgentSkills} of {totalAgentSkills} skills linked
+            {linkedAgentSkills} / {totalAgentSkills}
           </span>
         </div>
 
         <div className="dashboard-metric-card">
-          <span className="metric-label">Auto-Sync Status</span>
+          <span className="metric-label">{t("dashboard.metricSyncStatus", lang)}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
             <span className="sync-live-dot" />
-            <span style={{ fontWeight: 600, fontSize: 16 }}>Auto-Sync Active</span>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>{t("dashboard.syncActive", lang)}</span>
           </div>
           <span className="metric-subtext" style={{ marginTop: 4 }}>
-            Last updated {lastUpdatedTime}
+            {t("dashboard.lastRefreshed", lang)} {lastUpdatedTime}
           </span>
         </div>
       </div>
 
-      <h2 className="dashboard-section-title">Agent Health Grid</h2>
+      <h2 className="dashboard-section-title">{t("dashboard.agentMonitorTitle", lang)}</h2>
 
       {scanning && !report ? (
         <p className="empty-hint">Scanning agent workspaces...</p>
@@ -132,14 +135,14 @@ export default function Dashboard() {
 
                 <div className="dashboard-agent-stats">
                   <div className="dashboard-agent-stat-item">
-                    <span className="dashboard-agent-stat-label">Skills</span>
+                    <span className="dashboard-agent-stat-label">{t("nav.library", lang)}</span>
                     <span className="dashboard-agent-stat-value">
-                      {agent.skills.length} {agent.skills.length === 1 ? "Skill" : "Skills"}
+                      {agent.skills.length} {t("dashboard.skillsUnit", lang)}
                     </span>
                   </div>
 
                   <div className="dashboard-agent-stat-item">
-                    <span className="dashboard-agent-stat-label">Symlink Ratio</span>
+                    <span className="dashboard-agent-stat-label">{t("dashboard.managedRatio", lang)}</span>
                     <span className="dashboard-agent-stat-value">
                       {agentLinkedCount}/{agent.skills.length}
                     </span>

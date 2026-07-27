@@ -36,6 +36,11 @@ export const dict = {
     "settings.paths.placeholder": "输入自定义绝对路径",
     "settings.paths.save": "保存",
     "settings.paths.reset": "重置",
+    // Skill Card
+    "skillCard.upload": "上传至主库",
+    "skillCard.managed": "✓ 已在主库",
+    "skillCard.uploading": "上传中...",
+
     // Master Skill Library
     "skillLibrary.title": "Master 技能仓库",
     "skillLibrary.subtitle": "~/.asm/skills 集中存储与 Agent 软链接分发矩阵",
@@ -52,6 +57,21 @@ export const dict = {
     "skillLibrary.emptyHint": "在 ~/.asm/skills 中未找到 Master 技能。",
     "skillLibrary.emptySearch": "没有符合筛选条件的 Master 技能。",
     "skillLibrary.refresh": "刷新",
+
+    // Dashboard
+    "dashboard.title": "仪表盘",
+    "dashboard.subtitle": "Agent 技能全局运维与集中调度概览大屏",
+    "dashboard.metricMasterSkills": "主库技能总数",
+    "dashboard.metricActiveAgents": "已连接 Agent",
+    "dashboard.metricSymlinkCoverage": "软链接托管覆盖率",
+    "dashboard.metricSyncStatus": "实时同步状态",
+    "dashboard.syncActive": "后台自动同步中",
+    "dashboard.lastRefreshed": "上次更新",
+    "dashboard.quickLibrary": "主技能仓库",
+    "dashboard.quickAgents": "智能体管理",
+    "dashboard.agentMonitorTitle": "Agent 技能运行监控与分布矩阵",
+    "dashboard.skillsUnit": "个技能",
+    "dashboard.managedRatio": "主库托管率",
   },
   en: {
     // Navigation
@@ -105,6 +125,25 @@ export const dict = {
     "settings.paths.placeholder": "Enter custom path",
     "settings.paths.save": "Save",
     "settings.paths.reset": "Reset",
+    // Skill Card
+    "skillCard.upload": "Import to Master",
+    "skillCard.managed": "✓ In Master Repo",
+    "skillCard.uploading": "Importing...",
+
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.subtitle": "Agent skill ops overview & central matrix monitor",
+    "dashboard.metricMasterSkills": "Master Skills",
+    "dashboard.metricActiveAgents": "Active Agents",
+    "dashboard.metricSymlinkCoverage": "Symlink Coverage",
+    "dashboard.metricSyncStatus": "Sync Status",
+    "dashboard.syncActive": "Auto-Sync Active",
+    "dashboard.lastRefreshed": "Last updated",
+    "dashboard.quickLibrary": "Master Library",
+    "dashboard.quickAgents": "Manage Agents",
+    "dashboard.agentMonitorTitle": "Agent Skill Monitor & Distribution Matrix",
+    "dashboard.skillsUnit": "skills",
+    "dashboard.managedRatio": "Managed",
   },
 } as const;
 

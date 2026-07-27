@@ -76,7 +76,7 @@ describe("Dashboard Route Redesign", () => {
     expect(screen.getByText("Master Skills")).toBeInTheDocument();
     expect(screen.getByText("Active Agents")).toBeInTheDocument();
     expect(screen.getByText("Symlink Coverage")).toBeInTheDocument();
-    expect(screen.getByText("Auto-Sync Status")).toBeInTheDocument();
+    expect(screen.getByText("Sync Status")).toBeInTheDocument();
   });
 
   it("renders Agent Health Cards for detected agents", () => {
@@ -87,18 +87,25 @@ describe("Dashboard Route Redesign", () => {
     );
 
     expect(screen.getByText("Claude Code")).toBeInTheDocument();
-    expect(screen.getByText("1 Skill")).toBeInTheDocument();
+    expect(screen.getByText(/1\s+skills/i)).toBeInTheDocument();
   });
 
-  it("renders navigation shortcuts", () => {
+  it("renders navigation shortcuts and supports Chinese language switching", () => {
+    useI18nStore.setState({ lang: "zh" });
+
     render(
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>
     );
 
-    const libraryLink = screen.getByRole("link", { name: /master library/i });
-    const agentsLink = screen.getByRole("link", { name: /manage agents/i });
+    expect(screen.getByRole("heading", { name: "仪表盘" })).toBeInTheDocument();
+    expect(screen.getByText("主库技能总数")).toBeInTheDocument();
+    expect(screen.getByText("已连接 Agent")).toBeInTheDocument();
+    expect(screen.getByText("后台自动同步中")).toBeInTheDocument();
+
+    const libraryLink = screen.getByRole("link", { name: "主技能仓库" });
+    const agentsLink = screen.getByRole("link", { name: "智能体管理" });
 
     expect(libraryLink).toHaveAttribute("href", "/library");
     expect(agentsLink).toHaveAttribute("href", "/agents");
