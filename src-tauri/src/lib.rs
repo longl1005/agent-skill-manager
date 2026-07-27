@@ -11,7 +11,11 @@ pub fn run() {
         .manage(commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::ping,
-            commands::scan_agents
+            commands::scan_agents,
+            commands::read_skill_content,
+            commands::get_master_skills,
+            commands::toggle_agent_skill,
+            commands::import_to_master
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

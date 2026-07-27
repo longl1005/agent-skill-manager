@@ -6,6 +6,7 @@ pub mod adapter;
 pub mod db;
 pub mod errors;
 pub mod inventory;
+pub mod master_repo;
 pub mod platform;
 pub mod scanner;
 pub mod util;

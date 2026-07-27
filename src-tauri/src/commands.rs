@@ -7,8 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 use crate::modules::adapter::{
-    AgentAdapter, AgentId, ClaudeCodeAdapter, DetectContext, Platform, PlatformContext,
-    ScanContext, ScanId, ScanIssue, ScanResult,
+    AgentAdapter, AgentId, AntigravityAdapter, ClaudeCodeAdapter, CodexAdapter, DetectContext, Platform, PlatformContext,
+    PiAgentAdapter, ScanContext, ScanId, ScanIssue, ScanResult,
 };
 
 /// 整个 app 共享的 state。
@@ -85,7 +85,10 @@ pub struct IssueReport {
 }
 
 #[tauri::command]
-pub fn scan_agents(state: tauri::State<'_, AppState>) -> Result<ScanReport, String> {
+pub fn scan_agents(
+    state: tauri::State<'_, AppState>,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<ScanReport, String> {
     let started_at = SystemTime::now();
 
     // 构造 platform context
@@ -97,16 +100,25 @@ pub fn scan_agents(state: tauri::State<'_, AppState>) -> Result<ScanReport, Stri
         cwd,
     };
 
-    // 注册的 adapter 列表（M0 仅 ClaudeCodeAdapter）
-    let adapters: Vec<Box<dyn AgentAdapter>> = vec![Box::new(ClaudeCodeAdapter)];
+    // 注册的 adapter 列表（ClaudeCodeAdapter, CodexAdapter, AntigravityAdapter & PiAgentAdapter）
+    let adapters: Vec<Box<dyn AgentAdapter>> = vec![
+        Box::new(ClaudeCodeAdapter),
+        Box::new(CodexAdapter),
+        Box::new(AntigravityAdapter),
+        Box::new(PiAgentAdapter),
+    ];
 
     let mut agent_reports: Vec<AgentReport> = Vec::new();
     let mut total_skills = 0usize;
     let mut total_issues = 0usize;
 
     for adapter in &adapters {
+        let custom_path_str = custom_paths.as_ref().and_then(|m| m.get(&adapter.id().0));
+        let custom_pathbuf = custom_path_str.map(PathBuf::from);
+
         let det = adapter.detect(&DetectContext {
             platform: &platform_ctx,
+            custom_path: custom_pathbuf.as_deref(),
         });
         let roots = adapter.skill_roots(&det);
         let descriptor = adapter.descriptor();
@@ -249,6 +261,19 @@ fn unix_millis(t: SystemTime) -> u64 {
         .unwrap_or(0)
 }
 
+#[tauri::command]
+pub fn read_skill_content(location: String) -> Result<String, String> {
+    let path = PathBuf::from(&location);
+    let entry_file = if path.is_file() {
+        path
+    } else {
+        path.join("SKILL.md")
+    };
+
+    std::fs::read_to_string(&entry_file)
+        .map_err(|e| format!("Failed to read SKILL.md at {:?}: {}", entry_file, e))
+}
+
 // 简易 uuid 包装, 避免在 commands.rs 引入 uuid::Uuid 的额外 import
 struct UuidWrapper;
 impl UuidWrapper {
@@ -256,4 +281,36 @@ impl UuidWrapper {
     fn new() -> String {
         uuid::Uuid::new_v4().to_string()
     }
+}
+
+// ============================================================
+// Master Repo commands
+// ============================================================
+
+#[tauri::command]
+pub fn get_master_skills(
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<Vec<crate::modules::master_repo::MasterSkillReport>, String> {
+    Ok(crate::modules::master_repo::scan_master_repo(custom_paths.as_ref()))
+}
+
+#[tauri::command]
+pub fn toggle_agent_skill(
+    agent_id: String,
+    skill_name: String,
+    enable: bool,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<bool, String> {
+    crate::modules::master_repo::toggle_skill_symlink(&agent_id, &skill_name, enable, custom_paths.as_ref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_to_master(
+    agent_id: String,
+    skill_name: String,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<bool, String> {
+    crate::modules::master_repo::import_skill_to_master(&agent_id, &skill_name, custom_paths.as_ref())
+        .map_err(|e| e.to_string())
 }
