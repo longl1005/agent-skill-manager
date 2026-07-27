@@ -46,3 +46,12 @@ export interface IssueReport {
   path: string | null;
   message: string;
 }
+
+// ===== master_repo 响应 =====
+
+export interface MasterSkillReport {
+  name: string;
+  description: string;
+  path: string;
+  linked_agents: Record<string, boolean>;
+}
