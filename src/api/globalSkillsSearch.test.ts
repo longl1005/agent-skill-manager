@@ -32,7 +32,7 @@ describe("Global Skills Search API", () => {
     expect(res.items.length).toBeGreaterThan(0);
     expect(res.totalCount).toBeGreaterThan(0);
     expect(res.page).toBe(1);
-    expect(res.pageSize).toBe(20);
+    expect(res.pageSize).toBe(18);
   });
 
   it("filters skills.sh items by query", async () => {
@@ -92,7 +92,7 @@ describe("Global Skills Search API", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
     const res = await searchGlobalSkills({ query: "", page: 1 });
-    expect(res.items.length).toBe(SKILLS_SH_LEADERBOARD.length);
+    expect(res.items.length).toBe(18);
     expect(res.totalCount).toBe(SKILLS_SH_LEADERBOARD.length);
   });
 
@@ -119,13 +119,14 @@ describe("Global Skills Search API", () => {
     expect(matchCount).toBe(1);
   });
 
-  it("only includes skills.sh items on page 1", async () => {
+  it("paginates skills.sh items across pages when page > 1", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({ items: [], total_count: 100 }),
     } as Response);
 
     const resPage2 = await searchGlobalSkills({ query: "", page: 2 });
-    expect(resPage2.items.some((item) => item.isVerifiedSkillsSh)).toBe(false);
+    expect(resPage2.items.length).toBe(18);
+    expect(resPage2.items[0].id).toBe(SKILLS_SH_LEADERBOARD[18].id);
   });
 });

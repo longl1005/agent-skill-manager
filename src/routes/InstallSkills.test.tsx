@@ -224,7 +224,7 @@ describe("InstallSkills Route", () => {
     expect(screen.getByTestId("online-content")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "stars" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, pageSize: 18, sortBy: "stars" });
       expect(screen.getByText("react-agent")).toBeInTheDocument();
       expect(screen.getByText("facebook/react-agent")).toBeInTheDocument();
       expect(screen.getByText("⚡ 709.5K")).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("InstallSkills Route", () => {
     fireEvent.change(searchInput, { target: { value: "python" } });
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "python", page: 1, sortBy: "stars" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "python", page: 1, pageSize: 18, sortBy: "stars" });
     });
   });
 
@@ -250,7 +250,7 @@ describe("InstallSkills Route", () => {
     fireEvent.click(onlineTabBtn);
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "stars" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, pageSize: 18, sortBy: "stars" });
     });
 
     // Switch sort order to updated
@@ -258,7 +258,7 @@ describe("InstallSkills Route", () => {
     fireEvent.click(updatedSortBtn);
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "updated" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, pageSize: 18, sortBy: "updated" });
     });
 
     // Click next page
@@ -266,7 +266,7 @@ describe("InstallSkills Route", () => {
     fireEvent.click(nextBtn);
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 2, sortBy: "updated" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 2, pageSize: 18, sortBy: "updated" });
     });
 
     // Click prev page
@@ -274,7 +274,7 @@ describe("InstallSkills Route", () => {
     fireEvent.click(prevBtn);
 
     await waitFor(() => {
-      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, sortBy: "updated" });
+      expect(searchGlobalSkills).toHaveBeenCalledWith({ query: "", page: 1, pageSize: 18, sortBy: "updated" });
     });
   });
 });

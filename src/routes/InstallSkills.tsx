@@ -36,7 +36,7 @@ export default function InstallSkills() {
     setIsSearchingOnline(true);
 
     const timer = setTimeout(() => {
-      searchGlobalSkills({ query: onlineQuery, page: onlinePage, sortBy: onlineSortBy })
+      searchGlobalSkills({ query: onlineQuery, page: onlinePage, pageSize: 18, sortBy: onlineSortBy })
         .then((res) => {
           if (isMounted) {
             setOnlineResults(res.items);

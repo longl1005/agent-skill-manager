@@ -28,7 +28,7 @@ export interface GlobalSkillsSearchResult {
 export async function searchGlobalSkills(
   options: GlobalSkillsSearchOptions = {}
 ): Promise<GlobalSkillsSearchResult> {
-  const { query = "", page = 1, pageSize = 20, sortBy = "stars" } = options;
+  const { query = "", page = 1, pageSize = 18, sortBy = "stars" } = options;
   const q = query.trim().toLowerCase();
 
   // 1. Filter local/skills.sh directory items first
@@ -95,7 +95,20 @@ export async function searchGlobalSkills(
 
   // Add skills.sh verified items first for page 1
   if (page === 1) {
-    for (const item of skillsShItems) {
+    const skillsShSlice = skillsShItems.slice(0, pageSize);
+    for (const item of skillsShSlice) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        if (item.ownerRepo) seenRepos.add(item.ownerRepo.toLowerCase());
+        if (item.repoUrl) seenRepos.add(item.repoUrl.toLowerCase());
+        mergedItems.push(item);
+      }
+    }
+  } else {
+    // For pages > 1, slice skills.sh items corresponding to page
+    const startIdx = (page - 1) * pageSize;
+    const skillsShSlice = skillsShItems.slice(startIdx, startIdx + pageSize);
+    for (const item of skillsShSlice) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         if (item.ownerRepo) seenRepos.add(item.ownerRepo.toLowerCase());
@@ -118,10 +131,11 @@ export async function searchGlobalSkills(
     }
   }
 
+  const finalSlice = mergedItems.slice(0, pageSize);
   const totalCount = Math.max(gitHubTotal, skillsShItems.length);
 
   return {
-    items: mergedItems,
+    items: finalSlice,
     totalCount,
     page,
     pageSize,
