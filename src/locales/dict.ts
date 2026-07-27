@@ -90,6 +90,24 @@ export const dict = {
     "agentDetail.noDescription": "(暂无描述)",
     "agentDetail.emptySkills": "该 Agent 暂未安装任何技能。",
     "agentDetail.fileCount": "{count} 个文件",
+
+    // Install Skills
+    "installSkills.title": "安装技能",
+    "installSkills.subtitle": "从开源技能市场、Git 仓库或本地目录一键安装并分发至 Agent",
+    "installSkills.tabMarketplace": "🔥 热门技能市场",
+    "installSkills.tabUrl": "🔗 Git / GitHub 网址安装",
+    "installSkills.tabLocal": "📁 本地目录导入",
+    "installSkills.filterAll": "全部",
+    "installSkills.filterUi": "UI/前端",
+    "installSkills.filterSearch": "工具与搜索",
+    "installSkills.filterWorkflow": "工作流",
+    "installSkills.urlPlaceholder": "输入 Git / GitHub 仓库地址 (例如 https://github.com/user/skill-repo 或 owner/repo)",
+    "installSkills.urlSubmit": "解析并安装",
+    "installSkills.localPrompt": "拖拽技能文件夹至此处，或点击浏览",
+    "installSkills.targetModalTitle": "选择分发 Target Agents",
+    "installSkills.targetModalConfirm": "确认安装并建立软链接",
+    "installSkills.cancel": "取消",
+    "installSkills.installed": "✓ 已在主库",
   },
   en: {
     // Navigation
@@ -180,6 +198,24 @@ export const dict = {
     "agentDetail.noDescription": "(No description provided)",
     "agentDetail.emptySkills": "No installed skills.",
     "agentDetail.fileCount": "{count} files",
+
+    // Install Skills
+    "installSkills.title": "Install Skills",
+    "installSkills.subtitle": "Discover, download from Git, or import local skill directories",
+    "installSkills.tabMarketplace": "🔥 Marketplace",
+    "installSkills.tabUrl": "🔗 Git / URL Import",
+    "installSkills.tabLocal": "📁 Local Import",
+    "installSkills.filterAll": "All",
+    "installSkills.filterUi": "UI & Design",
+    "installSkills.filterSearch": "Search & Tools",
+    "installSkills.filterWorkflow": "Workflow",
+    "installSkills.urlPlaceholder": "Enter Git / GitHub repository URL or owner/repo",
+    "installSkills.urlSubmit": "Fetch & Install",
+    "installSkills.localPrompt": "Drag and drop skill folder here, or click to browse",
+    "installSkills.targetModalTitle": "Select Target Agents for Symlink Distribution",
+    "installSkills.targetModalConfirm": "Confirm & Install Symlinks",
+    "installSkills.cancel": "Cancel",
+    "installSkills.installed": "✓ Installed",
   },
 } as const;
 

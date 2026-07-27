@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import AppSidebar from "./components/AppSidebar";
 import Dashboard from "./routes/Dashboard";
 import SkillLibrary from "./routes/SkillLibrary";
+import InstallSkills from "./routes/InstallSkills";
 import AgentMatrix from "./routes/AgentMatrix";
 import Agents from "./routes/Agents";
 import AgentDetail from "./routes/AgentDetail";
@@ -32,7 +33,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/library" element={<SkillLibrary />} />
-            <Route path="/install" element={<SkillLibrary />} />
+            <Route path="/install" element={<InstallSkills />} />
             <Route path="/matrix" element={<AgentMatrix />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/:agentId" element={<AgentDetail />} />

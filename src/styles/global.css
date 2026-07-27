@@ -3254,3 +3254,238 @@ a.agent-detail__skill-card,
   color: var(--fg);
 }
 
+/* ===== Install Skills Page ===== */
+.install-skills-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.install-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.install-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.install-tab-btn:hover {
+  color: var(--fg);
+  background: var(--surface-hover);
+}
+
+.install-tab-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  font-weight: 600;
+}
+
+.install-category-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.install-category-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.install-category-chip:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+}
+
+.install-category-chip.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.install-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.install-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.15s ease;
+}
+
+.install-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.install-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.install-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--fg);
+}
+
+.install-card-author {
+  font-size: 11px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.install-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.install-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.install-card-files {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.installed-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.install-url-box {
+  display: flex;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 12px;
+}
+
+.install-url-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--fg);
+  outline: none;
+}
+
+.install-url-input:focus {
+  border-color: var(--accent);
+}
+
+.install-local-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface);
+  transition: all 0.15s ease;
+  margin-top: 12px;
+}
+
+.install-local-dropzone:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.dropzone-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.dropzone-text {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.dropzone-path {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.install-target-modal {
+  max-width: 480px;
+  width: 100%;
+}
+
+.target-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 24px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.target-agent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.target-agent-item.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.target-agent-item input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+
