@@ -3599,13 +3599,13 @@ a.agent-detail__skill-card,
 }
 
 .install-target-modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  max-width: 580px;
+  background: var(--surface, #141419);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  border-radius: 18px;
+  max-width: 560px;
   width: 100%;
-  padding: 28px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+  padding: 26px 28px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
   position: relative;
   z-index: 1001;
   animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3616,24 +3616,33 @@ a.agent-detail__skill-card,
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .modal-header-row h2 {
   font-size: 20px;
   font-weight: 700;
   margin: 0 0 6px 0;
-  color: var(--fg);
+  color: var(--text, #f0f0f5);
+}
+
+.modal-subtitle {
+  font-size: 13.5px;
+  color: var(--muted, #888899);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .target-skill-chip {
   display: inline-block;
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--color-accent-blue, #6366f1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
   padding: 2px 8px;
   border-radius: 6px;
-  font-family: monospace;
+  font-family: var(--font-mono, monospace);
   font-weight: 600;
   font-size: 13px;
 }
@@ -3648,53 +3657,68 @@ a.agent-detail__skill-card,
 .modal-text-btn {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--color-accent-blue, #6366f1);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
   transition: all 0.15s ease;
 }
 
 .modal-text-btn:hover {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: rgba(99, 102, 241, 0.12);
 }
 
 .modal-select-actions .divider {
-  color: var(--muted);
+  color: var(--muted, #888899);
   font-size: 12px;
+  opacity: 0.6;
 }
 
 .target-agent-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .target-agent-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  padding: 13px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none !important;
+  box-shadow: none !important;
+  transition: all 0.18s ease;
+}
+
+.target-agent-card:focus,
+.target-agent-card:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .target-agent-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .target-agent-card.is-selected {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+  border-color: var(--color-accent-blue, #6366f1);
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25) !important;
+}
+
+.target-agent-card.is-selected:focus,
+.target-agent-card.is-selected:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25) !important;
 }
 
 .target-agent-card-left {
@@ -3706,27 +3730,33 @@ a.agent-detail__skill-card,
 .target-agent-card-left .agent-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text, #f0f0f5);
 }
 
 .target-check-indicator {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
   color: transparent;
   transition: all 0.15s ease;
 }
 
 .target-check-indicator.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--color-accent-blue, #6366f1);
+  border-color: var(--color-accent-blue, #6366f1);
   color: #ffffff;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .install-online-controls {
