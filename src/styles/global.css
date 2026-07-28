@@ -943,8 +943,8 @@ input:focus-visible {
   font-size: 13px;
   font-weight: 500;
   gap: 9px;
-  min-height: 44px;
-  padding: 9px 10px;
+  min-height: 35px;
+  padding: 6px 10px;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
@@ -969,7 +969,9 @@ input:focus-visible {
 .sidebar nav[aria-label="Discovered Agents"] a:not(:first-of-type) {
   color: var(--muted);
   font-size: 12px;
-  min-height: 44px;
+  min-height: 34px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   padding-left: 34px;
 }
 
