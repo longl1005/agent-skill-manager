@@ -109,6 +109,9 @@ pub fn init_db_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Cleanup legacy translation table if it exists
+    let _ = conn.execute("DROP TABLE IF EXISTS skill_translations", []);
+
     Ok(())
 }
 
