@@ -83,9 +83,9 @@ describe("SkillLibrary Route", () => {
     const claudeBadge = screen.getByTestId("agent-badge-web-search-pro-claude-code");
     const codexBadge = screen.getByTestId("agent-badge-web-search-pro-codex");
 
-    expect(claudeBadge).toHaveTextContent("Claude Code");
+    expect(claudeBadge).toHaveAttribute("title", expect.stringContaining("Claude Code"));
     expect(claudeBadge).toHaveTextContent("Linked");
-    expect(codexBadge).toHaveTextContent("Codex");
+    expect(codexBadge).toHaveAttribute("title", expect.stringContaining("Codex"));
     expect(codexBadge).toHaveTextContent("Unlinked");
   });
 

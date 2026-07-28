@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 
 import { isDiscoveredAgent } from "../agentDiscovery";
+import type { AgentReport } from "../ipc/types";
 import { useScanStore } from "../stores/scanStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { t, type TranslationKey } from "../locales/dict";
@@ -55,6 +56,22 @@ function SidebarLink({
   );
 }
 
+function AgentSidebarLink({ agent }: { agent: AgentReport }) {
+  return (
+    <NavLink
+      to={`/agents/${agent.agent_id}`}
+      end
+      className={({ isActive }) => (isActive ? "is-selected active" : undefined)}
+    >
+      <AgentSidebarIcon agentId={agent.agent_id} />
+      <span className="sidebar-agent-name">{agent.display_name}</span>
+      <span className="sidebar-skill-count-badge" title={`${agent.skills.length} skills`}>
+        {agent.skills.length}
+      </span>
+    </NavLink>
+  );
+}
+
 export default function AppSidebar() {
   const report = useScanStore((state) => state.report);
   const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
@@ -78,7 +95,7 @@ export default function AppSidebar() {
         <p className="sidebar-group-label">{t("nav.discoveredAgents", lang)}</p>
         <SidebarLink icon="agents" label={t("nav.allAgents", lang)} to="/agents" end />
         {detectedAgents.map((agent) => (
-          <SidebarLink key={agent.agent_id} label={agent.display_name} to={`/agents/${agent.agent_id}`} agentId={agent.agent_id} />
+          <AgentSidebarLink key={agent.agent_id} agent={agent} />
         ))}
       </nav>
       <nav aria-label={t("nav.settings", lang)} style={{ borderTop: "1px solid var(--border)", marginTop: "auto", paddingTop: 8 }}>

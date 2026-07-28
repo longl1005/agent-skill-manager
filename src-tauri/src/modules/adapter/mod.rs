@@ -8,6 +8,10 @@
 
 mod claude_code;
 mod codex;
+mod antigravity;
+mod pi_agent;
+mod opencode;
+mod cursor;
 
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -104,6 +108,7 @@ pub enum CompareConfidence {
 
 pub struct DetectContext<'a> {
     pub platform: &'a PlatformContext,
+    pub custom_path: Option<&'a std::path::Path>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -290,6 +295,10 @@ pub enum ScanCompleteness {
 
 pub use claude_code::ClaudeCodeAdapter;
 pub use codex::CodexAdapter;
+pub use antigravity::AntigravityAdapter;
+pub use pi_agent::PiAgentAdapter;
+pub use opencode::OpenCodeAdapter;
+pub use cursor::CursorAdapter;
 
 #[cfg(test)]
 mod tests {

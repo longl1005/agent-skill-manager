@@ -52,8 +52,8 @@ describe("AppSidebar", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Codex" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Claude Code" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Codex/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Claude Code/i })).toBeVisible();
     expect(screen.queryByRole("link", { name: "Unavailable Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Unsupported Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Failed Agent" })).not.toBeInTheDocument();

@@ -89,13 +89,13 @@ describe("masterRepoStore", () => {
   });
 
   it("imports skill to master and triggers refresh and scan", async () => {
-    vi.mocked(commands.importToMaster).mockResolvedValueOnce(true);
+    vi.mocked(commands.importToMaster).mockResolvedValueOnce({ type: "success" });
     vi.mocked(commands.getMasterSkills).mockResolvedValueOnce([]);
 
     const result = await useMasterRepoStore.getState().importToMaster("claude_code", "test-skill");
 
-    expect(result).toBe(true);
-    expect(commands.importToMaster).toHaveBeenCalledWith("claude_code", "test-skill", {});
+    expect(result).toEqual({ type: "success" });
+    expect(commands.importToMaster).toHaveBeenCalledWith("claude_code", "test-skill", undefined, {});
     expect(commands.getMasterSkills).toHaveBeenCalled();
     expect(useScanStore.getState().scan).toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe("masterRepoStore", () => {
 
     const result = await useMasterRepoStore.getState().importToMaster("claude_code", "test-skill");
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ type: "conflict", skill_name: "test-skill", existing_fingerprint: "", incoming_fingerprint: "" });
     expect(useMasterRepoStore.getState().error).toBe("Error: Import failed");
   });
 });

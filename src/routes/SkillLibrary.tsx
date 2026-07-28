@@ -9,6 +9,8 @@ export const SUPPORTED_AGENTS = [
   { id: "codex", name: "Codex" },
   { id: "antigravity", name: "Antigravity" },
   { id: "pi-agent", name: "Pi Agent" },
+  { id: "opencode", name: "Open Code" },
+  { id: "cursor", name: "Cursor" },
 ];
 
 export type StatusFilter = "all" | "linked" | "unlinked";
@@ -174,12 +176,12 @@ export default function SkillLibrary() {
                         className={`agent-link-badge ${isLinked ? "linked" : "unlinked"}`}
                         onClick={() => handleToggleAgent(agent.id, skill.name, isLinked)}
                         disabled={isToggling}
+                        title={`${agent.name} (${isLinked ? t("skillLibrary.linked", lang) : t("skillLibrary.unlinked", lang)})`}
                         aria-label={`Toggle ${agent.name} link for ${skill.name}`}
                         data-testid={`agent-badge-${skill.name}-${agent.id}`}
                       >
                         <div className="badge-agent-info">
                           <AgentIdentityMark agentId={agent.id} />
-                          <span className="agent-name">{agent.name}</span>
                         </div>
                         <span className={`link-status-tag ${isLinked ? "status-linked" : "status-unlinked"}`}>
                           {isToggling

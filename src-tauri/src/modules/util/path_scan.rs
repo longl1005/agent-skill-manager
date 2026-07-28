@@ -58,10 +58,14 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput<'_>) -> (Vec<SkillCandidate
             continue;
         }
 
-        // symlink_metadata: 不 follow
-        let meta = match fs::symlink_metadata(&dir_path) {
+        // 校验目录属性: 用 metadata 自动 follow symlink/快捷方式
+        let meta = match fs::metadata(&dir_path) {
             Ok(m) => m,
             Err(e) => {
+                // 若是断链/目标不存在，默默跳过
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    continue;
+                }
                 issues.push(ScanIssue {
                     code: "PERMISSION_DENIED".into(),
                     severity: IssueSeverity::Warning,
@@ -74,36 +78,21 @@ pub fn enumerate_skill_dirs(input: &EnumerationInput<'_>) -> (Vec<SkillCandidate
             }
         };
 
-        if !meta.file_type().is_dir() {
+        if !meta.is_dir() {
             continue;
         }
 
-        // 检查 entry file
+        // 检查 entry file (如 SKILL.md)
         let entry_path = dir_path.join(input.entry_filename);
         let entry_meta = match fs::metadata(&entry_path) {
             Ok(m) => m,
             Err(_) => {
-                issues.push(ScanIssue {
-                    code: "ENTRY_MISSING".into(),
-                    severity: IssueSeverity::Warning,
-                    phase: IssuePhase::Enumeration,
-                    path: Some(dir_path.clone()),
-                    message: format!("missing {}", input.entry_filename),
-                    recoverable: true,
-                });
+                // 缺 SKILL.md，默默跳过
                 continue;
             }
         };
 
         if !entry_meta.is_file() {
-            issues.push(ScanIssue {
-                code: "ENTRY_NOT_A_FILE".into(),
-                severity: IssueSeverity::Warning,
-                phase: IssuePhase::Enumeration,
-                path: Some(entry_path.clone()),
-                message: format!("{} is not a regular file", input.entry_filename),
-                recoverable: true,
-            });
             continue;
         }
 
@@ -171,18 +160,7 @@ mod tests {
         };
         let (candidates, issues) = enumerate_skill_dirs(&input);
         assert_eq!(candidates.len(), 1);
-        assert!(!issues.is_empty());
-        let code = issues
-            .iter()
-            .find(|i| {
-                i.path
-                    .as_ref()
-                    .unwrap()
-                    .to_string_lossy()
-                    .contains("no_entry")
-            })
-            .map(|i| i.code.as_str());
-        assert_eq!(code, Some("ENTRY_MISSING"));
+        assert!(issues.is_empty());
     }
 
     #[test]
@@ -200,5 +178,31 @@ mod tests {
         let (candidates, _) = enumerate_skill_dirs(&input);
         assert_eq!(candidates.len(), 1);
         // 不可读目录无法在大多数 CI 上可靠模拟，跳过。但确保不 panic 已经足够。
+    }
+
+    #[test]
+    fn enumerate_supports_symlinked_skill_directories() {
+        let tmp = tempdir();
+        let target = tmp.join("target_skill");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("SKILL.md"), "name: symlinked-skill").unwrap();
+
+        let skills_root = tmp.join("skills");
+        fs::create_dir_all(&skills_root).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, skills_root.join("symlinked-link")).unwrap();
+
+        #[cfg(unix)]
+        {
+            let input = EnumerationInput {
+                root: &skills_root,
+                entry_filename: "SKILL.md",
+                skip_hidden: true,
+                max_depth: 1,
+            };
+            let (candidates, _) = enumerate_skill_dirs(&input);
+            assert_eq!(candidates.len(), 1);
+            assert!(candidates[0].dir.ends_with("symlinked-link"));
+        }
     }
 }

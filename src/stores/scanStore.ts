@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { scanAgents } from "../ipc/commands";
 import type { ScanReport } from "../ipc/types";
+import { useAgentConfigStore } from "./agentConfigStore";
 
 interface ScanState {
   report: ScanReport | null;
@@ -16,7 +17,8 @@ export const useScanStore = create<ScanState>((set) => ({
   scan: async () => {
     set({ scanning: true, error: null });
     try {
-      set({ report: await scanAgents() });
+      const customPaths = useAgentConfigStore.getState().customPaths;
+      set({ report: await scanAgents(customPaths) });
     } catch (error) {
       set({ error: String(error) });
     } finally {

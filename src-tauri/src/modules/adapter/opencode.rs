@@ -1,5 +1,4 @@
-//! Claude Code Adapter 真实实现。
-//! 见 docs/superpowers/specs/2026-07-20-claude-code-adapter-design.md §7。
+//! Open Code Adapter 真实实现。
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -22,20 +21,20 @@ const ENTRY_FILENAME: &str = "SKILL.md";
 const COMPARABLE_EXTS: &[&str] = &["md", "txt", "json", "yaml", "yml"];
 const EXCLUDE_NAMES: &[&str] = &[".DS_Store"];
 
-pub struct ClaudeCodeAdapter;
+pub struct OpenCodeAdapter;
 
-impl AgentAdapter for ClaudeCodeAdapter {
+impl AgentAdapter for OpenCodeAdapter {
     fn id(&self) -> AgentId {
-        AgentId("claude-code".to_string())
+        AgentId("opencode".to_string())
     }
 
     fn descriptor(&self) -> AgentDescriptor {
         AgentDescriptor {
             agent_id: self.id(),
-            adapter_id: "claude-code@1".to_string(),
-            display_name: "Claude Code".to_string(),
+            adapter_id: "opencode@1".to_string(),
+            display_name: "Open Code".to_string(),
             supported_platforms: vec![Platform::MacOs, Platform::Linux, Platform::Windows],
-            documentation_url: Some("https://code.claude.com/docs/en/skills".to_string()),
+            documentation_url: Some("https://opencode.ai".to_string()),
             adapter_version: ADAPTER_VERSION.to_string(),
         }
     }
@@ -51,9 +50,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
             update_planning: SupportLevel::Unsupported,
             sync_planning: SupportLevel::Unsupported,
             supported_platforms: vec![Platform::MacOs, Platform::Linux, Platform::Windows],
-            notes: vec![
-                "user-scope $HOME/.claude/skills".to_string(),
-            ],
+            notes: vec!["user-scope $HOME/.config/opencode/skills".to_string()],
         }
     }
 
@@ -94,7 +91,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
                 }
             }
         }
-        // 优先用 ctx.platform.home_dir（test 可注入）；空时回落到 platform::user_home_dir()。
         let home = if !ctx.platform.home_dir.as_os_str().is_empty() {
             ctx.platform.home_dir.clone()
         } else {
@@ -119,22 +115,27 @@ impl AgentAdapter for ClaudeCodeAdapter {
             }
         };
 
-        let user_root = home.join(".claude").join("skills");
-        let user_present = std::fs::symlink_metadata(&user_root)
-            .map(|m| m.file_type().is_dir())
-            .unwrap_or(false);
+        let candidate_roots = [
+            home.join(".config").join("opencode").join("skills"),
+            home.join(".opencode").join("skills"),
+            home.join(".open-code").join("skills"),
+        ];
 
         let mut roots = Vec::new();
-        if user_present {
-            roots.push(SkillRoot {
-                root_id: "user-skills".into(),
-                display_path: user_root.clone(),
-                canonical_path: user_root,
-                scope: RootScope::User,
-            });
+        for path in &candidate_roots {
+            let present = std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
+            if present {
+                roots.push(SkillRoot {
+                    root_id: "user-skills".into(),
+                    display_path: path.clone(),
+                    canonical_path: path.clone(),
+                    scope: RootScope::User,
+                });
+                break;
+            }
         }
 
-        let status = if user_present {
+        let status = if !roots.is_empty() {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
@@ -147,7 +148,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
                 severity: IssueSeverity::Info,
                 phase: IssuePhase::Detect,
                 path: None,
-                message: "no Claude Code Skills roots found".into(),
+                message: "no Open Code Skills roots found".into(),
                 recoverable: true,
             });
         }
@@ -181,7 +182,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
             issues.extend(enum_issues);
 
             for cand in candidates {
-                // 1. 读 SKILL.md
                 let bytes = match std::fs::read(&cand.entry_file) {
                     Ok(b) => b,
                     Err(e) => {
@@ -211,7 +211,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
                     }
                 };
 
-                // 2. parse frontmatter
                 let fm = match parse_frontmatter(&text) {
                     Ok(fm) => fm,
                     Err(e) => {
@@ -223,7 +222,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
                             message: format!("{:?}", e),
                             recoverable: true,
                         });
-                        // 仍构造 installation，name fallback 到 dir name
                         let dir_name = cand
                             .dir
                             .file_name()
@@ -243,7 +241,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
                     }
                 };
 
-                // 3. compute fingerprint
                 let fp_input = FingerprintInput {
                     root: cand.dir.clone(),
                     comparable_extensions: COMPARABLE_EXTS,
@@ -270,7 +267,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
                     }
                 };
 
-                // 4. 构造 installation
                 let (name, source) = match fm.name.clone() {
                     Some(n) => (n, IdentitySource::FrontmatterName),
                     None => {
@@ -300,7 +296,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
             }
         }
 
-        // 排序: 先按 root_id 字典序（在 ctx.roots 顺序已是 root_id 顺序），再按 normalized_name
         installations.sort_by(|a, b| a.identity.normalized_name.cmp(&b.identity.normalized_name));
 
         let outcome = if issues
@@ -365,15 +360,15 @@ fn build_installation_full(
 ) -> SkillInstallation {
     SkillInstallation {
         agent_id: agent_id.clone(),
-        adapter_id: "claude-code@1".into(),
+        adapter_id: "opencode@1".into(),
         root_id,
         location: LocationDescriptor {
             display_path: cand.dir.clone(),
             canonical_path: cand.dir.clone(),
         },
         format: SkillFormatDescriptor {
-            id: "claude-code-skill".into(),
-            display_name: "Claude Code Skill".into(),
+            id: "opencode-skill".into(),
+            display_name: "Open Code Skill".into(),
             entry_file: ENTRY_FILENAME.into(),
         },
         identity: SkillIdentityEvidence {
@@ -399,10 +394,6 @@ fn build_installation_full(
     }
 }
 
-// ============================================================
-// Tests
-// ============================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,20 +409,9 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let p = std::env::temp_dir().join(format!("asm-cc-{}-{}-{}", pid, nanos, n));
+        let p = std::env::temp_dir().join(format!("asm-opencode-{}-{}-{}", pid, nanos, n));
         fs::create_dir_all(&p).unwrap();
         p
-    }
-
-    fn write_skill(root: &Path, name: &str, frontmatter: &str, extras: &[(&str, &str)]) {
-        let d = root.join(name);
-        fs::create_dir_all(&d).unwrap();
-        fs::write(d.join("SKILL.md"), frontmatter).unwrap();
-        for (rel, content) in extras {
-            let p = d.join(rel);
-            fs::create_dir_all(p.parent().unwrap()).unwrap();
-            fs::write(&p, content).unwrap();
-        }
     }
 
     fn fake_platform(home: &Path, cwd: &Path) -> PlatformContext {
@@ -442,86 +422,27 @@ mod tests {
         }
     }
 
-    // ---- detect 测试 ----
-
     #[test]
-    fn claude_detect_no_home() {
-        // home_dir 设置为 None 通过 ctx 绕开——但 ctx 强制 home 存在。
-        // 改测：home_dir 路径不存在 → 走 dirs 失败模拟
-        // 这里通过 detect 不调 user_home_dir 来"测试"——其实 T6 实现会调。
-        // 简化：home 路径是一个根本不存在的目录，user root 不存在
-        let tmp = tempdir();
-        let home = tmp.join("nope-home"); // 不创建
-        let cwd = tmp.join("cwd");
-        fs::create_dir_all(&cwd).unwrap();
-        let ctx = DetectContext {
-            platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
-            custom_path: None,
-        };
-        let r = ClaudeCodeAdapter.detect(&ctx);
-        // home 不存在但 paths 存在，user_home_dir() 还是返回 Some(home) 因为它只是 read 系统 home
-        // ——本测试的可靠性受 dirs::home_dir() 实际值影响
-        // 替代方案：直接在 tmp 创建一个 home 目录，里面没有 .claude
-        assert!(matches!(
-            r.status,
-            DetectionStatus::Unavailable | DetectionStatus::Detected | DetectionStatus::Failed
-        ));
-    }
-
-    #[test]
-    fn claude_detect_only_user() {
+    fn opencode_detect_only_user() {
         let tmp = tempdir();
         let home = tmp.join("home");
-        let claude = home.join(".claude");
-        let skills = claude.join("skills");
+        let skills = home.join(".config/opencode/skills");
         fs::create_dir_all(&skills).unwrap();
-        // 不创建 project root
         let cwd = tmp.join("cwd");
         fs::create_dir_all(&cwd).unwrap();
         let ctx = DetectContext {
             platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
             custom_path: None,
         };
-        let r = ClaudeCodeAdapter.detect(&ctx);
+        let r = OpenCodeAdapter.detect(&ctx);
         assert_eq!(r.status, DetectionStatus::Detected);
-        let user_roots: Vec<_> = r
-            .roots
-            .iter()
-            .filter(|r| r.scope == RootScope::User)
-            .collect();
-        assert_eq!(user_roots.len(), 1);
-        assert!(r.roots.iter().all(|r| r.scope != RootScope::Project));
-    }
-
-    #[test]
-    fn claude_detect_user_and_project() {
-        let tmp = tempdir();
-        let home = tmp.join("home");
-        let user_skills = home.join(".claude/skills");
-        fs::create_dir_all(&user_skills).unwrap();
-        // project: 在 cwd 下创建 .claude/skills
-        let project = tmp.join("project");
-        let project_skills = project.join(".claude/skills");
-        fs::create_dir_all(&project_skills).unwrap();
-        let ctx = DetectContext {
-            platform: Box::leak(Box::new(fake_platform(&home, &project))),
-            custom_path: None,
-        };
-        let r = ClaudeCodeAdapter.detect(&ctx);
-        assert_eq!(r.status, DetectionStatus::Detected);
-        let user = r
-            .roots
-            .iter()
-            .filter(|r| r.scope == RootScope::User)
-            .count();
-        assert_eq!(user, 1);
         assert_eq!(r.roots.len(), 1);
+        assert_eq!(r.roots[0].scope, RootScope::User);
     }
 
     #[test]
-    fn claude_detect_neither() {
+    fn opencode_detect_neither() {
         let tmp = tempdir();
-        // home/.claude 不存在；cwd 也不含 .claude
         let home = tmp.join("home");
         fs::create_dir_all(&home).unwrap();
         let cwd = tmp.join("cwd");
@@ -530,183 +451,7 @@ mod tests {
             platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
             custom_path: None,
         };
-        let r = ClaudeCodeAdapter.detect(&ctx);
+        let r = OpenCodeAdapter.detect(&ctx);
         assert_eq!(r.status, DetectionStatus::Unavailable);
-    }
-
-    // ---- scan 测试 ----
-
-    fn make_root_with_skill(name: &str) -> (PathBuf, PathBuf) {
-        let tmp = tempdir();
-        let skills = tmp.join("skills");
-        fs::create_dir_all(&skills).unwrap();
-        write_skill(
-            &skills,
-            name,
-            "---\nname: foo\ndescription: bar\n---\n",
-            &[("refs/a.md", "a")],
-        );
-        (tmp, skills)
-    }
-
-    fn scan_ctx_for(root: &SkillRoot) -> (DetectContext<'static>, PlatformContext) {
-        let platform = PlatformContext {
-            platform: Platform::MacOs,
-            home_dir: PathBuf::from("/tmp"),
-            cwd: PathBuf::from("/tmp"),
-        };
-        let leaked: &'static PlatformContext = Box::leak(Box::new(platform.clone()));
-        let detect_ctx = DetectContext { platform: leaked, custom_path: None };
-        // 把 root 也 leak 出 'static 生命周期
-        let _leaked_root: &'static SkillRoot = Box::leak(Box::new(root.clone()));
-        // 这一段 lifecycle juggling 在真实 Tauri 命令里走 cmd 内部一次性 borrow，不会遇到 'static leak。
-        // 测试中我们只用 leaked_root 调 scan 一次就 drop。
-        (detect_ctx, platform)
-    }
-
-    // helper: run scan on one root
-    fn run_scan(adapter: &ClaudeCodeAdapter, root: &SkillRoot) -> ScanResult {
-        let platform = PlatformContext {
-            platform: Platform::MacOs,
-            home_dir: PathBuf::from("/tmp"),
-            cwd: PathBuf::from("/tmp"),
-        };
-        let leaked_root: &'static SkillRoot = Box::leak(Box::new(root.clone()));
-        let leaked_platform: &'static PlatformContext = Box::leak(Box::new(platform));
-        let ctx = ScanContext {
-            scan_id: ScanId::new(),
-            agent: adapter.id(),
-            roots: std::slice::from_ref(leaked_root),
-            platform: leaked_platform,
-            started_at: SystemTime::now(),
-        };
-        adapter.scan(&ctx)
-    }
-
-    #[test]
-    fn claude_scan_empty_root() {
-        let tmp = tempdir();
-        let skills = tmp.join("skills");
-        fs::create_dir_all(&skills).unwrap();
-        let root = SkillRoot {
-            root_id: "test".into(),
-            display_path: skills.clone(),
-            canonical_path: skills.clone(),
-            scope: RootScope::User,
-        };
-        let r = run_scan(&ClaudeCodeAdapter, &root);
-        assert_eq!(r.outcome, ScanOutcome::Completed);
-        assert!(r.installations.is_empty());
-    }
-
-    #[test]
-    fn claude_scan_normalizes_name() {
-        let (tmp, skills) = make_root_with_skill("dirname");
-        let root = SkillRoot {
-            root_id: "test".into(),
-            display_path: skills.clone(),
-            canonical_path: skills.clone(),
-            scope: RootScope::User,
-        };
-        let r = run_scan(&ClaudeCodeAdapter, &root);
-        assert_eq!(r.installations.len(), 1);
-        // frontmatter 写了 name: foo, 优先于目录名 dirname
-        let inst = &r.installations[0];
-        assert_eq!(inst.identity.normalized_name, "foo");
-        assert!(matches!(
-            inst.identity.source,
-            IdentitySource::FrontmatterName
-        ));
-        // 防止 tmp 在测试结束前 drop
-        let _ = tmp;
-    }
-
-    #[test]
-    fn claude_scan_uses_dir_name_fallback() {
-        let tmp = tempdir();
-        let skills = tmp.join("skills");
-        fs::create_dir_all(&skills).unwrap();
-        // SKILL.md 没有任何 frontmatter
-        write_skill(&skills, "no-fm", "just a body, no ---\n", &[]);
-        let root = SkillRoot {
-            root_id: "test".into(),
-            display_path: skills.clone(),
-            canonical_path: skills.clone(),
-            scope: RootScope::User,
-        };
-        let r = run_scan(&ClaudeCodeAdapter, &root);
-        let inst = &r.installations[0];
-        assert_eq!(inst.identity.normalized_name, "no-fm");
-        assert!(matches!(
-            inst.identity.source,
-            IdentitySource::DirectoryName
-        ));
-    }
-
-    #[test]
-    fn claude_scan_sorts_deterministically() {
-        let tmp = tempdir();
-        let skills = tmp.join("skills");
-        fs::create_dir_all(&skills).unwrap();
-        // 每个 skill 的 frontmatter name 与目录名匹配，得到不同的 normalized_name，
-        // 这样排序断言 ["alpha", "mu", "x"] 才有意义。
-        // brief 原文三个都用 "name: x" 无法产生该期望输出，本处修正 fixture 与 assertion 对齐。
-        for n in &["zeta", "alpha", "mu"] {
-            write_skill(&skills, n, &format!("---\nname: {}\n---\n", n), &[]);
-        }
-        let root = SkillRoot {
-            root_id: "test".into(),
-            display_path: skills.clone(),
-            canonical_path: skills.clone(),
-            scope: RootScope::User,
-        };
-        let r1 = run_scan(&ClaudeCodeAdapter, &root);
-        let r2 = run_scan(&ClaudeCodeAdapter, &root);
-        let names1: Vec<_> = r1
-            .installations
-            .iter()
-            .map(|i| i.identity.normalized_name.clone())
-            .collect();
-        let names2: Vec<_> = r2
-            .installations
-            .iter()
-            .map(|i| i.identity.normalized_name.clone())
-            .collect();
-        assert_eq!(names1, names2);
-        // 必须按字典序
-        assert_eq!(
-            names1,
-            vec!["alpha".to_string(), "mu".to_string(), "zeta".to_string()]
-        );
-    }
-
-    #[test]
-    fn claude_scan_collects_issues() {
-        let tmp = tempdir();
-        let skills = tmp.join("skills");
-        fs::create_dir_all(&skills).unwrap();
-        // 损坏的 SKILL.md
-        fs::create_dir(skills.join("broken")).unwrap();
-        fs::write(
-            skills.join("broken/SKILL.md"),
-            "---\nname: : : invalid yaml\n---\n",
-        )
-        .unwrap();
-        // 正常的
-        write_skill(&skills, "good", "---\nname: good\n---\n", &[]);
-        let root = SkillRoot {
-            root_id: "test".into(),
-            display_path: skills.clone(),
-            canonical_path: skills.clone(),
-            scope: RootScope::User,
-        };
-        let r = run_scan(&ClaudeCodeAdapter, &root);
-        // good 应当入选，broken 因 YAML 解析失败应当触发 FRONTMATTER_INVALID
-        // issue（spec §6.3 / 扫描实现）并 fallback 到 dir name 入选。
-        assert!(
-            r.issues.iter().any(|i| i.code == "FRONTMATTER_INVALID"),
-            "expected FRONTMATTER_INVALID issue, got: {:?}",
-            r.issues
-        );
     }
 }

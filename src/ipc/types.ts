@@ -55,3 +55,18 @@ export interface MasterSkillReport {
   path: string;
   linked_agents: Record<string, boolean>;
 }
+
+export type ImportMode =
+  | { mode: "auto" }
+  | { mode: "use_master" }
+  | { mode: "overwrite_master" }
+  | { mode: "rename_new"; new_name: string };
+
+export type ImportResult =
+  | { type: "success" }
+  | {
+      type: "conflict";
+      skill_name: string;
+      existing_fingerprint: string;
+      incoming_fingerprint: string;
+    };
