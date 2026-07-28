@@ -3,11 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { readSkillContent, getSkillTranslation, saveSkillTranslation } from "../ipc/commands";
+import { readSkillContent } from "../ipc/commands";
 import { useScanStore } from "../stores/scanStore";
-import { useI18nStore } from "../stores/i18nStore";
 import { AgentIdentityMark } from "../components/AgentVisual";
-import { translateSkill, translateFrontmatterKey } from "../utils/skillTranslator";
 
 function BreadcrumbSeparator() {
   return (
@@ -52,18 +50,11 @@ function renderFrontmatterValue(key: string, value: string) {
 export default function SkillDetail() {
   const { agentId, skillName } = useParams();
   const { report } = useScanStore();
-  const appLang = useI18nStore((s) => s.lang);
   const [rawContent, setRawContent] = useState<string | null>(null);
-  const [dbTranslation, setDbTranslation] = useState<{ name_zh?: string; description_zh: string; body_zh: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
-  const [lang, setLang] = useState<"en" | "zh">(appLang);
   const [copied, setCopied] = useState<boolean>(false);
-
-  useEffect(() => {
-    setLang(appLang);
-  }, [appLang]);
 
   const agent = report?.agents.find((a) => a.agent_id === agentId);
   const skill = agent?.skills.find((s) => s.name === skillName || decodeURIComponent(skillName || "") === s.name);
@@ -89,15 +80,6 @@ export default function SkillDetail() {
         }
       });
 
-    // Check SQLite for existing saved Chinese translation
-    getSkillTranslation(skill.name)
-      .then((saved) => {
-        if (mounted && saved && saved.body_zh) {
-          setDbTranslation({ name_zh: saved.name_zh, description_zh: saved.description_zh, body_zh: saved.body_zh });
-        }
-      })
-      .catch(() => {});
-
     return () => {
       mounted = false;
     };
@@ -119,23 +101,7 @@ export default function SkillDetail() {
 
   const entryPath = `${skill.location}/SKILL.md`;
   const { frontmatter, body } = rawContent ? parseFrontmatter(rawContent) : { frontmatter: null, body: "" };
-
-  const translation = translateSkill(skill.name, skill.description || frontmatter?.description || "", body);
-
-  const displayDescription = lang === "zh"
-    ? (dbTranslation?.description_zh || translation.descriptionZh)
-    : (skill.description || frontmatter?.description || "No description provided.");
-  const displayBody = lang === "zh"
-    ? (dbTranslation?.body_zh || translation.bodyZh)
-    : body;
-
-  const handleToggleLang = (newLang: "en" | "zh") => {
-    setLang(newLang);
-    if (newLang === "zh" && skill?.name) {
-      // Auto persist translation to SQLite database
-      saveSkillTranslation(skill.name, translation.titleZh ?? "", translation.descriptionZh, translation.bodyZh).catch(() => {});
-    }
-  };
+  const displayDescription = skill.description || frontmatter?.description || "No description provided.";
 
   const otherFields = frontmatter
     ? Object.entries(frontmatter).filter(
@@ -149,10 +115,6 @@ export default function SkillDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const displayTitle = lang === "zh"
-    ? (dbTranslation?.name_zh || translation.titleZh || skill.name)
-    : skill.name;
-
   return (
     <section className="page skill-detail-page">
       <nav aria-label="Breadcrumb" className="agent-breadcrumb agent-detail__breadcrumb">
@@ -160,7 +122,7 @@ export default function SkillDetail() {
         <BreadcrumbSeparator />
         <Link to={`/agents/${agent.agent_id}`}>{agent.display_name}</Link>
         <BreadcrumbSeparator />
-        <span aria-current="page">{displayTitle}</span>
+        <span aria-current="page">{skill.name}</span>
       </nav>
 
       <header className="skill-detail__header">
@@ -170,34 +132,10 @@ export default function SkillDetail() {
           </div>
           <div className="skill-detail__identity">
             <div className="skill-detail__title-row">
-              <h1>
-                {displayTitle}
-                {lang === "zh" && (dbTranslation?.name_zh || translation.titleZh) && (
-                  <span className="skill-id-subtag" style={{ marginLeft: 10, opacity: 0.6, fontSize: "0.6em", fontWeight: "normal" }}>
-                    ({skill.name})
-                  </span>
-                )}
-              </h1>
+              <h1>{skill.name}</h1>
               <span className="skill-detail__agent-tag">{agent.display_name}</span>
             </div>
             <p className="skill-detail__description">{displayDescription}</p>
-          </div>
-
-          <div className="skill-detail__lang-switcher">
-            <button
-              className={`lang-btn ${lang === "zh" ? "active" : ""}`}
-              onClick={() => handleToggleLang("zh")}
-              type="button"
-            >
-              中文
-            </button>
-            <button
-              className={`lang-btn ${lang === "en" ? "active" : ""}`}
-              onClick={() => handleToggleLang("en")}
-              type="button"
-            >
-              EN
-            </button>
           </div>
         </div>
 
@@ -248,7 +186,7 @@ export default function SkillDetail() {
               <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2">
                 <path d="M4 6h16M4 12h16M4 18h7" />
               </svg>
-              <h3>{lang === "zh" ? "元数据属性 (Metadata Frontmatter)" : "Metadata Frontmatter"}</h3>
+              <h3>Metadata Frontmatter</h3>
             </div>
             <span className="skill-detail__frontmatter-type">YAML</span>
           </div>
@@ -257,7 +195,7 @@ export default function SkillDetail() {
             {otherFields.map(([k, v]) => (
               <div className="skill-detail__frontmatter-item" key={k}>
                 <span className="skill-detail__frontmatter-label">
-                  {lang === "zh" ? translateFrontmatterKey(k) : k.replace(/-/g, " ")}
+                  {k.replace(/-/g, " ")}
                 </span>
                 <div className="skill-detail__frontmatter-value">
                   {renderFrontmatterValue(k, v)}
@@ -315,11 +253,11 @@ export default function SkillDetail() {
           <div className="skill-detail__markdown-viewer">
             {viewMode === "rendered" ? (
               <div className="markdown-rendered-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayBody}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
               </div>
             ) : (
               <pre className="skill-detail__raw-markdown">
-                <code>{viewMode === "raw" && lang === "zh" ? displayBody : rawContent}</code>
+                <code>{rawContent}</code>
               </pre>
             )}
           </div>

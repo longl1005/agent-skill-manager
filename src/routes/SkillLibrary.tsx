@@ -4,8 +4,6 @@ import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { AgentIdentityMark } from "../components/AgentVisual";
 
-import { translateSkill } from "../utils/skillTranslator";
-
 export const SUPPORTED_AGENTS = [
   { id: "claude-code", name: "Claude Code" },
   { id: "codex", name: "Codex" },
@@ -53,15 +51,11 @@ export default function SkillLibrary() {
 
   const filteredSkills = useMemo(() => {
     return skills.filter((skill) => {
-      const tr = translateSkill(skill.name, skill.description, "");
-      const titleZh = skill.name_zh || tr.titleZh;
-      const descZh = skill.description_zh || tr.descriptionZh;
-
-      // Search filter matches English or Chinese name/description
+      // Search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const matchesName = skill.name.toLowerCase().includes(query) || (titleZh && titleZh.toLowerCase().includes(query));
-        const matchesDesc = skill.description.toLowerCase().includes(query) || (descZh && descZh.toLowerCase().includes(query));
+        const matchesName = skill.name.toLowerCase().includes(query);
+        const matchesDesc = skill.description.toLowerCase().includes(query);
         if (!matchesName && !matchesDesc) return false;
       }
 
@@ -138,23 +132,11 @@ export default function SkillLibrary() {
       ) : (
         <div className="master-skill-grid">
           {filteredSkills.map((skill) => {
-            const tr = translateSkill(skill.name, skill.description, "");
-            const titleZh = skill.name_zh || tr.titleZh;
-            const displayTitle = lang === "zh" ? (titleZh || skill.name) : skill.name;
-            const displayDesc = lang === "zh" ? (skill.description_zh || tr.descriptionZh) : (skill.description || null);
-
             return (
               <div className="master-skill-card" key={skill.name} data-testid={`skill-card-${skill.name}`}>
                 <div className="master-skill-card-header">
                   <div className="title-section">
-                    <h3 className="skill-title">
-                      {displayTitle}
-                      {lang === "zh" && titleZh && titleZh !== skill.name && (
-                        <span className="skill-id-subtag" style={{ marginLeft: 8, opacity: 0.65, fontSize: "0.8em", fontWeight: "normal" }}>
-                          ({skill.name})
-                        </span>
-                      )}
-                    </h3>
+                    <h3 className="skill-title">{skill.name}</h3>
                     <code className="skill-path-badge" title={skill.path}>
                       {skill.path}
                     </code>
@@ -177,7 +159,7 @@ export default function SkillLibrary() {
                 </div>
 
                 <p className="skill-description">
-                  {displayDesc || <em className="muted">{t("skillLibrary.noDescription", lang)}</em>}
+                  {skill.description || <em className="muted">{t("skillLibrary.noDescription", lang)}</em>}
                 </p>
 
                 <div className="agent-distribution-section">

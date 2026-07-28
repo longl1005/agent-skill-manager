@@ -7,7 +7,6 @@ import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
 import { searchGlobalSkills, type GlobalSkillItem } from "../api/globalSkillsSearch";
-import { translateSkill } from "../utils/skillTranslator";
 
 export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
@@ -209,21 +208,11 @@ export default function InstallSkills() {
           <div className="install-card-grid">
             {featuredSkillsList.map((skill: FeaturedSkill) => {
               const isInstalled = installedSkillNames.has(skill.name);
-              const tr = translateSkill(skill.name, "", "");
-              const displayTitle = lang === "zh" ? (tr.titleZh || skill.name) : skill.name;
-
               return (
                 <div className="install-card" key={skill.id} data-testid={`featured-card-${skill.name}`}>
                   <div className="install-card-header">
                     <div className="install-card-title-group">
-                      <h3 className="install-card-title">
-                        {displayTitle}
-                        {lang === "zh" && tr.titleZh && tr.titleZh !== skill.name && (
-                          <span style={{ marginLeft: 6, opacity: 0.65, fontSize: "0.8em", fontWeight: "normal" }}>
-                            ({skill.name})
-                          </span>
-                        )}
-                      </h3>
+                      <h3 className="install-card-title">{skill.name}</h3>
                       {skill.ownerRepo && (
                         <span className="install-card-owner-repo">{skill.ownerRepo}</span>
                       )}

@@ -12,8 +12,6 @@ pub struct MasterSkillReport {
     pub description: String,
     pub path: String,
     pub linked_agents: HashMap<String, bool>,
-    pub name_zh: Option<String>,
-    pub description_zh: Option<String>,
 }
 
 pub fn master_repo_dir() -> PathBuf {
@@ -221,32 +219,20 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
             linked_agents.insert(agent_id.to_string(), is_linked);
         }
 
-        // Sync to SQLite database & read saved translations
-        let (name_zh, description_zh) = if let Ok(conn) = crate::modules::db::open_db(None) {
+        // Sync to SQLite database
+        if let Ok(conn) = crate::modules::db::open_db(None) {
             let _ = crate::modules::db::upsert_master_skill(&conn, &name, &description, "", "", 1);
             for (agent_id, &is_linked) in &linked_agents {
                 let status = if is_linked { "linked" } else { "unlinked" };
                 let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, &name, status);
             }
-            if let Ok(Some(trans)) = crate::modules::db::get_skill_translation(&conn, &name) {
-                (
-                    if trans.name_zh.trim().is_empty() { None } else { Some(trans.name_zh) },
-                    if trans.description_zh.trim().is_empty() { None } else { Some(trans.description_zh) },
-                )
-            } else {
-                (None, None)
-            }
-        } else {
-            (None, None)
-        };
+        }
 
         reports.push(MasterSkillReport {
             name,
             description,
             path: path.to_string_lossy().into_owned(),
             linked_agents,
-            name_zh,
-            description_zh,
         });
     }
 

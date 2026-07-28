@@ -341,30 +341,3 @@ pub fn get_activity_logs(limit: Option<usize>) -> Result<Vec<crate::modules::db:
     let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
     crate::modules::db::get_activity_logs(&conn, limit.unwrap_or(20)).map_err(|e| e.to_string())
 }
-
-#[tauri::command]
-pub fn save_skill_translation(
-    skill_name: String,
-    name_zh: Option<String>,
-    description_zh: Option<String>,
-    body_zh: Option<String>,
-) -> Result<bool, String> {
-    let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
-    crate::modules::db::upsert_skill_translation(
-        &conn,
-        &skill_name,
-        name_zh.as_deref().unwrap_or(""),
-        description_zh.as_deref().unwrap_or(""),
-        body_zh.as_deref().unwrap_or(""),
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(true)
-}
-
-#[tauri::command]
-pub fn get_skill_translation(
-    skill_name: String,
-) -> Result<Option<crate::modules::db::DbSkillTranslation>, String> {
-    let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
-    crate::modules::db::get_skill_translation(&conn, &skill_name).map_err(|e| e.to_string())
-}

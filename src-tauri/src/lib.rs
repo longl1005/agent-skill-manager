@@ -18,9 +18,7 @@ pub fn run() {
             commands::import_to_master,
             commands::install_skill_to_master,
             commands::get_db_summary,
-            commands::get_activity_logs,
-            commands::save_skill_translation,
-            commands::get_skill_translation
+            commands::get_activity_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

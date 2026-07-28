@@ -54,8 +54,6 @@ export interface MasterSkillReport {
   description: string;
   path: string;
   linked_agents: Record<string, boolean>;
-  name_zh?: string | null;
-  description_zh?: string | null;
 }
 
 export type ImportMode =
@@ -91,14 +89,6 @@ export interface DbActivityLog {
   target_skill: string;
   target_agent: string;
   created_at: string;
-}
-
-export interface DbSkillTranslation {
-  skill_name: string;
-  name_zh: string;
-  description_zh: string;
-  body_zh: string;
-  updated_at: string;
 }
 
 export interface DbSummaryReport {
