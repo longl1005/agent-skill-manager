@@ -981,6 +981,25 @@ input:focus-visible {
   font-weight: 600;
 }
 
+/* ===== Agent Icon Styling & Dark Mode Adaptations ===== */
+.agent-icon-img {
+  display: block;
+  border-radius: inherit;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="dark"] .agent-icon-img,
+.theme-dark .agent-icon-img {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .agent-icon-tile--codex,
+.theme-dark .agent-icon-tile--codex {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
 .content {
   background: var(--canvas);
   color: var(--text);

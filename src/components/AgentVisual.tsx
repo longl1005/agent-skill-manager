@@ -62,32 +62,52 @@ import cursorWebp from "../assets/icons/agents/cursor.webp";
 
 export function ClaudeCodeMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={claudeCodeWebp} alt="claude-code identity mark" aria-label="claude-code identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  return <img className="agent-icon-img" src={claudeCodeWebp} alt="claude-code identity mark" aria-label="claude-code identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function CodexMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={codexWebp} alt="codex identity mark" aria-label="codex identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  const innerSize = Math.round(size * 0.72);
+  return (
+    <span
+      className="agent-icon-tile agent-icon-tile--codex"
+      style={{
+        width: size,
+        height: size,
+        borderRadius,
+        background: "#FFFFFF",
+        border: "1px solid rgba(228, 228, 231, 0.8)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.12)",
+        flexShrink: 0,
+        boxSizing: "border-box",
+      }}
+    >
+      <img src={codexWebp} alt="codex identity mark" aria-label="codex identity mark" width={innerSize} height={innerSize} style={{ display: "block" }} />
+    </span>
+  );
 }
 
 export function AntigravityMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={antigravityWebp} alt="antigravity identity mark" aria-label="antigravity identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  return <img className="agent-icon-img" src={antigravityWebp} alt="antigravity identity mark" aria-label="antigravity identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function PiAgentMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={piAgentWebp} alt="pi-agent identity mark" aria-label="pi-agent identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  return <img className="agent-icon-img" src={piAgentWebp} alt="pi-agent identity mark" aria-label="pi-agent identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function OpenCodeMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={openCodeWebp} alt="opencode identity mark" aria-label="opencode identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  return <img className="agent-icon-img" src={openCodeWebp} alt="opencode identity mark" aria-label="opencode identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function CursorMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
-  return <img src={cursorWebp} alt="cursor identity mark" aria-label="cursor identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+  return <img className="agent-icon-img" src={cursorWebp} alt="cursor identity mark" aria-label="cursor identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function AgentSidebarIcon({ agentId }: { agentId: string }): JSX.Element {
