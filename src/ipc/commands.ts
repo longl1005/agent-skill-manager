@@ -91,3 +91,29 @@ export async function getDbSummary(): Promise<import("./types").DbSummaryReport>
 export async function getActivityLogs(limit?: number): Promise<import("./types").DbActivityLog[]> {
   return invoke<import("./types").DbActivityLog[]>("get_activity_logs", { limit: limit ?? 20 });
 }
+
+/**
+ * 保存技能的中文翻译数据至 SQLite 数据库。
+ */
+export async function saveSkillTranslation(
+  skillName: string,
+  nameZh?: string,
+  descriptionZh?: string,
+  bodyZh?: string
+): Promise<boolean> {
+  return invoke<boolean>("save_skill_translation", {
+    skillName,
+    nameZh: nameZh ?? null,
+    descriptionZh: descriptionZh ?? null,
+    bodyZh: bodyZh ?? null,
+  });
+}
+
+/**
+ * 从 SQLite 数据库查询技能的中文翻译。
+ */
+export async function getSkillTranslation(
+  skillName: string
+): Promise<import("./types").DbSkillTranslation | null> {
+  return invoke<import("./types").DbSkillTranslation | null>("get_skill_translation", { skillName });
+}

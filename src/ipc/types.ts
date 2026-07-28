@@ -91,6 +91,14 @@ export interface DbActivityLog {
   created_at: string;
 }
 
+export interface DbSkillTranslation {
+  skill_name: string;
+  name_zh: string;
+  description_zh: string;
+  body_zh: string;
+  updated_at: string;
+}
+
 export interface DbSummaryReport {
   db_path: string;
   total_skills: number;

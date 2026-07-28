@@ -143,19 +143,17 @@ export function translateFrontmatterKey(key: string): string {
   return COMMON_LABEL_MAP[key] || key.replace(/-/g, " ");
 }
 
-export function translateSkill(skillName: string, originalDesc: string, originalBody: string): {
-  descriptionZh: string;
-  bodyZh: string;
-} {
+export function translateSkill(skillName: string, originalDesc: string, originalBody: string): TranslatedSkillData {
   const preset = PRESET_TRANSLATIONS[skillName];
   if (preset) {
     return {
+      titleZh: preset.titleZh,
       descriptionZh: preset.descriptionZh,
       bodyZh: preset.bodyZh,
     };
   }
 
-  // 智能智能回落翻译规则
+  // 智能回落翻译规则
   let translatedDesc = originalDesc;
   if (originalDesc) {
     translatedDesc = originalDesc
@@ -175,6 +173,7 @@ export function translateSkill(skillName: string, originalDesc: string, original
   }
 
   return {
+    titleZh: undefined,
     descriptionZh: translatedDesc || "暂无中文描述",
     bodyZh: translatedBody,
   };

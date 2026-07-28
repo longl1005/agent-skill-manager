@@ -37,6 +37,15 @@ pub struct DbActivityLog {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DbSkillTranslation {
+    pub skill_name: String,
+    pub name_zh: String,
+    pub description_zh: String,
+    pub body_zh: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DbSummaryReport {
     pub db_path: String,
     pub total_skills: usize,
@@ -109,7 +118,59 @@ pub fn init_db_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS skill_translations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_name TEXT UNIQUE NOT NULL,
+            name_zh TEXT NOT NULL DEFAULT '',
+            description_zh TEXT NOT NULL DEFAULT '',
+            body_zh TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
     Ok(())
+}
+
+pub fn upsert_skill_translation(
+    conn: &Connection,
+    skill_name: &str,
+    name_zh: &str,
+    description_zh: &str,
+    body_zh: &str,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO skill_translations (skill_name, name_zh, description_zh, body_zh, updated_at)
+         VALUES (?1, ?2, ?3, ?4, datetime('now'))
+         ON CONFLICT(skill_name) DO UPDATE SET
+            name_zh = excluded.name_zh,
+            description_zh = excluded.description_zh,
+            body_zh = excluded.body_zh,
+            updated_at = datetime('now')",
+        params![skill_name, name_zh, description_zh, body_zh],
+    )?;
+    Ok(())
+}
+
+pub fn get_skill_translation(conn: &Connection, skill_name: &str) -> Result<Option<DbSkillTranslation>> {
+    let mut stmt = conn.prepare(
+        "SELECT skill_name, name_zh, description_zh, body_zh, updated_at
+         FROM skill_translations WHERE skill_name = ?1",
+    )?;
+
+    let mut rows = stmt.query(params![skill_name])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(DbSkillTranslation {
+            skill_name: row.get(0)?,
+            name_zh: row.get(1)?,
+            description_zh: row.get(2)?,
+            body_zh: row.get(3)?,
+            updated_at: row.get(4)?,
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn upsert_master_skill(
@@ -267,5 +328,11 @@ mod tests {
         let summary = get_db_summary(&conn, Some(Path::new(":memory:"))).unwrap();
         assert_eq!(summary.total_skills, 1);
         assert_eq!(summary.total_symlinks, 1);
+
+        // 5. Skill translation persistence
+        upsert_skill_translation(&conn, "frontend-design", "前端视觉美化", "针对 UI 提供美化指导", "# 前端 Visual Design").unwrap();
+        let trans = get_skill_translation(&conn, "frontend-design").unwrap().unwrap();
+        assert_eq!(trans.name_zh, "前端视觉美化");
+        assert_eq!(trans.description_zh, "针对 UI 提供美化指导");
     }
 }

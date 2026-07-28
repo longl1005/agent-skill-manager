@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { readSkillContent } from "../ipc/commands";
+import { readSkillContent, getSkillTranslation, saveSkillTranslation } from "../ipc/commands";
 import { useScanStore } from "../stores/scanStore";
 import { AgentIdentityMark } from "../components/AgentVisual";
 import { translateSkill, translateFrontmatterKey } from "../utils/skillTranslator";
@@ -52,6 +52,7 @@ export default function SkillDetail() {
   const { agentId, skillName } = useParams();
   const { report } = useScanStore();
   const [rawContent, setRawContent] = useState<string | null>(null);
+  const [dbTranslation, setDbTranslation] = useState<{ description_zh: string; body_zh: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
@@ -82,10 +83,19 @@ export default function SkillDetail() {
         }
       });
 
+    // Check SQLite for existing saved Chinese translation
+    getSkillTranslation(skill.name)
+      .then((saved) => {
+        if (mounted && saved && saved.body_zh) {
+          setDbTranslation({ description_zh: saved.description_zh, body_zh: saved.body_zh });
+        }
+      })
+      .catch(() => {});
+
     return () => {
       mounted = false;
     };
-  }, [skill?.location]);
+  }, [skill?.location, skill?.name]);
 
   if (!agent || !skill) {
     return (
@@ -106,8 +116,20 @@ export default function SkillDetail() {
 
   const translation = translateSkill(skill.name, skill.description || frontmatter?.description || "", body);
 
-  const displayDescription = lang === "zh" ? translation.descriptionZh : (skill.description || frontmatter?.description || "No description provided.");
-  const displayBody = lang === "zh" ? translation.bodyZh : body;
+  const displayDescription = lang === "zh"
+    ? (dbTranslation?.description_zh || translation.descriptionZh)
+    : (skill.description || frontmatter?.description || "No description provided.");
+  const displayBody = lang === "zh"
+    ? (dbTranslation?.body_zh || translation.bodyZh)
+    : body;
+
+  const handleToggleLang = (newLang: "en" | "zh") => {
+    setLang(newLang);
+    if (newLang === "zh" && skill?.name) {
+      // Auto persist translation to SQLite database
+      saveSkillTranslation(skill.name, translation.titleZh ?? "", translation.descriptionZh, translation.bodyZh).catch(() => {});
+    }
+  };
 
   const otherFields = frontmatter
     ? Object.entries(frontmatter).filter(
@@ -147,14 +169,14 @@ export default function SkillDetail() {
           <div className="skill-detail__lang-switcher">
             <button
               className={`lang-btn ${lang === "zh" ? "active" : ""}`}
-              onClick={() => setLang("zh")}
+              onClick={() => handleToggleLang("zh")}
               type="button"
             >
               中文
             </button>
             <button
               className={`lang-btn ${lang === "en" ? "active" : ""}`}
-              onClick={() => setLang("en")}
+              onClick={() => handleToggleLang("en")}
               type="button"
             >
               EN
