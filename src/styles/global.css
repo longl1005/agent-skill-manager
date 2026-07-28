@@ -717,24 +717,49 @@ html, body, #root {
 
 .skill-search {
   align-items: center;
-  background: var(--agents-canvas);
-  border: 1px solid var(--agents-border);
-  border-radius: 7px;
-  color: var(--agents-muted);
+  background: var(--surface, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  color: var(--muted, #888899);
   display: flex;
-  gap: 7px;
-  padding: 0 9px;
+  gap: 9px;
+  height: 38px;
+  padding: 0 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.skill-search:focus-within {
+  border-color: var(--color-accent-blue, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.skill-search svg {
+  flex-shrink: 0;
+  color: var(--muted, #888899);
+  transition: color 0.15s ease;
+}
+
+.skill-search:focus-within svg {
+  color: var(--color-accent-blue, #6366f1);
 }
 
 .skill-search input {
   background: transparent;
   border: 0;
-  color: var(--agents-text);
+  color: var(--text, #f0f0f5);
   font: inherit;
-  font-size: 13px;
-  height: 32px;
-  min-width: 170px;
+  font-size: 13.5px;
+  height: 100%;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
   outline: none;
+}
+
+.skill-search input::placeholder {
+  color: var(--muted, #888899);
+  opacity: 0.75;
+  font-size: 13px;
 }
 
 .workspace-refresh { height: 34px; }
@@ -2702,7 +2727,8 @@ a.agent-detail__skill-card,
 
 .filter-controls .skill-search {
   flex: 1;
-  max-width: 380px;
+  max-width: 440px;
+  min-width: 280px;
 }
 
 .status-filter-group {
