@@ -219,6 +219,15 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
             linked_agents.insert(agent_id.to_string(), is_linked);
         }
 
+        // Sync to SQLite database
+        if let Ok(conn) = crate::modules::db::open_db(None) {
+            let _ = crate::modules::db::upsert_master_skill(&conn, &name, &description, "", "", 1);
+            for (agent_id, &is_linked) in &linked_agents {
+                let status = if is_linked { "linked" } else { "unlinked" };
+                let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, &name, status);
+            }
+        }
+
         reports.push(MasterSkillReport {
             name,
             description,
@@ -257,6 +266,14 @@ pub fn toggle_skill_symlink(
         create_skill_symlink(&master_skill_path, &target_symlink)?;
     } else {
         remove_skill_symlink(&target_symlink)?;
+    }
+
+    // Persist change into SQLite database
+    if let Ok(conn) = crate::modules::db::open_db(None) {
+        let status = if enable { "linked" } else { "unlinked" };
+        let action = if enable { "LINK_SKILL" } else { "UNLINK_SKILL" };
+        let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, status);
+        let _ = crate::modules::db::log_activity(&conn, action, skill_name, agent_id);
     }
 
     Ok(true)

@@ -70,3 +70,30 @@ export type ImportResult =
       existing_fingerprint: string;
       incoming_fingerprint: string;
     };
+
+// ===== sqlite db 响应 =====
+
+export interface DbMasterSkill {
+  id: number;
+  name: string;
+  description: string;
+  author: string;
+  repo_url: string;
+  file_count: number;
+  installed_at: string;
+}
+
+export interface DbActivityLog {
+  id: number;
+  action: string;
+  target_skill: string;
+  target_agent: string;
+  created_at: string;
+}
+
+export interface DbSummaryReport {
+  db_path: string;
+  total_skills: number;
+  total_symlinks: number;
+  recent_activities: DbActivityLog[];
+}

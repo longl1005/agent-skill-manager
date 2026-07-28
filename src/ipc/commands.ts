@@ -75,3 +75,19 @@ export async function installSkillToMaster(
     customPaths: customPaths ?? null,
   });
 }
+
+/**
+ * 与 Rust 端 `commands::get_db_summary` 对应。
+ * 获取 SQLite 数据库总体统计与最近落库记录。
+ */
+export async function getDbSummary(): Promise<import("./types").DbSummaryReport> {
+  return invoke<import("./types").DbSummaryReport>("get_db_summary");
+}
+
+/**
+ * 与 Rust 端 `commands::get_activity_logs` 对应。
+ * 获取 SQLite 数据库中的历史操作日志。
+ */
+export async function getActivityLogs(limit?: number): Promise<import("./types").DbActivityLog[]> {
+  return invoke<import("./types").DbActivityLog[]>("get_activity_logs", { limit: limit ?? 20 });
+}

@@ -28,4 +28,5 @@ serde_yml = "0.0.12"
 sha2 = "0.10"
 walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
 

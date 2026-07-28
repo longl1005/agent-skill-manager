@@ -329,3 +329,15 @@ pub fn install_skill_to_master(
         .map(|path| path.to_string_lossy().into_owned())
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn get_db_summary() -> Result<crate::modules::db::DbSummaryReport, String> {
+    let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
+    crate::modules::db::get_db_summary(&conn, None).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_activity_logs(limit: Option<usize>) -> Result<Vec<crate::modules::db::DbActivityLog>, String> {
+    let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
+    crate::modules::db::get_activity_logs(&conn, limit.unwrap_or(20)).map_err(|e| e.to_string())
+}
