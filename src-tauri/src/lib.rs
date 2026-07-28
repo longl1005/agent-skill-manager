@@ -15,7 +15,8 @@ pub fn run() {
             commands::read_skill_content,
             commands::get_master_skills,
             commands::toggle_agent_skill,
-            commands::import_to_master
+            commands::import_to_master,
+            commands::install_skill_to_master
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

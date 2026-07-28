@@ -7,8 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 use crate::modules::adapter::{
-    AgentAdapter, AgentId, AntigravityAdapter, ClaudeCodeAdapter, CodexAdapter, DetectContext, Platform, PlatformContext,
-    PiAgentAdapter, ScanContext, ScanId, ScanIssue, ScanResult,
+    AgentAdapter, AgentId, AntigravityAdapter, ClaudeCodeAdapter, CodexAdapter, CursorAdapter, DetectContext, Platform, PlatformContext,
+    PiAgentAdapter, OpenCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult,
 };
 
 /// 整个 app 共享的 state。
@@ -100,12 +100,14 @@ pub fn scan_agents(
         cwd,
     };
 
-    // 注册的 adapter 列表（ClaudeCodeAdapter, CodexAdapter, AntigravityAdapter & PiAgentAdapter）
+    // 注册的 adapter 列表（ClaudeCodeAdapter, CodexAdapter, AntigravityAdapter, PiAgentAdapter & OpenCodeAdapter）
     let adapters: Vec<Box<dyn AgentAdapter>> = vec![
         Box::new(ClaudeCodeAdapter),
         Box::new(CodexAdapter),
         Box::new(AntigravityAdapter),
         Box::new(PiAgentAdapter),
+        Box::new(OpenCodeAdapter),
+        Box::new(CursorAdapter),
     ];
 
     let mut agent_reports: Vec<AgentReport> = Vec::new();
@@ -309,8 +311,21 @@ pub fn toggle_agent_skill(
 pub fn import_to_master(
     agent_id: String,
     skill_name: String,
+    mode: Option<crate::modules::master_repo::ImportMode>,
     custom_paths: Option<std::collections::HashMap<String, String>>,
-) -> Result<bool, String> {
-    crate::modules::master_repo::import_skill_to_master(&agent_id, &skill_name, custom_paths.as_ref())
+) -> Result<crate::modules::master_repo::ImportResult, String> {
+    let mode = mode.unwrap_or(crate::modules::master_repo::ImportMode::Auto);
+    crate::modules::master_repo::import_skill_to_master_with_mode(&agent_id, &skill_name, mode, custom_paths.as_ref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn install_skill_to_master(
+    skill_name: String,
+    source: Option<String>,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<String, String> {
+    crate::modules::master_repo::install_skill_to_master(&skill_name, source.as_deref(), custom_paths.as_ref())
+        .map(|path| path.to_string_lossy().into_owned())
         .map_err(|e| e.to_string())
 }

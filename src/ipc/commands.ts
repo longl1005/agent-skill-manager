@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { MasterSkillReport, PingResponse, ScanReport } from "./types";
+import type { ImportMode, ImportResult, MasterSkillReport, PingResponse, ScanReport } from "./types";
 
 /**
  * 与 Rust 端 `commands::ping` 对应。
@@ -53,7 +53,25 @@ export async function toggleAgentSkill(
 export async function importToMaster(
   agentId: string,
   skillName: string,
+  mode?: ImportMode,
   customPaths?: Record<string, string>
-): Promise<boolean> {
-  return invoke<boolean>("import_to_master", { agentId, skillName, customPaths: customPaths ?? null });
+): Promise<ImportResult> {
+  return invoke<ImportResult>("import_to_master", {
+    agentId,
+    skillName,
+    mode: mode ?? null,
+    customPaths: customPaths ?? null,
+  });
+}
+
+export async function installSkillToMaster(
+  skillName: string,
+  source?: string,
+  customPaths?: Record<string, string>
+): Promise<string> {
+  return invoke<string>("install_skill_to_master", {
+    skillName,
+    source: source ?? null,
+    customPaths: customPaths ?? null,
+  });
 }

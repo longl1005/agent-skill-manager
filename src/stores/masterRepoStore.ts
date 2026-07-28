@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { getMasterSkills, toggleAgentSkill, importToMaster } from "../ipc/commands";
-import type { MasterSkillReport } from "../ipc/types";
+import { getMasterSkills, toggleAgentSkill, importToMaster, installSkillToMaster } from "../ipc/commands";
+import type { ImportMode, ImportResult, MasterSkillReport } from "../ipc/types";
 import { useAgentConfigStore } from "./agentConfigStore";
 import { useScanStore } from "./scanStore";
 
@@ -10,7 +10,8 @@ export interface MasterRepoState {
   error: string | null;
   fetchMasterSkills: () => Promise<void>;
   toggleAgentSkill: (agentId: string, skillName: string, enable: boolean) => Promise<boolean>;
-  importToMaster: (agentId: string, skillName: string) => Promise<boolean>;
+  importToMaster: (agentId: string, skillName: string, mode?: ImportMode) => Promise<ImportResult>;
+  installSkillToMaster: (skillName: string, source?: string) => Promise<string | null>;
 }
 
 export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
@@ -47,11 +48,11 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     }
   },
 
-  importToMaster: async (agentId: string, skillName: string) => {
+  importToMaster: async (agentId: string, skillName: string, mode?: ImportMode) => {
     set({ error: null });
     try {
       const customPaths = useAgentConfigStore.getState().customPaths;
-      const result = await importToMaster(agentId, skillName, customPaths);
+      const result = await importToMaster(agentId, skillName, mode, customPaths);
       await Promise.all([
         get().fetchMasterSkills(),
         useScanStore.getState().scan(),
@@ -59,7 +60,23 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
       return result;
     } catch (err) {
       set({ error: String(err) });
-      return false;
+      return { type: "conflict", skill_name: skillName, existing_fingerprint: "", incoming_fingerprint: "" };
+    }
+  },
+
+  installSkillToMaster: async (skillName: string, source?: string) => {
+    set({ error: null });
+    try {
+      const customPaths = useAgentConfigStore.getState().customPaths;
+      const result = await installSkillToMaster(skillName, source, customPaths);
+      await Promise.all([
+        get().fetchMasterSkills(),
+        useScanStore.getState().scan(),
+      ]);
+      return result;
+    } catch (err) {
+      set({ error: String(err) });
+      return null;
     }
   },
 }));

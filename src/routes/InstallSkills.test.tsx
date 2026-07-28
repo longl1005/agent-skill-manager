@@ -21,6 +21,7 @@ vi.mock("../api/globalSkillsSearch", () => ({
 describe("InstallSkills Route", () => {
   const mockToggleAgentSkill = vi.fn().mockResolvedValue(true);
   const mockImportToMaster = vi.fn().mockResolvedValue({ type: "success" });
+  const mockInstallSkillToMaster = vi.fn().mockResolvedValue("/tmp/skills/mock");
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,6 +56,7 @@ describe("InstallSkills Route", () => {
       fetchMasterSkills: vi.fn(),
       toggleAgentSkill: mockToggleAgentSkill,
       importToMaster: mockImportToMaster,
+      installSkillToMaster: mockInstallSkillToMaster,
     } as any);
 
     vi.mocked(useScanStore).mockReturnValue({
@@ -169,8 +171,8 @@ describe("InstallSkills Route", () => {
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(mockImportToMaster).toHaveBeenCalledWith(
-        "claude-code",
+      expect(mockInstallSkillToMaster).toHaveBeenCalledWith(
+        "skills",
         "https://github.com/anthropics/skills"
       );
       expect(mockToggleAgentSkill).toHaveBeenCalledWith("claude-code", "skills", true);

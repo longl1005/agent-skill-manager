@@ -68,6 +68,34 @@ pub fn get_agent_skills_dir(
                 Some(pi_agent_dir)
             }
         }
+        "opencode" | "open-code" => {
+            let cfg_dir = home.join(".config").join("opencode").join("skills");
+            let dot_dir = home.join(".opencode").join("skills");
+            let dash_dir = home.join(".open-code").join("skills");
+            if cfg_dir.exists() {
+                Some(cfg_dir)
+            } else if dot_dir.exists() {
+                Some(dot_dir)
+            } else if dash_dir.exists() {
+                Some(dash_dir)
+            } else {
+                Some(cfg_dir)
+            }
+        }
+        "cursor" => {
+            let dot_dir = home.join(".cursor").join("skills");
+            let rules_dir = home.join(".cursor").join("rules");
+            let cfg_dir = home.join(".config").join("cursor").join("skills");
+            if dot_dir.exists() {
+                Some(dot_dir)
+            } else if rules_dir.exists() {
+                Some(rules_dir)
+            } else if cfg_dir.exists() {
+                Some(cfg_dir)
+            } else {
+                Some(dot_dir)
+            }
+        }
         _ => None,
     }
 }
@@ -128,7 +156,7 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
     };
 
     let mut reports = Vec::new();
-    let known_agents = ["claude-code", "codex", "antigravity", "pi-agent"];
+    let known_agents = ["claude-code", "codex", "antigravity", "pi-agent", "opencode", "cursor"];
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -160,7 +188,31 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
         for &agent_id in &known_agents {
             let is_linked = if let Some(agent_dir) = get_agent_skills_dir(agent_id, custom_paths) {
                 let target_symlink = agent_dir.join(&file_name);
-                is_valid_symlink_to(&target_symlink, &path)
+                if is_valid_symlink_to(&target_symlink, &path) {
+                    true
+                } else if target_symlink.exists() || fs::symlink_metadata(&target_symlink).is_ok() {
+                    let fp_input_tgt = FingerprintInput {
+                        root: target_symlink.clone(),
+                        comparable_extensions: &[],
+                        exclude_names: &[],
+                    };
+                    let fp_input_mst = FingerprintInput {
+                        root: path.clone(),
+                        comparable_extensions: &[],
+                        exclude_names: &[],
+                    };
+                    let tgt_fp = compute_fingerprint(&fp_input_tgt).map(|(h, _)| h).unwrap_or_default();
+                    let mst_fp = compute_fingerprint(&fp_input_mst).map(|(h, _)| h).unwrap_or_default();
+                    if !tgt_fp.is_empty() && tgt_fp == mst_fp {
+                        let _ = remove_skill_symlink(&target_symlink);
+                        let _ = create_skill_symlink(&path, &target_symlink);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             } else {
                 false
             };
@@ -199,12 +251,51 @@ pub fn toggle_skill_symlink(
                 format!("Master skill '{}' does not exist at {:?}", skill_name, master_skill_path),
             ));
         }
+        if !agent_dir.exists() {
+            fs::create_dir_all(&agent_dir)?;
+        }
         create_skill_symlink(&master_skill_path, &target_symlink)?;
     } else {
         remove_skill_symlink(&target_symlink)?;
     }
 
     Ok(true)
+}
+
+pub fn install_skill_to_master(
+    skill_name: &str,
+    source: Option<&str>,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<PathBuf> {
+    let master_dir = ensure_master_dir_with_custom(custom_paths)?;
+    let target_dir = master_dir.join(skill_name);
+
+    if !target_dir.exists() {
+        if let Some(src_str) = source {
+            let src_path = PathBuf::from(src_str);
+            if src_path.exists() && src_path.is_dir() {
+                copy_dir_all(&src_path, &target_dir)?;
+            } else {
+                fs::create_dir_all(&target_dir)?;
+                let desc = format!("Installed skill '{}' from {}", skill_name, src_str);
+                let skill_md_content = format!(
+                    "---\nname: {}\ndescription: {}\n---\n\n# {}\n\n{}",
+                    skill_name, desc, skill_name, desc
+                );
+                fs::write(target_dir.join("SKILL.md"), skill_md_content)?;
+            }
+        } else {
+            fs::create_dir_all(&target_dir)?;
+            let desc = format!("Skill '{}'", skill_name);
+            let skill_md_content = format!(
+                "---\nname: {}\ndescription: {}\n---\n\n# {}\n\n{}",
+                skill_name, desc, skill_name, desc
+            );
+            fs::write(target_dir.join("SKILL.md"), skill_md_content)?;
+        }
+    }
+
+    Ok(target_dir)
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -222,11 +313,45 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+use crate::modules::util::{compute_fingerprint, FingerprintInput};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ImportResult {
+    Success,
+    Conflict {
+        skill_name: String,
+        existing_fingerprint: String,
+        incoming_fingerprint: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum ImportMode {
+    Auto,
+    UseMaster,
+    OverwriteMaster,
+    RenameNew { new_name: String },
+}
+
 pub fn import_skill_to_master(
     agent_id: &str,
     skill_name: &str,
     custom_paths: Option<&HashMap<String, String>>,
 ) -> std::io::Result<bool> {
+    match import_skill_to_master_with_mode(agent_id, skill_name, ImportMode::Auto, custom_paths)? {
+        ImportResult::Success => Ok(true),
+        ImportResult::Conflict { .. } => Ok(false),
+    }
+}
+
+pub fn import_skill_to_master_with_mode(
+    agent_id: &str,
+    skill_name: &str,
+    mode: ImportMode,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<ImportResult> {
     let master_dir = ensure_master_dir_with_custom(custom_paths)?;
     let agent_dir = get_agent_skills_dir(agent_id, custom_paths)
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {}", agent_id)))?;
@@ -239,27 +364,108 @@ pub fn import_skill_to_master(
         ));
     }
 
-    let master_skill_path = master_dir.join(skill_name);
+    let target_name = match &mode {
+        ImportMode::RenameNew { new_name } => new_name.as_str(),
+        _ => skill_name,
+    };
+
+    let master_skill_path = master_dir.join(target_name);
 
     if is_valid_symlink_to(&source_path, &master_skill_path) {
-        return Ok(true);
+        return Ok(ImportResult::Success);
     }
 
-    if !master_skill_path.exists() {
-        if source_path.is_dir() {
-            copy_dir_all(&source_path, &master_skill_path)?;
-        } else if source_path.is_file() {
-            if let Some(parent) = master_skill_path.parent() {
-                fs::create_dir_all(parent)?;
+    match mode {
+        ImportMode::Auto => {
+            if master_skill_path.exists() {
+                let fp_input_src = FingerprintInput {
+                    root: source_path.clone(),
+                    comparable_extensions: &[],
+                    exclude_names: &[],
+                };
+                let fp_input_mst = FingerprintInput {
+                    root: master_skill_path.clone(),
+                    comparable_extensions: &[],
+                    exclude_names: &[],
+                };
+
+                let src_fp = compute_fingerprint(&fp_input_src).map(|(h, _)| h).unwrap_or_default();
+                let mst_fp = compute_fingerprint(&fp_input_mst).map(|(h, _)| h).unwrap_or_default();
+
+                if !src_fp.is_empty() && src_fp == mst_fp {
+                    remove_skill_symlink(&source_path)?;
+                    create_skill_symlink(&master_skill_path, &source_path)?;
+                    Ok(ImportResult::Success)
+                } else {
+                    Ok(ImportResult::Conflict {
+                        skill_name: skill_name.to_string(),
+                        existing_fingerprint: mst_fp,
+                        incoming_fingerprint: src_fp,
+                    })
+                }
+            } else {
+                if source_path.is_dir() {
+                    copy_dir_all(&source_path, &master_skill_path)?;
+                } else if source_path.is_file() {
+                    if let Some(parent) = master_skill_path.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    fs::copy(&source_path, &master_skill_path)?;
+                }
+                remove_skill_symlink(&source_path)?;
+                create_skill_symlink(&master_skill_path, &source_path)?;
+                Ok(ImportResult::Success)
             }
-            fs::copy(&source_path, &master_skill_path)?;
+        }
+        ImportMode::UseMaster => {
+            if !master_skill_path.exists() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Master skill '{}' does not exist", target_name),
+                ));
+            }
+            remove_skill_symlink(&source_path)?;
+            let _ = fs::remove_dir_all(&source_path);
+            create_skill_symlink(&master_skill_path, &source_path)?;
+            Ok(ImportResult::Success)
+        }
+        ImportMode::OverwriteMaster => {
+            if master_skill_path.exists() {
+                let _ = fs::remove_dir_all(&master_skill_path);
+                let _ = fs::remove_file(&master_skill_path);
+            }
+            if source_path.is_dir() {
+                copy_dir_all(&source_path, &master_skill_path)?;
+            } else if source_path.is_file() {
+                if let Some(parent) = master_skill_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(&source_path, &master_skill_path)?;
+            }
+            remove_skill_symlink(&source_path)?;
+            create_skill_symlink(&master_skill_path, &source_path)?;
+            Ok(ImportResult::Success)
+        }
+        ImportMode::RenameNew { new_name: ref _name } => {
+            if master_skill_path.exists() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    format!("Master skill with new name '{}' already exists", target_name),
+                ));
+            }
+            if source_path.is_dir() {
+                copy_dir_all(&source_path, &master_skill_path)?;
+            } else if source_path.is_file() {
+                if let Some(parent) = master_skill_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(&source_path, &master_skill_path)?;
+            }
+            remove_skill_symlink(&source_path)?;
+            create_skill_symlink(&master_skill_path, &source_path)?;
+            Ok(ImportResult::Success)
         }
     }
-
-    remove_skill_symlink(&source_path)?;
-    create_skill_symlink(&master_skill_path, &source_path)?;
-
-    Ok(true)
 }
 
 #[cfg(test)]

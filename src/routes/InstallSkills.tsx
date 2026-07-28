@@ -13,7 +13,7 @@ export type SkillCategory = "all" | "ui" | "search" | "workflow";
 
 export default function InstallSkills() {
   const lang = useI18nStore((s) => s.lang);
-  const { skills: masterSkills, toggleAgentSkill, importToMaster } = useMasterRepoStore();
+  const { skills: masterSkills, toggleAgentSkill, installSkillToMaster } = useMasterRepoStore();
 
   const [activeTab, setActiveTab] = useState<InstallTab>("marketplace");
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
@@ -116,9 +116,9 @@ export default function InstallSkills() {
     if (!targetSkillName) return;
     setInstalling(true);
     try {
+      await installSkillToMaster(targetSkillName, targetSkillSource || targetSkillName);
       const targetAgentIds = Object.keys(selectedAgents).filter((id) => selectedAgents[id]);
       for (const agentId of targetAgentIds) {
-        await importToMaster(agentId, targetSkillSource || targetSkillName);
         await toggleAgentSkill(agentId, targetSkillName, true);
       }
     } finally {
