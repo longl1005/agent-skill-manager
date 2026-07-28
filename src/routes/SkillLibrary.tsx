@@ -54,11 +54,14 @@ export default function SkillLibrary() {
   const filteredSkills = useMemo(() => {
     return skills.filter((skill) => {
       const tr = translateSkill(skill.name, skill.description, "");
+      const titleZh = skill.name_zh || tr.titleZh;
+      const descZh = skill.description_zh || tr.descriptionZh;
+
       // Search filter matches English or Chinese name/description
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const matchesName = skill.name.toLowerCase().includes(query) || (tr.titleZh && tr.titleZh.toLowerCase().includes(query));
-        const matchesDesc = skill.description.toLowerCase().includes(query) || tr.descriptionZh.toLowerCase().includes(query);
+        const matchesName = skill.name.toLowerCase().includes(query) || (titleZh && titleZh.toLowerCase().includes(query));
+        const matchesDesc = skill.description.toLowerCase().includes(query) || (descZh && descZh.toLowerCase().includes(query));
         if (!matchesName && !matchesDesc) return false;
       }
 
@@ -136,8 +139,9 @@ export default function SkillLibrary() {
         <div className="master-skill-grid">
           {filteredSkills.map((skill) => {
             const tr = translateSkill(skill.name, skill.description, "");
-            const displayTitle = lang === "zh" ? (tr.titleZh || skill.name) : skill.name;
-            const displayDesc = lang === "zh" ? tr.descriptionZh : (skill.description || null);
+            const titleZh = skill.name_zh || tr.titleZh;
+            const displayTitle = lang === "zh" ? (titleZh || skill.name) : skill.name;
+            const displayDesc = lang === "zh" ? (skill.description_zh || tr.descriptionZh) : (skill.description || null);
 
             return (
               <div className="master-skill-card" key={skill.name} data-testid={`skill-card-${skill.name}`}>
@@ -145,7 +149,7 @@ export default function SkillLibrary() {
                   <div className="title-section">
                     <h3 className="skill-title">
                       {displayTitle}
-                      {lang === "zh" && tr.titleZh && (
+                      {lang === "zh" && titleZh && titleZh !== skill.name && (
                         <span className="skill-id-subtag" style={{ marginLeft: 8, opacity: 0.65, fontSize: "0.8em", fontWeight: "normal" }}>
                           ({skill.name})
                         </span>

@@ -61,6 +61,10 @@ export default function SkillDetail() {
   const [lang, setLang] = useState<"en" | "zh">(appLang);
   const [copied, setCopied] = useState<boolean>(false);
 
+  useEffect(() => {
+    setLang(appLang);
+  }, [appLang]);
+
   const agent = report?.agents.find((a) => a.agent_id === agentId);
   const skill = agent?.skills.find((s) => s.name === skillName || decodeURIComponent(skillName || "") === s.name);
 

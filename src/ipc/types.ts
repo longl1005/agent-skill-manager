@@ -54,6 +54,8 @@ export interface MasterSkillReport {
   description: string;
   path: string;
   linked_agents: Record<string, boolean>;
+  name_zh?: string | null;
+  description_zh?: string | null;
 }
 
 export type ImportMode =
