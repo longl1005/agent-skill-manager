@@ -744,8 +744,13 @@ html, body, #root {
 }
 
 .skill-search input {
-  background: transparent;
-  border: 0;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--text, #f0f0f5);
   font: inherit;
   font-size: 13.5px;
@@ -753,7 +758,16 @@ html, body, #root {
   width: 100%;
   flex: 1;
   min-width: 0;
-  outline: none;
+  padding: 0;
+  margin: 0;
+}
+
+.skill-search input:focus,
+.skill-search input:focus-visible {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 .skill-search input::placeholder {
@@ -929,7 +943,7 @@ button {
 
 a:focus-visible,
 button:focus-visible,
-input:focus-visible {
+input:not(.skill-search *):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
