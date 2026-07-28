@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
@@ -136,7 +137,9 @@ export default function SkillLibrary() {
               <div className="master-skill-card" key={skill.name} data-testid={`skill-card-${skill.name}`}>
                 <div className="master-skill-card-header">
                   <div className="title-section">
-                    <h3 className="skill-title">{skill.name}</h3>
+                    <Link to={`/library/skills/${encodeURIComponent(skill.name)}`} className="skill-title-link">
+                      <h3 className="skill-title">{skill.name}</h3>
+                    </Link>
                     <code className="skill-path-badge" title={skill.path}>
                       {skill.path}
                     </code>

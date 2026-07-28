@@ -47,26 +47,45 @@ function renderFrontmatterValue(key: string, value: string) {
   return <span className="skill-fm__val">{value}</span>;
 }
 
+import { useMasterRepoStore } from "../stores/masterRepoStore";
+
 export default function SkillDetail() {
   const { agentId, skillName } = useParams();
   const { report } = useScanStore();
+  const { skills: masterSkills } = useMasterRepoStore();
+
   const [rawContent, setRawContent] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
   const [copied, setCopied] = useState<boolean>(false);
 
+  const decodedSkillName = decodeURIComponent(skillName || "");
+
+  const masterSkill = masterSkills.find(
+    (m) => m.name === skillName || m.name === decodedSkillName
+  );
+
   const agent = report?.agents.find((a) => a.agent_id === agentId);
-  const skill = agent?.skills.find((s) => s.name === skillName || decodeURIComponent(skillName || "") === s.name);
+  const agentSkill = agent
+    ? agent.skills.find((s) => s.name === skillName || s.name === decodedSkillName)
+    : report?.agents.flatMap((a) => a.skills).find((s) => s.name === skillName || s.name === decodedSkillName);
+
+  const resolvedLocation = masterSkill?.path || agentSkill?.location;
+  const resolvedName = masterSkill?.name || agentSkill?.name || decodedSkillName;
+  const resolvedDescription = masterSkill?.description || agentSkill?.description || "";
+  const resolvedFileCount = agentSkill?.file_count ?? 1;
+  const resolvedFingerprint = agentSkill?.fingerprint_short || "—";
+  const resolvedLicense = agentSkill?.license;
 
   useEffect(() => {
-    if (!skill) return;
+    if (!resolvedLocation) return;
 
     let mounted = true;
     setLoading(true);
     setError(null);
 
-    readSkillContent(skill.location)
+    readSkillContent(resolvedLocation)
       .then((data) => {
         if (mounted) {
           setRawContent(data);
@@ -83,25 +102,25 @@ export default function SkillDetail() {
     return () => {
       mounted = false;
     };
-  }, [skill?.location, skill?.name]);
+  }, [resolvedLocation]);
 
-  if (!agent || !skill) {
+  if (!resolvedLocation) {
     return (
       <section className="page agent-detail agent-detail--missing">
         <h1>Skill not found</h1>
-        <p>The requested skill "{skillName}" is not available in the current scan.</p>
+        <p>The requested skill "{skillName}" is not available.</p>
         <div className="agent-detail__recovery-actions">
-          <Link className="agent-detail-recovery agent-detail__recovery-link" to={`/agents/${agentId || ""}`}>
-            Back to Agent
+          <Link className="agent-detail-recovery agent-detail__recovery-link" to={agent ? `/agents/${agent.agent_id}` : "/library"}>
+            {agent ? "Back to Agent" : "Back to Skill Library"}
           </Link>
         </div>
       </section>
     );
   }
 
-  const entryPath = `${skill.location}/SKILL.md`;
+  const entryPath = `${resolvedLocation}/SKILL.md`;
   const { frontmatter, body } = rawContent ? parseFrontmatter(rawContent) : { frontmatter: null, body: "" };
-  const displayDescription = skill.description || frontmatter?.description || "No description provided.";
+  const displayDescription = resolvedDescription || frontmatter?.description || "No description provided.";
 
   const otherFields = frontmatter
     ? Object.entries(frontmatter).filter(
@@ -118,22 +137,38 @@ export default function SkillDetail() {
   return (
     <section className="page skill-detail-page">
       <nav aria-label="Breadcrumb" className="agent-breadcrumb agent-detail__breadcrumb">
-        <Link to="/agents">Discovered Agents</Link>
-        <BreadcrumbSeparator />
-        <Link to={`/agents/${agent.agent_id}`}>{agent.display_name}</Link>
-        <BreadcrumbSeparator />
-        <span aria-current="page">{skill.name}</span>
+        {agent ? (
+          <>
+            <Link to="/agents">Discovered Agents</Link>
+            <BreadcrumbSeparator />
+            <Link to={`/agents/${agent.agent_id}`}>{agent.display_name}</Link>
+            <BreadcrumbSeparator />
+            <span aria-current="page">{resolvedName}</span>
+          </>
+        ) : (
+          <>
+            <Link to="/library">Master Skill Library</Link>
+            <BreadcrumbSeparator />
+            <span aria-current="page">{resolvedName}</span>
+          </>
+        )}
       </nav>
 
       <header className="skill-detail__header">
         <div className="skill-detail__header-main">
           <div className="skill-detail__icon-wrapper">
-            <AgentIdentityMark agentId={agent.agent_id} />
+            <AgentIdentityMark agentId={agent?.agent_id || "antigravity"} />
           </div>
           <div className="skill-detail__identity">
             <div className="skill-detail__title-row">
-              <h1>{skill.name}</h1>
-              <span className="skill-detail__agent-tag">{agent.display_name}</span>
+              <h1>{resolvedName}</h1>
+              {agent ? (
+                <span className="skill-detail__agent-tag">{agent.display_name}</span>
+              ) : (
+                <span className="skill-detail__agent-tag" style={{ background: "rgba(99, 102, 241, 0.12)", color: "var(--color-accent-blue, #6366f1)" }}>
+                  Master Skill
+                </span>
+              )}
             </div>
             <p className="skill-detail__description">{displayDescription}</p>
           </div>
@@ -157,7 +192,7 @@ export default function SkillDetail() {
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
               <polyline points="13 2 13 9 20 9" />
             </svg>
-            <span>{skill.file_count} {skill.file_count === 1 ? "File" : "Files"}</span>
+            <span>{resolvedFileCount} {resolvedFileCount === 1 ? "File" : "Files"}</span>
           </div>
 
           <div className="skill-meta-pill">
@@ -165,15 +200,15 @@ export default function SkillDetail() {
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="monospace">Fingerprint: {skill.fingerprint_short || "—"}</span>
+            <span className="monospace">Fingerprint: {resolvedFingerprint}</span>
           </div>
 
-          {skill.license && (
+          {resolvedLicense && (
             <div className="skill-meta-pill">
               <svg aria-hidden="true" fill="none" height="13" viewBox="0 0 24 24" width="13" stroke="currentColor" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
-              <span>License: {skill.license}</span>
+              <span>License: {resolvedLicense}</span>
             </div>
           )}
         </div>

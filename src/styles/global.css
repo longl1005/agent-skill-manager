@@ -503,6 +503,24 @@ html, body, #root {
 
 .agents-console .empty-hint { color: var(--agents-muted); }
 
+.skill-title-link {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.15s ease;
+}
+
+.skill-title-link:hover {
+  color: var(--color-accent-blue, #6366f1);
+}
+
+.skill-title-link .skill-title {
+  transition: color 0.15s ease;
+}
+
+.skill-title-link:hover .skill-title {
+  color: var(--color-accent-blue, #6366f1);
+}
+
 .agents-console-header,
 .skill-workspace-header,
 .workspace-heading,

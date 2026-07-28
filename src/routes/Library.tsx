@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { ScanReport } from "../ipc/types";
 import { useScanStore } from "../stores/scanStore";
 
@@ -55,7 +56,11 @@ export default function Library() {
               const status = statusFor(skill.fingerprints);
               return (
                 <tr key={skill.name}>
-                  <td>{skill.name}</td>
+                  <td>
+                    <Link to={`/library/skills/${encodeURIComponent(skill.name)}`} className="skill-title-link">
+                      {skill.name}
+                    </Link>
+                  </td>
                   <td className="description">{skill.description || <em className="muted">(no description)</em>}</td>
                   <td className="number">{skill.agents.size}</td>
                   <td className="number">{skill.installations}</td>

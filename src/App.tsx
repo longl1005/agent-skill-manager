@@ -33,6 +33,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/library" element={<SkillLibrary />} />
+            <Route path="/library/skills/:skillName" element={<SkillDetail />} />
+            <Route path="/skills/:skillName" element={<SkillDetail />} />
             <Route path="/install" element={<InstallSkills />} />
             <Route path="/matrix" element={<AgentMatrix />} />
             <Route path="/agents" element={<Agents />} />
