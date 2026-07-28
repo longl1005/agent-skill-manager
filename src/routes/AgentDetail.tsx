@@ -8,6 +8,8 @@ import { useI18nStore } from "../stores/i18nStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
 
+import { translateSkill } from "../utils/skillTranslator";
+
 function BreadcrumbSeparator() {
   return (
     <svg aria-hidden="true" className="agent-detail__breadcrumb-separator" fill="none" height="16" viewBox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">
@@ -159,6 +161,13 @@ export default function AgentDetail() {
               const isManaged = Boolean(masterSkill);
               const isImporting = importingSkill === skill.name;
 
+              const tr = translateSkill(skill.name, skill.description || "", "");
+              const titleZh = masterSkill?.name_zh || tr.titleZh;
+              const displayTitle = lang === "zh" ? (titleZh || skill.name) : skill.name;
+              const displayDesc = lang === "zh"
+                ? (masterSkill?.description_zh || tr.descriptionZh || skill.description || t("agentDetail.noDescription", lang))
+                : (skill.description || t("agentDetail.noDescription", lang));
+
               return (
                 <li key={skill.location + skill.name}>
                   <Link className="agent-detail__skill-card" to={`/agents/${agent.agent_id}/skills/${encodeURIComponent(skill.name)}`}>
@@ -168,10 +177,17 @@ export default function AgentDetail() {
                           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                         </svg>
                       </div>
-                      <h3 className="agent-detail__skill-name" title={skill.name}>{skill.name}</h3>
+                      <h3 className="agent-detail__skill-name" title={skill.name}>
+                        {displayTitle}
+                        {lang === "zh" && titleZh && titleZh !== skill.name && (
+                          <span style={{ marginLeft: 6, opacity: 0.65, fontSize: "0.8em", fontWeight: "normal" }}>
+                            ({skill.name})
+                          </span>
+                        )}
+                      </h3>
                     </div>
-                    <p className="agent-detail__skill-description" title={skill.description || t("agentDetail.noDescription", lang)}>
-                      {skill.description || t("agentDetail.noDescription", lang)}
+                    <p className="agent-detail__skill-description" title={displayDesc}>
+                      {displayDesc}
                     </p>
                     <div className="agent-detail__skill-card-footer">
                       <span className="agent-detail__file-count">
