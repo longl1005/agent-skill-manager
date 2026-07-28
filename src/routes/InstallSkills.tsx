@@ -166,58 +166,78 @@ export default function InstallSkills() {
       </header>
 
       {toast && (
-        <div className={`install-toast-banner ${toast.type}`} role="status" data-testid="install-toast">
-          <div className="install-toast-icon">
-            {toast.type === "success" ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
-          </div>
-          <div className="install-toast-body">
-            <h4>{toast.title}</h4>
-            <p>
+        <div className="modal-overlay install-toast-overlay" data-testid="install-toast">
+          <div className={`install-toast-card ${toast.type}`}>
+            <div className="install-toast-header">
+              <div className="install-toast-icon">
+                {toast.type === "success" ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                )}
+              </div>
+              <div className="install-toast-title-group">
+                <h3>{toast.title}</h3>
+                <span className="install-toast-skill-name">{toast.skillName}</span>
+              </div>
+            </div>
+
+            <div className="install-toast-content">
               {toast.type === "success" ? (
                 lang === "zh" ? (
                   <>
-                    技能 <strong>{toast.skillName}</strong> 已成功导入至 <code>~/.asm/skills/{toast.skillName}</code>
-                    {toast.linkedAgents.length > 0
-                      ? `，并已分发软链接至：${toast.linkedAgents.join("、")}`
-                      : "（未勾选 Agent 软链接）"}
+                    <p className="install-toast-path">
+                      存储位置：<code>~/.asm/skills/{toast.skillName}</code>
+                    </p>
+                    <p className="install-toast-agents">
+                      {toast.linkedAgents.length > 0
+                        ? `已分发软链接至 ${toast.linkedAgents.length} 个 Agent (${toast.linkedAgents.join("、")})`
+                        : "未分发 Agent 软链接"}
+                    </p>
                   </>
                 ) : (
                   <>
-                    Skill <strong>{toast.skillName}</strong> installed to <code>~/.asm/skills/{toast.skillName}</code>
-                    {toast.linkedAgents.length > 0
-                      ? ` and symlinked to: ${toast.linkedAgents.join(", ")}`
-                      : " (No agent symlinks created)"}
+                    <p className="install-toast-path">
+                      Master path: <code>~/.asm/skills/{toast.skillName}</code>
+                    </p>
+                    <p className="install-toast-agents">
+                      {toast.linkedAgents.length > 0
+                        ? `Symlinked to ${toast.linkedAgents.length} Agents (${toast.linkedAgents.join(", ")})`
+                        : "No agent symlinks created"}
+                    </p>
                   </>
                 )
               ) : (
-                toast.message || "An unexpected error occurred during installation."
+                <p className="install-toast-error-msg">
+                  {toast.message || "An unexpected error occurred during installation."}
+                </p>
               )}
-            </p>
-          </div>
-          <div className="install-toast-actions">
-            {toast.type === "success" && (
-              <Link to={`/library/skills/${encodeURIComponent(toast.skillName)}`} className="install-toast-link">
-                {lang === "zh" ? "查看技能详情 ↗" : "View Skill Detail ↗"}
-              </Link>
-            )}
-            <button
-              type="button"
-              className="install-toast-close"
-              onClick={() => setToast(null)}
-              aria-label="Close notification"
-            >
-              ✕
-            </button>
+            </div>
+
+            <div className="install-toast-footer">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setToast(null)}
+              >
+                {lang === "zh" ? "完成" : "Done"}
+              </button>
+              {toast.type === "success" && (
+                <Link
+                  to={`/library/skills/${encodeURIComponent(toast.skillName)}`}
+                  className="btn primary install-toast-detail-btn"
+                  onClick={() => setToast(null)}
+                >
+                  {lang === "zh" ? "查看技能详情 ↗" : "View Skill Detail ↗"}
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}

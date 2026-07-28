@@ -3759,28 +3759,35 @@ a.agent-detail__skill-card,
   margin-top: 8px;
 }
 
-/* ===== Install Success & Error Toast Banner ===== */
-.install-toast-banner {
+/* ===== Install Success & Error Centered Modal Toast Card ===== */
+.install-toast-overlay {
+  z-index: 1200;
+}
+
+.install-toast-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.install-toast-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  background: color-mix(in srgb, var(--success) 8%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--success) 25%, var(--line));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  animation: modalFadeIn 0.2s ease-out;
-}
-
-.install-toast-banner.error {
-  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
-  border-color: color-mix(in srgb, var(--danger) 25%, var(--line));
 }
 
 .install-toast-icon {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--success);
   color: #ffffff;
@@ -3788,37 +3795,46 @@ a.agent-detail__skill-card,
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--success) 35%, transparent);
 }
 
-.install-toast-banner.error .install-toast-icon {
+.install-toast-card.error .install-toast-icon {
   background: var(--danger);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
-.install-toast-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.install-toast-body h4 {
-  margin: 0 0 3px;
-  font-size: 14.5px;
+.install-toast-title-group h3 {
+  margin: 0 0 2px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
 }
 
-.install-toast-body p {
-  margin: 0;
+.install-toast-skill-name {
   font-size: 13px;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.install-toast-body strong {
-  color: var(--text);
+  color: var(--accent);
   font-weight: 600;
+  font-family: var(--font-mono, monospace);
 }
 
-.install-toast-body code {
+.install-toast-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  border-radius: 10px;
+}
+
+.install-toast-content p {
+  margin: 0;
+}
+
+.install-toast-path code {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
@@ -3829,51 +3845,23 @@ a.agent-detail__skill-card,
   font-weight: 600;
 }
 
-.install-toast-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+.install-toast-agents {
+  color: var(--text);
+  font-size: 13px;
 }
 
-.install-toast-link {
-  background: var(--accent);
-  color: #ffffff !important;
-  font-size: 12.5px;
-  font-weight: 600;
+.install-toast-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.install-toast-detail-btn {
   text-decoration: none;
-  padding: 6px 14px;
-  border-radius: 7px;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
   display: inline-flex;
   align-items: center;
-}
-
-.install-toast-link:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-.install-toast-close {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.install-toast-close:hover {
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .install-online-controls {
