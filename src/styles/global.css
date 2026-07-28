@@ -3759,6 +3759,105 @@ a.agent-detail__skill-card,
   margin-top: 8px;
 }
 
+/* ===== Install Success & Error Toast Banner ===== */
+.install-toast-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin-bottom: 24px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.install-toast-banner.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.install-toast-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.install-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-toast-body h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #f0f0f5);
+}
+
+.install-toast-body p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted, #a0a0b0);
+  line-height: 1.5;
+}
+
+.install-toast-body strong {
+  color: var(--text, #ffffff);
+}
+
+.install-toast-body code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  color: var(--color-accent-blue, #6366f1);
+}
+
+.install-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.install-toast-link {
+  background: var(--color-accent-blue, #6366f1);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.install-toast-link:hover {
+  background: #4f46e5;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.install-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--muted, #888899);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.install-toast-close:hover {
+  color: var(--text, #ffffff);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .install-online-controls {
   display: flex;
   flex-wrap: wrap;

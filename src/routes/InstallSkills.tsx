@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
@@ -14,6 +15,14 @@ export type SkillCategory = "all" | "ui" | "search" | "workflow";
 export default function InstallSkills() {
   const lang = useI18nStore((s) => s.lang);
   const { skills: masterSkills, toggleAgentSkill, installSkillToMaster } = useMasterRepoStore();
+
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    title: string;
+    skillName: string;
+    linkedAgents: string[];
+    message?: string;
+  } | null>(null);
 
   const [activeTab, setActiveTab] = useState<InstallTab>("marketplace");
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
@@ -114,13 +123,30 @@ export default function InstallSkills() {
 
   const handleConfirmInstall = async () => {
     if (!targetSkillName) return;
+    const installedSkill = targetSkillName;
+    const targetAgentIds = Object.keys(selectedAgents).filter((id) => selectedAgents[id]);
+    const agentNames = SUPPORTED_AGENTS.filter((a) => targetAgentIds.includes(a.id)).map((a) => a.name);
+
     setInstalling(true);
     try {
-      await installSkillToMaster(targetSkillName, targetSkillSource || targetSkillName);
-      const targetAgentIds = Object.keys(selectedAgents).filter((id) => selectedAgents[id]);
+      await installSkillToMaster(installedSkill, targetSkillSource || installedSkill);
       for (const agentId of targetAgentIds) {
-        await toggleAgentSkill(agentId, targetSkillName, true);
+        await toggleAgentSkill(agentId, installedSkill, true);
       }
+      setToast({
+        type: "success",
+        title: lang === "zh" ? "🎉 技能安装成功！" : "🎉 Skill Installed Successfully!",
+        skillName: installedSkill,
+        linkedAgents: agentNames,
+      });
+    } catch (err) {
+      setToast({
+        type: "error",
+        title: lang === "zh" ? "❌ 技能安装失败" : "❌ Installation Failed",
+        skillName: installedSkill,
+        linkedAgents: [],
+        message: String(err),
+      });
     } finally {
       setInstalling(false);
       setModalOpen(false);
@@ -138,6 +164,51 @@ export default function InstallSkills() {
           <p className="page-subtitle">{t("installSkills.subtitle", lang)}</p>
         </div>
       </header>
+
+      {toast && (
+        <div className={`install-toast-banner ${toast.type}`} role="status" data-testid="install-toast">
+          <div className="install-toast-icon">{toast.type === "success" ? "✨" : "⚠️"}</div>
+          <div className="install-toast-body">
+            <h4>{toast.title}</h4>
+            <p>
+              {toast.type === "success" ? (
+                lang === "zh" ? (
+                  <>
+                    技能 <strong>{toast.skillName}</strong> 已成功导入至 <code>~/.asm/skills/{toast.skillName}</code>
+                    {toast.linkedAgents.length > 0
+                      ? `，并已分发软链接至：${toast.linkedAgents.join("、")}`
+                      : "（未勾选 Agent 软链接）"}
+                  </>
+                ) : (
+                  <>
+                    Skill <strong>{toast.skillName}</strong> installed to <code>~/.asm/skills/{toast.skillName}</code>
+                    {toast.linkedAgents.length > 0
+                      ? ` and symlinked to: ${toast.linkedAgents.join(", ")}`
+                      : " (No agent symlinks created)"}
+                  </>
+                )
+              ) : (
+                toast.message || "An unexpected error occurred during installation."
+              )}
+            </p>
+          </div>
+          <div className="install-toast-actions">
+            {toast.type === "success" && (
+              <Link to={`/library/skills/${encodeURIComponent(toast.skillName)}`} className="install-toast-link">
+                {lang === "zh" ? "查看技能详情 ↗" : "View Skill Detail ↗"}
+              </Link>
+            )}
+            <button
+              type="button"
+              className="install-toast-close"
+              onClick={() => setToast(null)}
+              aria-label="Close notification"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="install-tabs" role="tablist">
