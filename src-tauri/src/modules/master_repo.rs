@@ -279,6 +279,66 @@ pub fn toggle_skill_symlink(
     Ok(true)
 }
 
+fn parse_git_url(source: &str) -> String {
+    let trimmed = source.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        if trimmed.ends_with(".git") {
+            trimmed.to_string()
+        } else {
+            format!("{}.git", trimmed.trim_end_matches('/'))
+        }
+    } else if trimmed.starts_with("npx skills add ") {
+        let repo = trimmed.trim_start_matches("npx skills add ").trim();
+        parse_git_url(repo)
+    } else if trimmed.contains('/') {
+        format!("https://github.com/{}.git", trimmed.trim_matches('/'))
+    } else {
+        format!("https://github.com/{}/skills.git", trimmed)
+    }
+}
+
+fn uuid_simple() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap_or_default();
+    format!("{}-{}", since_the_epoch.as_millis(), std::process::id())
+}
+
+fn find_skill_dir_in_tree(root: &Path, target_skill: &str) -> Option<PathBuf> {
+    if !root.exists() || !root.is_dir() {
+        return None;
+    }
+
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        if name_str.eq_ignore_ascii_case(target_skill) {
+                            let candidate = entry.path();
+                            if candidate.join("SKILL.md").exists() || candidate.join("skill.md").exists() {
+                                return Some(candidate);
+                            }
+                        }
+                        if name_str != ".git" {
+                            stack.push(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.join("SKILL.md").exists() || root.join("skill.md").exists() {
+        return Some(root.to_path_buf());
+    }
+
+    None
+}
+
 pub fn install_skill_to_master(
     skill_name: &str,
     source: Option<&str>,
@@ -287,21 +347,57 @@ pub fn install_skill_to_master(
     let master_dir = ensure_master_dir_with_custom(custom_paths)?;
     let target_dir = master_dir.join(skill_name);
 
-    if !target_dir.exists() {
+    // If target_dir exists, check if it's a dummy placeholder file (< 350 bytes with only 1 file)
+    let is_dummy_placeholder = if target_dir.exists() {
+        let skill_md = target_dir.join("SKILL.md");
+        if let Ok(metadata) = fs::metadata(&skill_md) {
+            metadata.len() < 350 && fs::read_dir(&target_dir).map(|d| d.count() <= 1).unwrap_or(false)
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if !target_dir.exists() || is_dummy_placeholder {
+        if is_dummy_placeholder {
+            let _ = fs::remove_dir_all(&target_dir);
+        }
+
+        let mut installed = false;
+
         if let Some(src_str) = source {
             let src_path = PathBuf::from(src_str);
             if src_path.exists() && src_path.is_dir() {
-                copy_dir_all(&src_path, &target_dir)?;
+                let dir_to_copy = find_skill_dir_in_tree(&src_path, skill_name).unwrap_or(src_path);
+                copy_dir_all(&dir_to_copy, &target_dir)?;
+                installed = true;
             } else {
-                fs::create_dir_all(&target_dir)?;
-                let desc = format!("Installed skill '{}' from {}", skill_name, src_str);
-                let skill_md_content = format!(
-                    "---\nname: {}\ndescription: {}\n---\n\n# {}\n\n{}",
-                    skill_name, desc, skill_name, desc
-                );
-                fs::write(target_dir.join("SKILL.md"), skill_md_content)?;
+                let repo_url = parse_git_url(src_str);
+                let temp_dir = std::env::temp_dir().join(format!("asm-clone-{}", uuid_simple()));
+                let _ = fs::remove_dir_all(&temp_dir);
+
+                let status = std::process::Command::new("git")
+                    .args(["clone", "--depth", "1", &repo_url, temp_dir.to_str().unwrap()])
+                    .status();
+
+                if let Ok(st) = status {
+                    if st.success() {
+                        if let Some(skill_dir) = find_skill_dir_in_tree(&temp_dir, skill_name) {
+                            copy_dir_all(&skill_dir, &target_dir)?;
+                            installed = true;
+                        } else if temp_dir.join("SKILL.md").exists() || temp_dir.join("skill.md").exists() {
+                            copy_dir_all(&temp_dir, &target_dir)?;
+                            let _ = fs::remove_dir_all(target_dir.join(".git"));
+                            installed = true;
+                        }
+                    }
+                }
+                let _ = fs::remove_dir_all(&temp_dir);
             }
-        } else {
+        }
+
+        if !installed {
             fs::create_dir_all(&target_dir)?;
             let desc = format!("Skill '{}'", skill_name);
             let skill_md_content = format!(
@@ -310,6 +406,12 @@ pub fn install_skill_to_master(
             );
             fs::write(target_dir.join("SKILL.md"), skill_md_content)?;
         }
+    }
+
+    if let Ok(conn) = crate::modules::db::open_db(None) {
+        let desc = format!("Skill '{}'", skill_name);
+        let file_count = fs::read_dir(&target_dir).map(|d| d.count()).unwrap_or(1);
+        let _ = crate::modules::db::upsert_master_skill(&conn, skill_name, &desc, "", source.unwrap_or(""), file_count);
     }
 
     Ok(target_dir)
