@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getMasterSkills, toggleAgentSkill, importToMaster, installSkillToMaster } from "../ipc/commands";
+import { getMasterSkills, toggleAgentSkill, importToMaster, installSkillToMaster, deleteMasterSkill } from "../ipc/commands";
 import type { ImportMode, ImportResult, MasterSkillReport } from "../ipc/types";
 import { useAgentConfigStore } from "./agentConfigStore";
 import { useScanStore } from "./scanStore";
@@ -12,6 +12,7 @@ export interface MasterRepoState {
   toggleAgentSkill: (agentId: string, skillName: string, enable: boolean) => Promise<boolean>;
   importToMaster: (agentId: string, skillName: string, mode?: ImportMode) => Promise<ImportResult>;
   installSkillToMaster: (skillName: string, source?: string) => Promise<string | null>;
+  deleteMasterSkill: (skillName: string) => Promise<string[]>;
 }
 
 export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
@@ -77,6 +78,22 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     } catch (err) {
       set({ error: String(err) });
       return null;
+    }
+  },
+
+  deleteMasterSkill: async (skillName: string) => {
+    set({ error: null });
+    try {
+      const customPaths = useAgentConfigStore.getState().customPaths;
+      const removedAgents = await deleteMasterSkill(skillName, customPaths);
+      await Promise.all([
+        get().fetchMasterSkills(),
+        useScanStore.getState().scan(),
+      ]);
+      return removedAgents;
+    } catch (err) {
+      set({ error: String(err) });
+      return [];
     }
   },
 }));

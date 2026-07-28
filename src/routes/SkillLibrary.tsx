@@ -17,13 +17,15 @@ export const SUPPORTED_AGENTS = [
 export type StatusFilter = "all" | "linked" | "unlinked";
 
 export default function SkillLibrary() {
-  const { skills, loading, error, fetchMasterSkills, toggleAgentSkill } = useMasterRepoStore();
+  const { skills, loading, error, fetchMasterSkills, toggleAgentSkill, deleteMasterSkill } = useMasterRepoStore();
   const lang = useI18nStore((s) => s.lang);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<{ skillName: string; linkedCount: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchMasterSkills();
@@ -47,6 +49,23 @@ export default function SkillLibrary() {
       await toggleAgentSkill(agentId, skillName, !currentState);
     } finally {
       setTogglingMap((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleDeleteClick = (skillName: string) => {
+    const skill = skills.find((s) => s.name === skillName);
+    const linkedCount = skill ? Object.values(skill.linked_agents ?? {}).filter(Boolean).length : 0;
+    setDeleteConfirm({ skillName, linkedCount });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      await deleteMasterSkill(deleteConfirm.skillName);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm(null);
     }
   };
 
@@ -144,21 +163,37 @@ export default function SkillLibrary() {
                       {skill.path}
                     </code>
                   </div>
-                  <button
-                    className="copy-path-btn"
-                    onClick={() => handleCopyPath(skill.path)}
-                    title={t("skillLibrary.copyPath", lang)}
-                    aria-label={`Copy path for ${skill.name}`}
-                  >
-                    {copiedPath === skill.path ? (
-                      <span className="copied-text">{t("skillLibrary.copied", lang)}</span>
-                    ) : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  <div className="card-header-actions">
+                    <button
+                      className="copy-path-btn"
+                      onClick={() => handleCopyPath(skill.path)}
+                      title={t("skillLibrary.copyPath", lang)}
+                      aria-label={`Copy path for ${skill.name}`}
+                    >
+                      {copiedPath === skill.path ? (
+                        <span className="copied-text">{t("skillLibrary.copied", lang)}</span>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      className="delete-skill-btn"
+                      onClick={() => handleDeleteClick(skill.name)}
+                      title={lang === "zh" ? "删除技能" : "Delete skill"}
+                      aria-label={`Delete skill ${skill.name}`}
+                      data-testid={`delete-btn-${skill.name}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
                       </svg>
-                    )}
-                  </button>
+                    </button>
+                  </div>
                 </div>
 
                 <p className="skill-description">
@@ -202,6 +237,63 @@ export default function SkillLibrary() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}>
+          <div className="delete-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-confirm-header">
+              <div className="delete-confirm-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </div>
+              <div>
+                <h3>{lang === "zh" ? "确认删除技能" : "Delete Skill"}</h3>
+                <span className="delete-confirm-skill-name">{deleteConfirm.skillName}</span>
+              </div>
+            </div>
+
+            <div className="delete-confirm-body">
+              <p>
+                {lang === "zh"
+                  ? <>确定要删除技能 <strong>{deleteConfirm.skillName}</strong> 吗？</>
+                  : <>Are you sure you want to delete <strong>{deleteConfirm.skillName}</strong>?</>}
+              </p>
+              <p className="delete-confirm-warning">
+                {lang === "zh"
+                  ? <>此操作将删除 <code>~/.asm/skills/{deleteConfirm.skillName}</code> 目录{deleteConfirm.linkedCount > 0 ? `，并移除 ${deleteConfirm.linkedCount} 个 Agent 中的软链接引用` : ""}。此操作不可撤销。</>
+                  : <>This will remove <code>~/.asm/skills/{deleteConfirm.skillName}</code>{deleteConfirm.linkedCount > 0 ? ` and unlink from ${deleteConfirm.linkedCount} Agent(s)` : ""}. This action cannot be undone.</>}
+              </p>
+            </div>
+
+            <div className="delete-confirm-footer">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+              >
+                {lang === "zh" ? "取消" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                data-testid="confirm-delete-btn"
+              >
+                {deleting
+                  ? (lang === "zh" ? "删除中..." : "Deleting...")
+                  : (lang === "zh" ? "确认删除" : "Delete")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

@@ -337,6 +337,15 @@ pub fn get_db_summary() -> Result<crate::modules::db::DbSummaryReport, String> {
 }
 
 #[tauri::command]
+pub fn delete_master_skill(
+    skill_name: String,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+) -> Result<Vec<String>, String> {
+    crate::modules::master_repo::delete_master_skill(&skill_name, custom_paths.as_ref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_activity_logs(limit: Option<usize>) -> Result<Vec<crate::modules::db::DbActivityLog>, String> {
     let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
     crate::modules::db::get_activity_logs(&conn, limit.unwrap_or(20)).map_err(|e| e.to_string())

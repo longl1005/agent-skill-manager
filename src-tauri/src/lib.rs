@@ -17,6 +17,7 @@ pub fn run() {
             commands::toggle_agent_skill,
             commands::import_to_master,
             commands::install_skill_to_master,
+            commands::delete_master_skill,
             commands::get_db_summary,
             commands::get_activity_logs
         ])

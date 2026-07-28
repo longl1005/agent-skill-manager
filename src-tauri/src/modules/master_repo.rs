@@ -279,6 +279,48 @@ pub fn toggle_skill_symlink(
     Ok(true)
 }
 
+/// Known agent IDs for symlink cleanup during skill deletion.
+const ALL_AGENT_IDS: &[&str] = &["claude-code", "codex", "antigravity", "pi-agent", "opencode", "cursor"];
+
+/// Delete a master skill entirely: remove all agent symlinks first, then delete the master directory.
+pub fn delete_master_skill(
+    skill_name: &str,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<Vec<String>> {
+    let master_dir = get_master_dir(custom_paths);
+    let master_skill_path = master_dir.join(skill_name);
+
+    // 1) Remove symlinks from all known agents
+    let mut removed_agents: Vec<String> = Vec::new();
+    for &agent_id in ALL_AGENT_IDS {
+        if let Some(agent_dir) = get_agent_skills_dir(agent_id, custom_paths) {
+            let symlink_path = agent_dir.join(skill_name);
+            if symlink_path.exists() || fs::symlink_metadata(&symlink_path).is_ok() {
+                remove_skill_symlink(&symlink_path)?;
+                removed_agents.push(agent_id.to_string());
+
+                // Update DB
+                if let Ok(conn) = crate::modules::db::open_db(None) {
+                    let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, "unlinked");
+                    let _ = crate::modules::db::log_activity(&conn, "UNLINK_SKILL", skill_name, agent_id);
+                }
+            }
+        }
+    }
+
+    // 2) Delete the master skill directory itself
+    if master_skill_path.exists() {
+        fs::remove_dir_all(&master_skill_path)?;
+    }
+
+    // 3) Log deletion activity
+    if let Ok(conn) = crate::modules::db::open_db(None) {
+        let _ = crate::modules::db::log_activity(&conn, "DELETE_SKILL", skill_name, "master");
+    }
+
+    Ok(removed_agents)
+}
+
 fn parse_git_url(source: &str) -> String {
     let trimmed = source.trim();
     if trimmed.starts_with("http://") || trimmed.starts_with("https://") {

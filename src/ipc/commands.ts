@@ -77,6 +77,21 @@ export async function installSkillToMaster(
 }
 
 /**
+ * 与 Rust 端 `commands::delete_master_skill` 对应。
+ * 删除主仓库中指定技能目录，并自动移除所有 Agent 的 symlink 引用。
+ * 返回被移除 symlink 的 Agent ID 列表。
+ */
+export async function deleteMasterSkill(
+  skillName: string,
+  customPaths?: Record<string, string>
+): Promise<string[]> {
+  return invoke<string[]>("delete_master_skill", {
+    skillName,
+    customPaths: customPaths ?? null,
+  });
+}
+
+/**
  * 与 Rust 端 `commands::get_db_summary` 对应。
  * 获取 SQLite 数据库总体统计与最近落库记录。
  */
