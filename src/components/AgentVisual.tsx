@@ -64,7 +64,7 @@ export function ClaudeCodeMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#D97757" height="32" rx="7" width="32" x="0" y="0" />
+      <rect fill="#D97757" height="32" rx="8" width="32" x="0" y="0" />
       <g transform="translate(4, 4)">
         <svg height="24" viewBox="0 0 24 24" width="24">
           <path
@@ -89,10 +89,10 @@ export function CodexMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#10A37F" height="32" rx="7" width="32" x="0" y="0" />
+      <rect fill="#10A37F" height="32" rx="8" width="32" x="0" y="0" />
       <g transform="translate(6, 6)">
         <svg height="20" viewBox="0 0 24 24" width="20" fill="#FFFFFF">
-          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7917.7917 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.535-3.0137l.142.0852 4.783 2.7582a.7917.7917 0 0 0 .7854 0l5.833-3.368v2.3325a.0804.0804 0 0 1-.0332.0615l-4.8351 2.7913a4.4944 4.4944 0 0 1-6.1401-1.647zm-1.3582-10.4633a4.4755 4.4755 0 0 1 2.3414-2.2043l-.0047.1656v5.5163a.787.787 0 0 0 .3927.6813l5.833 3.368-2.02 1.1685a.0757.0757 0 0 1-.071 0l-4.8304-2.7914a4.504 4.504 0 0 1-1.641-5.904zm16.5963 3.8552l-5.833-3.368 2.02-1.1686a.0757.0757 0 0 1 .071 0l4.8304 2.7914a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.7917.7917 0 0 0-.4119-.6818zm2.0107-3.0231a4.4708 4.4708 0 0 1 .535 3.0137l-.142-.0852-4.783-2.7582a.7917.7917 0 0 0-.7854 0l-5.833 3.368v-2.3325a.0804.0804 0 0 1 .0332-.0615l4.8351-2.7913a4.4944 4.4944 0 0 1 6.1401 1.647zm-9.5376-7.857a4.4755 4.4755 0 0 1 2.8764 1.0408l-.1419.0804-4.7783 2.7582a.7917.7917 0 0 0-.3927.6813v6.7369l-2.02-1.1686a.071.071 0 0 1-.038-.052v-5.5826a4.504 4.504 0 0 1 4.4945-4.4944zm-2.006 8.5204l2.9145-1.682 2.9145 1.682v3.364l-2.9145 1.682-2.9145-1.682z" />
+          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7917.7917 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.535-3.0137l.142.0852 4.783 2.7582a.7917.7917 0 0 0 .7854 0l5.833-3.368v2.3325a.0804.0804 0 0 1-.0332.0615l-4.8351 2.7913a4.4944 4.4944 0 0 1-6.1401-1.647zm-1.3582-10.4633a4.4755 4.4755 0 0 1 2.3414-2.2043l-.0047.1656v5.5163a.787.787 0 0 0 .3927.6813l5.833 3.368-2.02 1.1685a.0757.0757 0 0 1-.071 0l-4.8304-2.7914a4.4944 4.4944 0 0 1-1.641-5.904zm16.5963 3.8552l-5.833-3.368 2.02-1.1686a.0757.0757 0 0 1 .071 0l4.8304 2.7914a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.7917.7917 0 0 0-.4119-.6818zm2.0107-3.0231a4.4708 4.4708 0 0 1 .535 3.0137l-.142-.0852-4.783-2.7582a.7917.7917 0 0 0-.7854 0l-5.833 3.368v-2.3325a.0804.0804 0 0 1 .0332-.0615l4.8351-2.7913a4.4944 4.4944 0 0 1 6.1401 1.647zm-9.5376-7.857a4.4755 4.4755 0 0 1 2.8764 1.0408l-.1419.0804-4.7783 2.7582a.7917.7917 0 0 0-.3927.6813v6.7369l-2.02-1.1686a.071.071 0 0 1-.038-.052v-5.5826a4.504 4.504 0 0 1 4.4945-4.4944zm-2.006 8.5204l2.9145-1.682 2.9145 1.682v3.364l-2.9145 1.682-2.9145-1.682z" />
         </svg>
       </g>
     </svg>
@@ -110,15 +110,22 @@ export function AntigravityMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#1A73E8" height="32" rx="7" width="32" x="0" y="0" />
+      <defs>
+        <linearGradient id="antigravity-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1A73E8" />
+          <stop offset="100%" stopColor="#4285F4" />
+        </linearGradient>
+      </defs>
+      <rect fill="url(#antigravity-bg)" height="32" rx="8" width="32" x="0" y="0" />
       <g transform="translate(6, 6)">
+        {/* Google Gemini / Antigravity 4-point Sparkle Star */}
         <path
           d="M10 0C10 5.52285 5.52285 10 0 10C5.52285 10 10 14.4771 10 20C10 14.4771 14.4771 10 20 10C14.4771 10 10 5.52285 10 0Z"
           fill="#FFFFFF"
         />
         <path
           d="M16 1C16 2.65685 14.6569 4 13 4C14.6569 4 16 5.34315 16 7C16 5.34315 17.3431 4 19 4C17.3431 4 16 2.65685 16 1Z"
-          fill="#8AB4F8"
+          fill="#AECBFA"
         />
       </g>
     </svg>
@@ -136,12 +143,14 @@ export function PiAgentMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#7C3AED" height="32" rx="7" width="32" x="0" y="0" />
+      <rect fill="#7C3AED" height="32" rx="8" width="32" x="0" y="0" />
       <g transform="translate(6, 6)">
-        <svg height="20" viewBox="0 0 24 24" width="20" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 6h16" />
-          <path d="M8 6v12c0 1.5-1 2-2.5 2" />
-          <path d="M16 6v14" />
+        {/* Inflection Pi Agent Official Geometric Pi Emblem */}
+        <svg height="20" viewBox="0 0 24 24" width="20" fill="none">
+          <path
+            d="M4 6.5C4 5.67157 4.67157 5 5.5 5H18.5C19.3284 5 20 5.67157 20 6.5C20 7.32843 19.3284 8 18.5 8H17V17.5C17 18.3284 17.6716 19 18.5 19H19V21H16.5C14.567 21 13 19.433 13 17.5V8H11V16.5C11 18.9853 8.98528 21 6.5 21H5V19H6.5C7.88071 19 9 17.8807 9 16.5V8H5.5C4.67157 8 4 7.32843 4 6.5Z"
+            fill="#FFFFFF"
+          />
         </svg>
       </g>
     </svg>
@@ -159,13 +168,13 @@ export function OpenCodeMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#18181B" height="32" rx="7" width="32" x="0" y="0" />
+      <rect fill="#18181B" height="32" rx="8" width="32" x="0" y="0" />
       <g transform="translate(6, 6)">
         <svg height="20" viewBox="0 0 24 24" width="20" fill="none">
-          {/* Official OpenCode pixel-block logo emblem (opencode.ai) */}
-          <path d="M21 21H3V3H21V21Z" fill="#71717A" />
-          <path d="M17 17H7V7H17V17Z" fill="#F4F4F5" />
-          <path d="M14 14H10V10H14V14Z" fill="#18181B" />
+          {/* Official OpenCode.ai Terminal Agent Emblem */}
+          <rect x="2" y="2" width="20" height="20" rx="3" fill="#27272A" stroke="#3F3F46" strokeWidth="1.5" />
+          <rect x="6" y="6" width="12" height="12" rx="1.5" fill="#FAFAFA" />
+          <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="#18181B" />
         </svg>
       </g>
     </svg>
@@ -183,13 +192,17 @@ export function CursorMark(): JSX.Element {
       width="32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#09090B" height="32" rx="7" width="32" x="0" y="0" />
-      <g transform="translate(6, 6)">
-        <svg height="20" viewBox="0 0 24 24" width="20" fill="none">
-          {/* Official Cursor 3D Isometric Prism Emblem */}
-          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#E4E4E7" />
-          <path d="M2 7V17L12 22V12L2 7Z" fill="#A1A1AA" />
-          <path d="M22 7V17L12 22V12L22 7Z" fill="#71717A" />
+      <rect fill="#09090B" height="32" rx="8" width="32" x="0" y="0" />
+      <g transform="translate(5, 5)">
+        <svg height="22" viewBox="0 0 24 24" width="22" fill="none">
+          {/* Official Cursor 3D Isometric Triangular Prism Emblem (cursor.com) */}
+          <path d="M12 2L2 7.8L12 13.6L22 7.8L12 2Z" fill="#F4F4F5" />
+          <path d="M2 7.8V16.2L12 22V13.6L2 7.8Z" fill="#A1A1AA" />
+          <path d="M22 7.8V16.2L12 22V13.6L22 7.8Z" fill="#71717A" />
+          {/* Inner Light Bevel Lines */}
+          <path d="M12 2L12 13.6" stroke="#FFFFFF" strokeOpacity="0.4" strokeWidth="0.8" />
+          <path d="M2 7.8L12 13.6" stroke="#FFFFFF" strokeOpacity="0.3" strokeWidth="0.8" />
+          <path d="M22 7.8L12 13.6" stroke="#FFFFFF" strokeOpacity="0.3" strokeWidth="0.8" />
         </svg>
       </g>
     </svg>
