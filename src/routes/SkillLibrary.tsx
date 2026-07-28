@@ -4,6 +4,8 @@ import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { AgentIdentityMark } from "../components/AgentVisual";
 
+import { translateSkill } from "../utils/skillTranslator";
+
 export const SUPPORTED_AGENTS = [
   { id: "claude-code", name: "Claude Code" },
   { id: "codex", name: "Codex" },
@@ -51,12 +53,13 @@ export default function SkillLibrary() {
 
   const filteredSkills = useMemo(() => {
     return skills.filter((skill) => {
-      // Search filter
-      const query = searchQuery.trim().toLowerCase();
-      if (query) {
-        const matchName = skill.name.toLowerCase().includes(query);
-        const matchDesc = skill.description.toLowerCase().includes(query);
-        if (!matchName && !matchDesc) return false;
+      const tr = translateSkill(skill.name, skill.description, "");
+      // Search filter matches English or Chinese name/description
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = skill.name.toLowerCase().includes(query) || (tr.titleZh && tr.titleZh.toLowerCase().includes(query));
+        const matchesDesc = skill.description.toLowerCase().includes(query) || tr.descriptionZh.toLowerCase().includes(query);
+        if (!matchesName && !matchesDesc) return false;
       }
 
       // Status filter
@@ -131,72 +134,85 @@ export default function SkillLibrary() {
         <p className="empty-hint">{t("skillLibrary.emptySearch", lang)}</p>
       ) : (
         <div className="master-skill-grid">
-          {filteredSkills.map((skill) => (
-            <div className="master-skill-card" key={skill.name} data-testid={`skill-card-${skill.name}`}>
-              <div className="master-skill-card-header">
-                <div className="title-section">
-                  <h3 className="skill-title">{skill.name}</h3>
-                  <code className="skill-path-badge" title={skill.path}>
-                    {skill.path}
-                  </code>
-                </div>
-                <button
-                  className="copy-path-btn"
-                  onClick={() => handleCopyPath(skill.path)}
-                  title={t("skillLibrary.copyPath", lang)}
-                  aria-label={`Copy path for ${skill.name}`}
-                >
-                  {copiedPath === skill.path ? (
-                    <span className="copied-text">{t("skillLibrary.copied", lang)}</span>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                    </svg>
-                  )}
-                </button>
-              </div>
+          {filteredSkills.map((skill) => {
+            const tr = translateSkill(skill.name, skill.description, "");
+            const displayTitle = lang === "zh" ? (tr.titleZh || skill.name) : skill.name;
+            const displayDesc = lang === "zh" ? tr.descriptionZh : (skill.description || null);
 
-              <p className="skill-description">
-                {skill.description || <em className="muted">{t("skillLibrary.noDescription", lang)}</em>}
-              </p>
-
-              <div className="agent-distribution-section">
-                <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>
-                <div className="agent-matrix-badges">
-                  {SUPPORTED_AGENTS.map((agent) => {
-                    const isLinked = Boolean(skill.linked_agents?.[agent.id]);
-                    const key = `${agent.id}:${skill.name}`;
-                    const isToggling = Boolean(togglingMap[key]);
-
-                    return (
-                      <button
-                        key={agent.id}
-                        type="button"
-                        className={`agent-link-badge ${isLinked ? "linked" : "unlinked"}`}
-                        onClick={() => handleToggleAgent(agent.id, skill.name, isLinked)}
-                        disabled={isToggling}
-                        title={`${agent.name} (${isLinked ? t("skillLibrary.linked", lang) : t("skillLibrary.unlinked", lang)})`}
-                        aria-label={`Toggle ${agent.name} link for ${skill.name}`}
-                        data-testid={`agent-badge-${skill.name}-${agent.id}`}
-                      >
-                        <div className="badge-agent-info">
-                          <AgentIdentityMark agentId={agent.id} />
-                        </div>
-                        <span className={`link-status-tag ${isLinked ? "status-linked" : "status-unlinked"}`}>
-                          {isToggling
-                            ? "..."
-                            : isLinked
-                            ? t("skillLibrary.linked", lang)
-                            : t("skillLibrary.unlinked", lang)}
+            return (
+              <div className="master-skill-card" key={skill.name} data-testid={`skill-card-${skill.name}`}>
+                <div className="master-skill-card-header">
+                  <div className="title-section">
+                    <h3 className="skill-title">
+                      {displayTitle}
+                      {lang === "zh" && tr.titleZh && (
+                        <span className="skill-id-subtag" style={{ marginLeft: 8, opacity: 0.65, fontSize: "0.8em", fontWeight: "normal" }}>
+                          ({skill.name})
                         </span>
-                      </button>
-                    );
-                  })}
+                      )}
+                    </h3>
+                    <code className="skill-path-badge" title={skill.path}>
+                      {skill.path}
+                    </code>
+                  </div>
+                  <button
+                    className="copy-path-btn"
+                    onClick={() => handleCopyPath(skill.path)}
+                    title={t("skillLibrary.copyPath", lang)}
+                    aria-label={`Copy path for ${skill.name}`}
+                  >
+                    {copiedPath === skill.path ? (
+                      <span className="copied-text">{t("skillLibrary.copied", lang)}</span>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                <p className="skill-description">
+                  {displayDesc || <em className="muted">{t("skillLibrary.noDescription", lang)}</em>}
+                </p>
+
+                <div className="agent-distribution-section">
+                  <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>
+                  <div className="agent-matrix-badges">
+                    {SUPPORTED_AGENTS.map((agent) => {
+                      const isLinked = Boolean(skill.linked_agents?.[agent.id]);
+                      const key = `${agent.id}:${skill.name}`;
+                      const isToggling = Boolean(togglingMap[key]);
+
+                      return (
+                        <button
+                          key={agent.id}
+                          type="button"
+                          className={`agent-link-badge ${isLinked ? "linked" : "unlinked"}`}
+                          onClick={() => handleToggleAgent(agent.id, skill.name, isLinked)}
+                          disabled={isToggling}
+                          title={`${agent.name} (${isLinked ? t("skillLibrary.linked", lang) : t("skillLibrary.unlinked", lang)})`}
+                          aria-label={`Toggle ${agent.name} link for ${skill.name}`}
+                          data-testid={`agent-badge-${skill.name}-${agent.id}`}
+                        >
+                          <div className="badge-agent-info">
+                            <AgentIdentityMark agentId={agent.id} />
+                          </div>
+                          <span className={`link-status-tag ${isLinked ? "status-linked" : "status-unlinked"}`}>
+                            {isToggling
+                              ? "..."
+                              : isLinked
+                              ? t("skillLibrary.linked", lang)
+                              : t("skillLibrary.unlinked", lang)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

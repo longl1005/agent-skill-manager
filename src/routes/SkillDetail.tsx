@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 
 import { readSkillContent, getSkillTranslation, saveSkillTranslation } from "../ipc/commands";
 import { useScanStore } from "../stores/scanStore";
+import { useI18nStore } from "../stores/i18nStore";
 import { AgentIdentityMark } from "../components/AgentVisual";
 import { translateSkill, translateFrontmatterKey } from "../utils/skillTranslator";
 
@@ -51,12 +52,13 @@ function renderFrontmatterValue(key: string, value: string) {
 export default function SkillDetail() {
   const { agentId, skillName } = useParams();
   const { report } = useScanStore();
+  const appLang = useI18nStore((s) => s.lang);
   const [rawContent, setRawContent] = useState<string | null>(null);
-  const [dbTranslation, setDbTranslation] = useState<{ description_zh: string; body_zh: string } | null>(null);
+  const [dbTranslation, setDbTranslation] = useState<{ name_zh?: string; description_zh: string; body_zh: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
-  const [lang, setLang] = useState<"en" | "zh">("en");
+  const [lang, setLang] = useState<"en" | "zh">(appLang);
   const [copied, setCopied] = useState<boolean>(false);
 
   const agent = report?.agents.find((a) => a.agent_id === agentId);
@@ -87,7 +89,7 @@ export default function SkillDetail() {
     getSkillTranslation(skill.name)
       .then((saved) => {
         if (mounted && saved && saved.body_zh) {
-          setDbTranslation({ description_zh: saved.description_zh, body_zh: saved.body_zh });
+          setDbTranslation({ name_zh: saved.name_zh, description_zh: saved.description_zh, body_zh: saved.body_zh });
         }
       })
       .catch(() => {});
@@ -143,6 +145,10 @@ export default function SkillDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const displayTitle = lang === "zh"
+    ? (dbTranslation?.name_zh || translation.titleZh || skill.name)
+    : skill.name;
+
   return (
     <section className="page skill-detail-page">
       <nav aria-label="Breadcrumb" className="agent-breadcrumb agent-detail__breadcrumb">
@@ -150,7 +156,7 @@ export default function SkillDetail() {
         <BreadcrumbSeparator />
         <Link to={`/agents/${agent.agent_id}`}>{agent.display_name}</Link>
         <BreadcrumbSeparator />
-        <span aria-current="page">{skill.name}</span>
+        <span aria-current="page">{displayTitle}</span>
       </nav>
 
       <header className="skill-detail__header">
@@ -160,7 +166,14 @@ export default function SkillDetail() {
           </div>
           <div className="skill-detail__identity">
             <div className="skill-detail__title-row">
-              <h1>{skill.name}</h1>
+              <h1>
+                {displayTitle}
+                {lang === "zh" && (dbTranslation?.name_zh || translation.titleZh) && (
+                  <span className="skill-id-subtag" style={{ marginLeft: 10, opacity: 0.6, fontSize: "0.6em", fontWeight: "normal" }}>
+                    ({skill.name})
+                  </span>
+                )}
+              </h1>
               <span className="skill-detail__agent-tag">{agent.display_name}</span>
             </div>
             <p className="skill-detail__description">{displayDescription}</p>
