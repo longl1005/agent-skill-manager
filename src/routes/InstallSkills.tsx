@@ -135,14 +135,14 @@ export default function InstallSkills() {
       }
       setToast({
         type: "success",
-        title: lang === "zh" ? "🎉 技能安装成功！" : "🎉 Skill Installed Successfully!",
+        title: lang === "zh" ? "技能安装成功" : "Skill Installed Successfully",
         skillName: installedSkill,
         linkedAgents: agentNames,
       });
     } catch (err) {
       setToast({
         type: "error",
-        title: lang === "zh" ? "❌ 技能安装失败" : "❌ Installation Failed",
+        title: lang === "zh" ? "技能安装失败" : "Installation Failed",
         skillName: installedSkill,
         linkedAgents: [],
         message: String(err),
@@ -167,7 +167,19 @@ export default function InstallSkills() {
 
       {toast && (
         <div className={`install-toast-banner ${toast.type}`} role="status" data-testid="install-toast">
-          <div className="install-toast-icon">{toast.type === "success" ? "✨" : "⚠️"}</div>
+          <div className="install-toast-icon">
+            {toast.type === "success" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+          </div>
           <div className="install-toast-body">
             <h4>{toast.title}</h4>
             <p>

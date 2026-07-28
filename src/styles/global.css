@@ -3763,25 +3763,35 @@ a.agent-detail__skill-card,
 .install-toast-banner {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  border-radius: 14px;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 12px;
   margin-bottom: 24px;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--success) 25%, var(--line));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  animation: modalFadeIn 0.2s ease-out;
 }
 
 .install-toast-banner.error {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 25%, var(--line));
 }
 
 .install-toast-icon {
-  font-size: 22px;
-  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+
+.install-toast-banner.error .install-toast-icon {
+  background: var(--danger);
 }
 
 .install-toast-body {
@@ -3790,72 +3800,80 @@ a.agent-detail__skill-card,
 }
 
 .install-toast-body h4 {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0 0 3px;
+  font-size: 14.5px;
   font-weight: 700;
-  color: var(--text, #f0f0f5);
+  color: var(--text);
 }
 
 .install-toast-body p {
   margin: 0;
-  font-size: 13.5px;
-  color: var(--muted, #a0a0b0);
-  line-height: 1.5;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .install-toast-body strong {
-  color: var(--text, #ffffff);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .install-toast-body code {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  padding: 2px 7px;
+  border-radius: 5px;
   font-family: var(--font-mono, monospace);
-  font-size: 12.5px;
-  color: var(--color-accent-blue, #6366f1);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .install-toast-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .install-toast-link {
-  background: var(--color-accent-blue, #6366f1);
-  color: #ffffff;
-  font-size: 13px;
+  background: var(--accent);
+  color: #ffffff !important;
+  font-size: 12.5px;
   font-weight: 600;
   text-decoration: none;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: 7px;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
+  display: inline-flex;
+  align-items: center;
 }
 
 .install-toast-link:hover {
-  background: #4f46e5;
-  color: #ffffff;
+  filter: brightness(1.1);
   transform: translateY(-1px);
 }
 
 .install-toast-close {
   background: transparent;
   border: none;
-  color: var(--muted, #888899);
+  color: var(--muted);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  padding: 4px 8px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 
 .install-toast-close:hover {
-  color: var(--text, #ffffff);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .install-online-controls {
