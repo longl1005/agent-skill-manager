@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::modules::adapter::{
     AgentAdapter, AgentId, AntigravityAdapter, ClaudeCodeAdapter, CodexAdapter, CursorAdapter, DetectContext, Platform, PlatformContext,
-    PiAgentAdapter, OpenCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult,
+    OhMyPiAdapter, PiAgentAdapter, OpenCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult,
 };
 
 /// 整个 app 共享的 state。
@@ -100,12 +100,13 @@ pub fn scan_agents(
         cwd,
     };
 
-    // 注册的 adapter 列表（ClaudeCodeAdapter, CodexAdapter, AntigravityAdapter, PiAgentAdapter & OpenCodeAdapter）
+    // 注册的 adapter 列表。
     let adapters: Vec<Box<dyn AgentAdapter>> = vec![
         Box::new(ClaudeCodeAdapter),
         Box::new(CodexAdapter),
         Box::new(AntigravityAdapter),
         Box::new(PiAgentAdapter),
+        Box::new(OhMyPiAdapter),
         Box::new(OpenCodeAdapter),
         Box::new(CursorAdapter),
     ];

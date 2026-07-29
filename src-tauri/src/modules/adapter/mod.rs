@@ -13,6 +13,7 @@ mod pi_agent;
 mod opencode;
 mod cursor;
 mod cline;
+mod oh_my_pi;
 
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -301,10 +302,31 @@ pub use pi_agent::PiAgentAdapter;
 pub use opencode::OpenCodeAdapter;
 pub use cursor::CursorAdapter;
 pub use cline::ClineAdapter;
+pub use oh_my_pi::OhMyPiAdapter;
 
 #[cfg(test)]
 mod tests {
-    use super::Platform;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{AgentAdapter, DetectContext, DetectionStatus, OhMyPiAdapter, Platform, PlatformContext};
+
+    static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn tempdir() -> std::path::PathBuf {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("asm-oh-my-pi-{id}"));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn platform_context(home: &Path) -> PlatformContext {
+        PlatformContext {
+            platform: Platform::MacOs,
+            home_dir: home.to_path_buf(),
+            cwd: home.to_path_buf(),
+        }
+    }
 
     #[test]
     fn current_platform_matches_compile_target() {
@@ -314,5 +336,35 @@ mod tests {
         assert_eq!(Platform::current(), Some(Platform::Linux));
         #[cfg(target_os = "windows")]
         assert_eq!(Platform::current(), Some(Platform::Windows));
+    }
+
+    #[test]
+    fn oh_my_pi_detects_native_user_skills_root() {
+        let home = tempdir();
+        let root = home.join(".omp/agent/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = OhMyPiAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots.len(), 1);
+        assert_eq!(detection.roots[0].display_path, root);
+    }
+
+    #[test]
+    fn oh_my_pi_is_unavailable_without_native_root() {
+        let home = tempdir();
+        let context = platform_context(&home);
+
+        let detection = OhMyPiAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Unavailable);
     }
 }

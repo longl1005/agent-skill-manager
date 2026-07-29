@@ -67,6 +67,7 @@ const knownAgents: AgentPathItem[] = [
   { id: "codex", name: "Codex", defaultPath: "~/.codex/skills" },
   { id: "antigravity", name: "Antigravity", defaultPath: "~/.gemini/antigravity/skills" },
   { id: "pi-agent", name: "Pi Agent", defaultPath: "~/.pi/agent/skills" },
+  { id: "oh-my-pi", name: "Oh My Pi (OPM)", defaultPath: "~/.omp/agent/skills" },
   { id: "opencode", name: "Open Code", defaultPath: "~/.config/opencode/skills" },
   { id: "cursor", name: "Cursor", defaultPath: "~/.cursor/skills" },
 ];

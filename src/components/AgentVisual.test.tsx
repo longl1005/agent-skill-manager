@@ -45,5 +45,10 @@ describe("AgentIdentityMark", () => {
 
     expect(screen.getByLabelText("pi-agent identity mark")).toBeInTheDocument();
   });
-});
 
+  it("renders the Oh My Pi identity mark before the generic Pi Agent match", () => {
+    render(<AgentIdentityMark agentId="oh-my-pi" />);
+
+    expect(screen.getByLabelText("oh-my-pi identity mark")).toBeInTheDocument();
+  });
+});

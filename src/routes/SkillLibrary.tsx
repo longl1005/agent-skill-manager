@@ -10,6 +10,7 @@ export const SUPPORTED_AGENTS = [
   { id: "codex", name: "Codex" },
   { id: "antigravity", name: "Antigravity" },
   { id: "pi-agent", name: "Pi Agent" },
+  { id: "oh-my-pi", name: "Oh My Pi (OPM)" },
   { id: "opencode", name: "Open Code" },
   { id: "cursor", name: "Cursor" },
 ];

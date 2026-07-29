@@ -57,6 +57,7 @@ import claudeCodeWebp from "../assets/icons/agents/claude-code.webp";
 import codexWebp from "../assets/icons/agents/codex.webp";
 import antigravityWebp from "../assets/icons/agents/antigravity.webp";
 import piAgentWebp from "../assets/icons/agents/pi-agent.webp";
+import ohMyPiWebp from "../assets/icons/agents/oh-my-pi.webp";
 import openCodeWebp from "../assets/icons/agents/opencode.webp";
 import cursorWebp from "../assets/icons/agents/cursor.webp";
 
@@ -100,6 +101,11 @@ export function PiAgentMark({ size = 32 }: { size?: number }): JSX.Element {
   return <img className="agent-icon-img" src={piAgentWebp} alt="pi-agent identity mark" aria-label="pi-agent identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
+export function OhMyPiMark({ size = 32 }: { size?: number }): JSX.Element {
+  const borderRadius = Math.round(size * 0.25);
+  return <img className="agent-icon-img" src={ohMyPiWebp} alt="oh-my-pi identity mark" aria-label="oh-my-pi identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+}
+
 export function OpenCodeMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
   return <img className="agent-icon-img" src={openCodeWebp} alt="opencode identity mark" aria-label="opencode identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
@@ -140,6 +146,9 @@ export function AgentIdentityMark({ agentId, size = 32 }: { agentId: string; siz
   }
   if (agentId.toLowerCase().includes("antigravity")) {
     return <AntigravityMark size={size} />;
+  }
+  if (agentId.toLowerCase().includes("oh-my-pi")) {
+    return <OhMyPiMark size={size} />;
   }
   if (agentId.toLowerCase().includes("pi")) {
     return <PiAgentMark size={size} />;

@@ -68,6 +68,7 @@ pub fn get_agent_skills_dir(
                 Some(pi_agent_dir)
             }
         }
+        "oh-my-pi" => Some(home.join(".omp").join("agent").join("skills")),
         "opencode" | "open-code" => {
             let cfg_dir = home.join(".config").join("opencode").join("skills");
             let dot_dir = home.join(".opencode").join("skills");
@@ -156,7 +157,7 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
     };
 
     let mut reports = Vec::new();
-    let known_agents = ["claude-code", "codex", "antigravity", "pi-agent", "opencode", "cursor"];
+    let known_agents = ["claude-code", "codex", "antigravity", "pi-agent", "oh-my-pi", "opencode", "cursor"];
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -280,7 +281,7 @@ pub fn toggle_skill_symlink(
 }
 
 /// Known agent IDs for symlink cleanup during skill deletion.
-const ALL_AGENT_IDS: &[&str] = &["claude-code", "codex", "antigravity", "pi-agent", "opencode", "cursor"];
+const ALL_AGENT_IDS: &[&str] = &["claude-code", "codex", "antigravity", "pi-agent", "oh-my-pi", "opencode", "cursor"];
 
 /// Delete a master skill entirely: remove all agent symlinks first, then delete the master directory.
 pub fn delete_master_skill(
