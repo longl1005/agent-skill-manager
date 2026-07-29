@@ -12,6 +12,7 @@ mod antigravity;
 mod pi_agent;
 mod opencode;
 mod cursor;
+mod cline;
 
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -299,6 +300,7 @@ pub use antigravity::AntigravityAdapter;
 pub use pi_agent::PiAgentAdapter;
 pub use opencode::OpenCodeAdapter;
 pub use cursor::CursorAdapter;
+pub use cline::ClineAdapter;
 
 #[cfg(test)]
 mod tests {
