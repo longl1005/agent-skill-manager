@@ -1,4 +1,4 @@
-import { SKILLS_SH_LEADERBOARD } from "./skillsShApi";
+import { fetchSkillsShDirectory, SKILLS_SH_LEADERBOARD } from "./skillsShApi";
 
 export interface GlobalSkillItem {
   id: string;
@@ -6,6 +6,7 @@ export interface GlobalSkillItem {
   ownerRepo: string;
   description: string;
   installsText: string;
+  fileCount?: number;
   repoUrl: string;
   skillsShUrl?: string;
   isVerifiedSkillsSh?: boolean;
@@ -25,14 +26,39 @@ export interface GlobalSkillsSearchResult {
   pageSize: number;
 }
 
+export type SkillDetailOrigin = "marketplace" | "online";
+
+/**
+ * Keep online-skill navigation shareable instead of relying on transient router
+ * state.  The registry already has all of this lightweight metadata, and the
+ * detail route can therefore also be opened directly or restored after reload.
+ */
+export function getOnlineSkillDetailPath(skill: GlobalSkillItem, origin: SkillDetailOrigin = "online"): string {
+  const params = new URLSearchParams({
+    name: skill.name,
+    owner: skill.ownerRepo,
+    description: skill.description,
+    installs: skill.installsText,
+    repo: skill.repoUrl,
+  });
+
+  if (skill.skillsShUrl) params.set("skillsSh", skill.skillsShUrl);
+  if (skill.isVerifiedSkillsSh) params.set("verified", "1");
+  if (origin === "marketplace") params.set("origin", origin);
+
+  return `/install/skills/${encodeURIComponent(skill.id)}?${params.toString()}`;
+}
+
 export async function searchGlobalSkills(
   options: GlobalSkillsSearchOptions = {}
 ): Promise<GlobalSkillsSearchResult> {
   const { query = "", page = 1, pageSize = 18, sortBy = "stars" } = options;
   const q = query.trim().toLowerCase();
 
-  // 1. Filter local/skills.sh directory items first
-  const skillsShItems: GlobalSkillItem[] = SKILLS_SH_LEADERBOARD.map((item) => ({
+  // 1. Read the live skills.sh directory first so install metrics stay current.
+  // The built-in list remains the offline fallback inside fetchSkillsShDirectory.
+  const directoryItems = await fetchSkillsShDirectory(q);
+  const skillsShItems: GlobalSkillItem[] = directoryItems.map((item) => ({
     id: item.id,
     name: item.name,
     ownerRepo: item.ownerRepo,
@@ -41,13 +67,10 @@ export async function searchGlobalSkills(
     repoUrl: item.githubUrl,
     skillsShUrl: item.skillsShUrl,
     isVerifiedSkillsSh: true,
-  })).filter(
-    (item) =>
-      !q ||
-      item.name.toLowerCase().includes(q) ||
-      item.ownerRepo.toLowerCase().includes(q) ||
-      item.description.toLowerCase().includes(q)
-  );
+    // Every skill package contains SKILL.md at minimum. A future directory
+    // manifest can supply a more precise fileCount for this optional field.
+    fileCount: 1,
+  }));
 
   // 2. Fetch live GitHub topic API items
   let gitHubItems: GlobalSkillItem[] = [];
@@ -132,7 +155,7 @@ export async function searchGlobalSkills(
   }
 
   const finalSlice = mergedItems.slice(0, pageSize);
-  const totalCount = Math.max(gitHubTotal, skillsShItems.length);
+  const totalCount = Math.max(gitHubTotal, skillsShItems.length, SKILLS_SH_LEADERBOARD.length);
 
   return {
     items: finalSlice,

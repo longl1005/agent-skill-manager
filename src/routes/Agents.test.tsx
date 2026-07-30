@@ -8,7 +8,7 @@ import Agents from "./Agents";
 
 const agent = (agent_id: string, detection_status: string) => ({
   agent_id,
-  display_name: agent_id === "codex" ? "Codex" : "Claude Code",
+  display_name: agent_id === "codex" ? "Codex" : agent_id === "claude" ? "Claude Code" : agent_id,
   detection_status,
   roots: [],
   skills: [],
@@ -41,7 +41,7 @@ describe("Agents", () => {
     expect(screen.getByRole("heading", { name: "All Agents" })).toBeVisible();
     expect(screen.getByRole("link", { name: /Codex/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /Claude Code/i })).toBeVisible();
-    expect(screen.queryByRole("link", { name: /other/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^other/i })).not.toBeInTheDocument();
   });
 
   it("shows install and rescan recovery guidance for an empty report", () => {

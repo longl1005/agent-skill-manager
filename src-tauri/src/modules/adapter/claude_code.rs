@@ -51,9 +51,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
             update_planning: SupportLevel::Unsupported,
             sync_planning: SupportLevel::Unsupported,
             supported_platforms: vec![Platform::MacOs, Platform::Linux, Platform::Windows],
-            notes: vec![
-                "user-scope $HOME/.claude/skills".to_string(),
-            ],
+            notes: vec!["user-scope $HOME/.claude/skills".to_string()],
         }
     }
 
@@ -62,7 +60,8 @@ impl AgentAdapter for ClaudeCodeAdapter {
 
         if let Some(custom_path) = ctx.custom_path {
             if !custom_path.as_os_str().is_empty() {
-                let exists = std::fs::metadata(custom_path).is_ok() || std::fs::symlink_metadata(custom_path).is_ok();
+                let exists = std::fs::metadata(custom_path).is_ok()
+                    || std::fs::symlink_metadata(custom_path).is_ok();
                 if exists {
                     return DetectionResult {
                         agent: self.id(),
@@ -86,7 +85,10 @@ impl AgentAdapter for ClaudeCodeAdapter {
                             severity: IssueSeverity::Error,
                             phase: IssuePhase::Detect,
                             path: Some(custom_path.to_path_buf()),
-                            message: format!("Custom path does not exist: {}", custom_path.display()),
+                            message: format!(
+                                "Custom path does not exist: {}",
+                                custom_path.display()
+                            ),
                             recoverable: true,
                         }],
                         observed_at: now,
@@ -556,7 +558,10 @@ mod tests {
             cwd: PathBuf::from("/tmp"),
         };
         let leaked: &'static PlatformContext = Box::leak(Box::new(platform.clone()));
-        let detect_ctx = DetectContext { platform: leaked, custom_path: None };
+        let detect_ctx = DetectContext {
+            platform: leaked,
+            custom_path: None,
+        };
         // 把 root 也 leak 出 'static 生命周期
         let _leaked_root: &'static SkillRoot = Box::leak(Box::new(root.clone()));
         // 这一段 lifecycle juggling 在真实 Tauri 命令里走 cmd 内部一次性 borrow，不会遇到 'static leak。

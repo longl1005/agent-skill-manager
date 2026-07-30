@@ -3,9 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { readSkillContent } from "../ipc/commands";
+import { openSkillDirectory, readSkillContent } from "../ipc/commands";
+import { t } from "../locales/dict";
+import { useI18nStore } from "../stores/i18nStore";
 import { useScanStore } from "../stores/scanStore";
-import { AgentIdentityMark } from "../components/AgentVisual";
+import { AgentIdentityMark, AppIdentityMark } from "../components/AgentVisual";
 
 function BreadcrumbSeparator() {
   return (
@@ -52,18 +54,21 @@ import { useMasterRepoStore } from "../stores/masterRepoStore";
 export default function SkillDetail() {
   const { agentId, skillName } = useParams();
   const { report } = useScanStore();
+  const lang = useI18nStore((state) => state.lang);
   const { skills: masterSkills } = useMasterRepoStore();
 
   const [rawContent, setRawContent] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
-  const [copied, setCopied] = useState<boolean>(false);
 
   const decodedSkillName = decodeURIComponent(skillName || "");
 
   const masterSkill = masterSkills.find(
-    (m) => m.name === skillName || m.name === decodedSkillName
+    (m) => {
+      const directoryName = m.path.replace(/[/\\]+$/, "").split(/[/\\]/).pop();
+      return m.name === skillName || m.name === decodedSkillName || directoryName === decodedSkillName;
+    }
   );
 
   const agent = report?.agents.find((a) => a.agent_id === agentId);
@@ -107,20 +112,20 @@ export default function SkillDetail() {
   if (!resolvedLocation) {
     return (
       <section className="page agent-detail agent-detail--missing">
-        <h1>Skill not found</h1>
-        <p>The requested skill "{skillName}" is not available.</p>
+        <h1>{t("skillDetail.notFoundTitle", lang)}</h1>
+        <p>{t("skillDetail.notFoundDesc", lang).replace("{name}", skillName || "")}</p>
         <div className="agent-detail__recovery-actions">
           <Link className="agent-detail-recovery agent-detail__recovery-link" to={agent ? `/agents/${agent.agent_id}` : "/library"}>
-            {agent ? "Back to Agent" : "Back to Skill Library"}
+            {agent ? t("skillDetail.backToAgent", lang) : t("skillDetail.backToLibrary", lang)}
           </Link>
         </div>
       </section>
     );
   }
 
-  const entryPath = `${resolvedLocation}/SKILL.md`;
+  const entryPath = resolvedLocation;
   const { frontmatter, body } = rawContent ? parseFrontmatter(rawContent) : { frontmatter: null, body: "" };
-  const displayDescription = resolvedDescription || frontmatter?.description || "No description provided.";
+  const displayDescription = resolvedDescription || frontmatter?.description || t("skillDetail.noDescription", lang);
 
   const otherFields = frontmatter
     ? Object.entries(frontmatter).filter(
@@ -128,18 +133,14 @@ export default function SkillDetail() {
       )
     : [];
 
-  const handleCopyPath = () => {
-    navigator.clipboard.writeText(entryPath);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleOpenDirectory = () => void openSkillDirectory(resolvedLocation);
 
   return (
     <section className="page skill-detail-page">
       <nav aria-label="Breadcrumb" className="agent-breadcrumb agent-detail__breadcrumb">
         {agent ? (
           <>
-            <Link to="/agents">Discovered Agents</Link>
+            <Link to="/agents">{t("nav.discoveredAgents", lang)}</Link>
             <BreadcrumbSeparator />
             <Link to={`/agents/${agent.agent_id}`}>{agent.display_name}</Link>
             <BreadcrumbSeparator />
@@ -147,7 +148,7 @@ export default function SkillDetail() {
           </>
         ) : (
           <>
-            <Link to="/library">Master Skill Library</Link>
+            <Link to="/library">{t("skillLibrary.title", lang)}</Link>
             <BreadcrumbSeparator />
             <span aria-current="page">{resolvedName}</span>
           </>
@@ -157,7 +158,7 @@ export default function SkillDetail() {
       <header className="skill-detail__header">
         <div className="skill-detail__header-main">
           <div className="skill-detail__icon-wrapper">
-            <AgentIdentityMark agentId={agent?.agent_id || "antigravity"} />
+            {agent ? <AgentIdentityMark agentId={agent.agent_id} /> : <AppIdentityMark />}
           </div>
           <div className="skill-detail__identity">
             <div className="skill-detail__title-row">
@@ -165,8 +166,8 @@ export default function SkillDetail() {
               {agent ? (
                 <span className="skill-detail__agent-tag">{agent.display_name}</span>
               ) : (
-                <span className="skill-detail__agent-tag" style={{ background: "rgba(99, 102, 241, 0.12)", color: "var(--color-accent-blue, #6366f1)" }}>
-                  Master Skill
+                <span className="skill-detail__agent-tag skill-detail__agent-tag--master">
+                  {t("skillDetail.masterTag", lang)}
                 </span>
               )}
             </div>
@@ -179,11 +180,11 @@ export default function SkillDetail() {
             <code className="skill-detail__location" title={entryPath}>{entryPath}</code>
             <button
               className="skill-detail__copy-btn"
-              onClick={handleCopyPath}
+              onClick={handleOpenDirectory}
               type="button"
-              title="Copy file path"
+              title={t("skillLibrary.openDirectory", lang)}
             >
-              {copied ? "Copied!" : "Copy Path"}
+              {t("skillLibrary.openDirectory", lang)}
             </button>
           </div>
 
@@ -192,7 +193,7 @@ export default function SkillDetail() {
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
               <polyline points="13 2 13 9 20 9" />
             </svg>
-            <span>{resolvedFileCount} {resolvedFileCount === 1 ? "File" : "Files"}</span>
+            <span>{t("skillDetail.fileCount", lang).replace("{count}", String(resolvedFileCount))}</span>
           </div>
 
           <div className="skill-meta-pill">
@@ -200,7 +201,7 @@ export default function SkillDetail() {
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="monospace">Fingerprint: {resolvedFingerprint}</span>
+            <span className="monospace">{t("skillDetail.fingerprint", lang)}: {resolvedFingerprint}</span>
           </div>
 
           {resolvedLicense && (
@@ -208,7 +209,7 @@ export default function SkillDetail() {
               <svg aria-hidden="true" fill="none" height="13" viewBox="0 0 24 24" width="13" stroke="currentColor" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
-              <span>License: {resolvedLicense}</span>
+              <span>{t("skillDetail.license", lang)}: {resolvedLicense}</span>
             </div>
           )}
         </div>
@@ -221,7 +222,7 @@ export default function SkillDetail() {
               <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2">
                 <path d="M4 6h16M4 12h16M4 18h7" />
               </svg>
-              <h3>Metadata Frontmatter</h3>
+              <h3>{t("skillDetail.metadata", lang)}</h3>
             </div>
             <span className="skill-detail__frontmatter-type">YAML</span>
           </div>
@@ -250,7 +251,7 @@ export default function SkillDetail() {
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            <h2>SKILL.md Document</h2>
+            <h2>{t("skillDetail.document", lang)}</h2>
           </div>
 
           <div className="skill-detail__view-toggle">
@@ -259,27 +260,27 @@ export default function SkillDetail() {
               onClick={() => setViewMode("rendered")}
               type="button"
             >
-              Preview
+              {t("skillDetail.preview", lang)}
             </button>
             <button
               className={`toggle-btn ${viewMode === "raw" ? "active" : ""}`}
               onClick={() => setViewMode("raw")}
               type="button"
             >
-              Raw
+              {t("skillDetail.raw", lang)}
             </button>
           </div>
         </div>
 
         {loading && (
           <div className="skill-detail__loading">
-            <p>Loading SKILL.md content...</p>
+            <p>{t("skillDetail.loading", lang)}</p>
           </div>
         )}
 
         {error && (
           <div className="agent-scan-error" role="alert">
-            <strong>Unable to load SKILL.md.</strong>
+            <strong>{t("skillDetail.loadError", lang)}</strong>
             <p className="agent-scan-error__detail">{error}</p>
           </div>
         )}

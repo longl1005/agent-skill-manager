@@ -9,6 +9,16 @@ export async function ping(): Promise<PingResponse> {
   return invoke<PingResponse>("ping");
 }
 
+/** Open documentation in the operating system's default browser. */
+export async function openExternalUrl(url: string): Promise<void> {
+  return invoke<void>("open_external_url", { url });
+}
+
+/** Open a local skill directory in Finder, Explorer, or the platform file manager. */
+export async function openSkillDirectory(location: string): Promise<void> {
+  return invoke<void>("open_skill_directory", { location });
+}
+
 /**
  * 与 Rust 端 `commands::scan_agents` 对应。
  * 同步阻塞: 76 个 Skill ~50ms。
@@ -23,6 +33,16 @@ export async function scanAgents(customPaths?: Record<string, string>): Promise<
  */
 export async function readSkillContent(location: string): Promise<string> {
   return invoke<string>("read_skill_content", { location });
+}
+
+/** Synchronize the native tray menu with the selected application language. */
+export async function setTrayLanguage(language: "zh" | "en"): Promise<void> {
+  return invoke<void>("set_tray_language", { language });
+}
+
+/** Synchronize native tray summary counts with the current application data. */
+export async function setTrayStatistics(language: "zh" | "en", masterSkills: number, connectedAgents: number): Promise<void> {
+  return invoke<void>("set_tray_statistics", { language, masterSkills, connectedAgents });
 }
 
 /**
@@ -45,6 +65,51 @@ export async function toggleAgentSkill(
 ): Promise<boolean> {
   return invoke<boolean>("toggle_agent_skill", { agentId, skillName, enable, customPaths: customPaths ?? null });
 }
+
+/**
+ * Atomically handles the same skill across multiple Agents. This avoids one
+ * frontend-to-Rust round trip (and one UI refresh) per Agent.
+ */
+export async function toggleAgentSkillsBatch(
+  agentIds: string[],
+  skillName: string,
+  enable: boolean,
+  customPaths?: Record<string, string>,
+): Promise<number> {
+  return invoke<number>("toggle_agent_skills_batch", {
+    agentIds,
+    skillName,
+    enable,
+    customPaths: customPaths ?? null,
+  });
+}
+
+export async function replaceAgentLocalSkillWithSymlink(
+  agentId: string,
+  skillName: string,
+  customPaths?: Record<string, string>,
+): Promise<boolean> {
+  return invoke<boolean>("replace_agent_local_skill_with_symlink", { agentId, skillName, customPaths: customPaths ?? null });
+}
+
+/** Delete one skill entry from the current Agent only. Symlink targets are never deleted. */
+export async function deleteAgentSkill(
+  agentId: string,
+  skillName: string,
+  customPaths?: Record<string, string>,
+): Promise<boolean> {
+  return invoke<boolean>("delete_agent_skill", { agentId, skillName, customPaths: customPaths ?? null });
+}
+
+export async function unlinkAllAgentSkills(agentId: string, customPaths?: Record<string, string>): Promise<number> {
+  return invoke<number>("unlink_all_agent_skills", { agentId, customPaths: customPaths ?? null });
+}
+export async function migrateAgentSkillsDir(agentId: string, oldCustomPath: string | null, newPath: string, customPaths?: Record<string, string>): Promise<number> { return invoke<number>("migrate_agent_skills_dir", { agentId, oldCustomPath, newPath, customPaths: customPaths ?? null }); }
+export async function resetAgentSkillsDir(agentId: string, oldCustomPath: string | null, customPaths?: Record<string, string>): Promise<number> { return invoke<number>("reset_agent_skills_dir", { agentId, oldCustomPath, customPaths: customPaths ?? null }); }
+export interface AgentConfigRecord { agent_id: string; custom_path: string | null; disabled: boolean; sort_order: number | null }
+export async function getAgentConfigs(): Promise<AgentConfigRecord[]> { return invoke<AgentConfigRecord[]>("get_agent_configs"); }
+export async function setAgentConfig(agentId: string, customPath: string | null, disabled: boolean): Promise<void> { return invoke<void>("set_agent_config", { agentId, customPath, disabled }); }
+export async function setAgentSortOrder(agentIds: string[]): Promise<void> { return invoke<void>("set_agent_sort_order", { agentIds }); }
 
 /**
  * 与 Rust 端 `commands::import_to_master` 对应。
@@ -74,6 +139,10 @@ export async function installSkillToMaster(
     source: source ?? null,
     customPaths: customPaths ?? null,
   });
+}
+
+export async function exportMasterSkillZip(skillName: string, destination: string, customPaths?: Record<string, string>): Promise<string> {
+  return invoke<string>("export_master_skill_zip", { skillName, destination, customPaths: customPaths ?? null });
 }
 
 /**

@@ -59,7 +59,8 @@ impl AgentAdapter for AntigravityAdapter {
 
         if let Some(custom_path) = ctx.custom_path {
             if !custom_path.as_os_str().is_empty() {
-                let exists = std::fs::metadata(custom_path).is_ok() || std::fs::symlink_metadata(custom_path).is_ok();
+                let exists = std::fs::metadata(custom_path).is_ok()
+                    || std::fs::symlink_metadata(custom_path).is_ok();
                 if exists {
                     return DetectionResult {
                         agent: self.id(),
@@ -83,7 +84,10 @@ impl AgentAdapter for AntigravityAdapter {
                             severity: IssueSeverity::Error,
                             phase: IssuePhase::Detect,
                             path: Some(custom_path.to_path_buf()),
-                            message: format!("Custom path does not exist: {}", custom_path.display()),
+                            message: format!(
+                                "Custom path does not exist: {}",
+                                custom_path.display()
+                            ),
                             recoverable: true,
                         }],
                         observed_at: now,
@@ -116,7 +120,8 @@ impl AgentAdapter for AntigravityAdapter {
         };
 
         let user_root = home.join(".gemini").join("antigravity").join("skills");
-        let user_present = std::fs::metadata(&user_root).is_ok() || std::fs::symlink_metadata(&user_root).is_ok();
+        let user_present =
+            std::fs::metadata(&user_root).is_ok() || std::fs::symlink_metadata(&user_root).is_ok();
 
         let mut roots = Vec::new();
         if user_present {

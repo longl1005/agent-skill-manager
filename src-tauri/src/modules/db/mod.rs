@@ -3,9 +3,9 @@
 //! ARCHITECTURE.md §3 "Database"：连接、迁移、仓库模块。
 //! 实现 Master Skills 元数据表、Agent Symlinks 关系表、Activity Logs 操作日志表。
 
-use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DbMasterSkill {
@@ -34,6 +34,14 @@ pub struct DbActivityLog {
     pub target_skill: String,
     pub target_agent: String,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DbAgentConfig {
+    pub agent_id: String,
+    pub custom_path: Option<String>,
+    pub disabled: bool,
+    pub sort_order: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -85,6 +93,9 @@ pub fn init_db_tables(conn: &Connection) -> Result<()> {
         )",
         [],
     )?;
+    conn.execute("CREATE TABLE IF NOT EXISTS agent_config (agent_id TEXT PRIMARY KEY, custom_path TEXT, disabled INTEGER NOT NULL DEFAULT 0, sort_order INTEGER)", [])?;
+    // Migration for databases created before Agent ordering was introduced.
+    let _ = conn.execute("ALTER TABLE agent_config ADD COLUMN sort_order INTEGER", []);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS agent_symlinks (
@@ -112,6 +123,43 @@ pub fn init_db_tables(conn: &Connection) -> Result<()> {
     // Cleanup legacy translation table if it exists
     let _ = conn.execute("DROP TABLE IF EXISTS skill_translations", []);
 
+    Ok(())
+}
+
+pub fn get_agent_configs(conn: &Connection) -> Result<Vec<DbAgentConfig>> {
+    let mut stmt = conn.prepare("SELECT agent_id, custom_path, disabled, sort_order FROM agent_config ORDER BY sort_order IS NULL, sort_order, agent_id")?;
+    let configs = stmt
+        .query_map([], |row| {
+            Ok(DbAgentConfig {
+                agent_id: row.get(0)?,
+                custom_path: row.get(1)?,
+                disabled: row.get::<_, i64>(2)? != 0,
+                sort_order: row.get(3)?,
+            })
+        })?
+        .collect();
+    configs
+}
+
+pub fn set_agent_sort_order(conn: &Connection, agent_ids: &[&str]) -> Result<()> {
+    let transaction = conn.unchecked_transaction()?;
+    for (sort_order, agent_id) in agent_ids.iter().enumerate() {
+        transaction.execute(
+            "INSERT INTO agent_config (agent_id, sort_order) VALUES (?1, ?2)
+             ON CONFLICT(agent_id) DO UPDATE SET sort_order = excluded.sort_order",
+            params![agent_id, sort_order as i64],
+        )?;
+    }
+    transaction.commit()
+}
+
+pub fn upsert_agent_config(
+    conn: &Connection,
+    agent_id: &str,
+    custom_path: Option<&str>,
+    disabled: bool,
+) -> Result<()> {
+    conn.execute("INSERT INTO agent_config (agent_id, custom_path, disabled) VALUES (?1, ?2, ?3) ON CONFLICT(agent_id) DO UPDATE SET custom_path=excluded.custom_path, disabled=excluded.disabled", params![agent_id, custom_path, disabled as i64])?;
     Ok(())
 }
 
@@ -221,11 +269,8 @@ pub fn get_db_summary(conn: &Connection, custom_path: Option<&Path>) -> Result<D
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| get_db_path().to_string_lossy().to_string());
 
-    let total_skills: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM skills_master",
-        [],
-        |row| row.get(0),
-    )?;
+    let total_skills: i64 =
+        conn.query_row("SELECT COUNT(*) FROM skills_master", [], |row| row.get(0))?;
 
     let total_symlinks: i64 = conn.query_row(
         "SELECT COUNT(*) FROM agent_symlinks WHERE status = 'linked'",
@@ -252,7 +297,15 @@ mod tests {
         let conn = open_db(Some(Path::new(":memory:"))).unwrap();
 
         // 1. Upsert master skill
-        upsert_master_skill(&conn, "frontend-design", "Create UI", "anthropics", "https://github.com/anthropics/skills", 3).unwrap();
+        upsert_master_skill(
+            &conn,
+            "frontend-design",
+            "Create UI",
+            "anthropics",
+            "https://github.com/anthropics/skills",
+            3,
+        )
+        .unwrap();
         let skills = get_all_master_skills(&conn).unwrap();
         assert_eq!(skills.len(), 1);
         assert_eq!(skills[0].name, "frontend-design");
@@ -270,5 +323,16 @@ mod tests {
         let summary = get_db_summary(&conn, Some(Path::new(":memory:"))).unwrap();
         assert_eq!(summary.total_skills, 1);
         assert_eq!(summary.total_symlinks, 1);
+    }
+
+    #[test]
+    fn saves_agent_display_order_with_config_records() {
+        let conn = open_db(Some(Path::new(":memory:"))).unwrap();
+
+        set_agent_sort_order(&conn, &["windsurf", "claude-code", "codex"]).unwrap();
+
+        let configs = get_agent_configs(&conn).unwrap();
+        assert_eq!(configs.iter().map(|config| config.agent_id.as_str()).collect::<Vec<_>>(), vec!["windsurf", "claude-code", "codex"]);
+        assert_eq!(configs.iter().map(|config| config.sort_order).collect::<Vec<_>>(), vec![Some(0), Some(1), Some(2)]);
     }
 }

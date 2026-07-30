@@ -50,7 +50,7 @@ impl AgentAdapter for ClineAdapter {
             update_planning: SupportLevel::Unsupported,
             sync_planning: SupportLevel::Unsupported,
             supported_platforms: vec![Platform::MacOs, Platform::Linux, Platform::Windows],
-            notes: vec!["user-scope $HOME/.cline/skills".to_string()],
+            notes: vec!["user-scope $HOME/.agents/skills".to_string()],
         }
     }
 
@@ -59,7 +59,8 @@ impl AgentAdapter for ClineAdapter {
 
         if let Some(custom_path) = ctx.custom_path {
             if !custom_path.as_os_str().is_empty() {
-                let exists = std::fs::metadata(custom_path).is_ok() || std::fs::symlink_metadata(custom_path).is_ok();
+                let exists = std::fs::metadata(custom_path).is_ok()
+                    || std::fs::symlink_metadata(custom_path).is_ok();
                 if exists {
                     return DetectionResult {
                         agent: self.id(),
@@ -83,7 +84,10 @@ impl AgentAdapter for ClineAdapter {
                             severity: IssueSeverity::Error,
                             phase: IssuePhase::Detect,
                             path: Some(custom_path.to_path_buf()),
-                            message: format!("Custom path does not exist: {}", custom_path.display()),
+                            message: format!(
+                                "Custom path does not exist: {}",
+                                custom_path.display()
+                            ),
                             recoverable: true,
                         }],
                         observed_at: now,
@@ -115,14 +119,17 @@ impl AgentAdapter for ClineAdapter {
             }
         };
 
-        let candidate_roots = [
-            home.join(".cline").join("skills"),
-            home.join(".config").join("cline").join("skills"),
-        ];
+        let candidate_roots = [home.join(".agents").join("skills")];
+        // Cline stores its runtime state in ~/.cline/data. A user can have Cline
+        // installed and configured before creating the optional global skills
+        // directory, so installation detection must not depend on that directory.
+        let installation_present = home.join(".cline").join("data").is_dir()
+            || home.join("Documents").join("Cline").is_dir();
 
         let mut roots = Vec::new();
         for path in &candidate_roots {
-            let present = std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
+            let present =
+                std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
             if present {
                 roots.push(SkillRoot {
                     root_id: "user-skills".into(),
@@ -134,20 +141,20 @@ impl AgentAdapter for ClineAdapter {
             }
         }
 
-        let status = if !roots.is_empty() {
+        let status = if installation_present || !roots.is_empty() {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
         };
 
         let mut issues = Vec::new();
-        if matches!(status, DetectionStatus::Unavailable) {
+        if roots.is_empty() {
             issues.push(ScanIssue {
                 code: "NO_SKILLS_ROOTS".into(),
                 severity: IssueSeverity::Info,
                 phase: IssuePhase::Detect,
                 path: None,
-                message: "no Cline Skills roots found".into(),
+                message: "no Cline Skills roots found; create ~/.agents/skills to add shared skills".into(),
                 recoverable: true,
             });
         }
@@ -422,10 +429,10 @@ mod tests {
     }
 
     #[test]
-    fn cline_detect_only_user() {
+    fn cline_detects_agents_skills_root() {
         let tmp = tempdir();
         let home = tmp.join("home");
-        let skills = home.join(".cline/skills");
+        let skills = home.join(".agents/skills");
         fs::create_dir_all(&skills).unwrap();
         let cwd = tmp.join("cwd");
         fs::create_dir_all(&cwd).unwrap();
@@ -437,6 +444,24 @@ mod tests {
         assert_eq!(r.status, DetectionStatus::Detected);
         assert_eq!(r.roots.len(), 1);
         assert_eq!(r.roots[0].scope, RootScope::User);
+    }
+
+    #[test]
+    fn cline_detects_installed_cli_without_a_skills_directory() {
+        let tmp = tempdir();
+        let home = tmp.join("home");
+        fs::create_dir_all(home.join(".cline/data")).unwrap();
+        let cwd = tmp.join("cwd");
+        fs::create_dir_all(&cwd).unwrap();
+        let ctx = DetectContext {
+            platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
+            custom_path: None,
+        };
+
+        let r = ClineAdapter.detect(&ctx);
+
+        assert_eq!(r.status, DetectionStatus::Detected);
+        assert!(r.roots.is_empty());
     }
 
     #[test]

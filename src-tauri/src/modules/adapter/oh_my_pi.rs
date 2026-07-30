@@ -49,7 +49,12 @@ impl AgentAdapter for OhMyPiAdapter {
 
         if let Some(custom_path) = ctx.custom_path.filter(|path| !path.as_os_str().is_empty()) {
             if path_exists(custom_path) {
-                return detected(self.id(), custom_path.to_path_buf(), RootScope::Custom, observed_at);
+                return detected(
+                    self.id(),
+                    custom_path.to_path_buf(),
+                    RootScope::Custom,
+                    observed_at,
+                );
             }
 
             return DetectionResult {
@@ -68,7 +73,12 @@ impl AgentAdapter for OhMyPiAdapter {
             };
         }
 
-        let root = ctx.platform.home_dir.join(".omp").join("agent").join("skills");
+        let root = ctx
+            .platform
+            .home_dir
+            .join(".omp")
+            .join("agent")
+            .join("skills");
         if path_exists(&root) {
             detected(self.id(), root, RootScope::User, observed_at)
         } else {
@@ -112,7 +122,12 @@ fn path_exists(path: &std::path::Path) -> bool {
     std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok()
 }
 
-fn detected(agent: AgentId, root: std::path::PathBuf, scope: RootScope, observed_at: SystemTime) -> DetectionResult {
+fn detected(
+    agent: AgentId,
+    root: std::path::PathBuf,
+    scope: RootScope,
+    observed_at: SystemTime,
+) -> DetectionResult {
     DetectionResult {
         agent,
         status: DetectionStatus::Detected,

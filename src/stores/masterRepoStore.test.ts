@@ -7,6 +7,7 @@ import * as commands from "../ipc/commands";
 vi.mock("../ipc/commands", () => ({
   getMasterSkills: vi.fn(),
   toggleAgentSkill: vi.fn(),
+  toggleAgentSkillsBatch: vi.fn(),
   importToMaster: vi.fn(),
 }));
 
@@ -86,6 +87,21 @@ describe("masterRepoStore", () => {
 
     expect(result).toBe(false);
     expect(useMasterRepoStore.getState().error).toBe("Error: Symlink failed");
+  });
+
+  it("batch toggles agent skills with one command and one refresh cycle", async () => {
+    vi.mocked(commands.toggleAgentSkillsBatch).mockResolvedValueOnce(2);
+    vi.mocked(commands.getMasterSkills).mockResolvedValueOnce([]);
+
+    const result = await useMasterRepoStore.getState()
+      .toggleAgentSkillsBatch(["claude-code", "codex"], "test-skill", true);
+
+    expect(result).toBe(2);
+    expect(commands.toggleAgentSkillsBatch).toHaveBeenCalledWith(
+      ["claude-code", "codex"], "test-skill", true, {},
+    );
+    expect(commands.getMasterSkills).toHaveBeenCalledTimes(1);
+    expect(useScanStore.getState().scan).toHaveBeenCalledTimes(1);
   });
 
   it("imports skill to master and triggers refresh and scan", async () => {

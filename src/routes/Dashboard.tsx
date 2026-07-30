@@ -6,6 +6,7 @@ import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { AgentIdentityMark, AgentStatus } from "../components/AgentVisual";
+import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
 
 function formatTime(unixMillis: number): string {
   if (!unixMillis) return "—";
@@ -17,12 +18,14 @@ export default function Dashboard() {
   const { report, scanning, error } = useScanStore();
   const { skills: masterSkills, fetchMasterSkills } = useMasterRepoStore();
   const lang = useI18nStore((s) => s.lang);
+  const disabledAgentIds = useAgentConfigStore((state) => state.disabledAgentIds);
+  const agentOrder = useAgentConfigStore((state) => state.agentOrder);
 
   useEffect(() => {
     fetchMasterSkills();
   }, [fetchMasterSkills]);
 
-  const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
+  const detectedAgents = orderAgents(report?.agents.filter((agent) => isDiscoveredAgent(agent) && !disabledAgentIds.includes(agent.agent_id)) ?? [], agentOrder);
 
   // Calculate Symlink Coverage across all detected agents
   let totalAgentSkills = 0;

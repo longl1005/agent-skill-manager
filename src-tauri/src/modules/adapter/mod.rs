@@ -6,14 +6,30 @@
 //! 本文件保留 dead_code allow，因 CodexAdapter 占位导致 pub use 触发警告。
 #![allow(dead_code, unused_imports)]
 
-mod claude_code;
-mod codex;
 mod antigravity;
-mod pi_agent;
-mod opencode;
-mod cursor;
+mod augment;
+mod claude_code;
 mod cline;
+mod codebuddy;
+mod codex;
+mod cursor;
+mod droid;
+mod grok;
+mod github_copilot;
+mod hermes;
+mod kiro;
+mod kimi_code;
 mod oh_my_pi;
+mod openclaw;
+mod opencode;
+mod pi_agent;
+mod qoder;
+mod qwen_code;
+mod roo_code;
+mod trae;
+mod trae_cn;
+mod workbuddy;
+mod windsurf;
 
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -295,27 +311,57 @@ pub enum ScanCompleteness {
     Unknown,
 }
 
-pub use claude_code::ClaudeCodeAdapter;
-pub use codex::CodexAdapter;
 pub use antigravity::AntigravityAdapter;
-pub use pi_agent::PiAgentAdapter;
-pub use opencode::OpenCodeAdapter;
-pub use cursor::CursorAdapter;
+pub use augment::AugmentAdapter;
+pub use claude_code::ClaudeCodeAdapter;
 pub use cline::ClineAdapter;
+pub use codebuddy::CodeBuddyAdapter;
+pub use codex::CodexAdapter;
+pub use cursor::CursorAdapter;
+pub use droid::DroidAdapter;
+pub use grok::GrokAdapter;
+pub use github_copilot::GitHubCopilotAdapter;
+pub use hermes::HermesAdapter;
+pub use kiro::KiroAdapter;
+pub use kimi_code::KimiCodeAdapter;
 pub use oh_my_pi::OhMyPiAdapter;
+pub use openclaw::OpenClawAdapter;
+pub use opencode::OpenCodeAdapter;
+pub use pi_agent::PiAgentAdapter;
+pub use qoder::QoderAdapter;
+pub use qwen_code::QwenCodeAdapter;
+pub use roo_code::RooCodeAdapter;
+pub use trae::TraeAdapter;
+pub use trae_cn::TraeCnAdapter;
+pub use workbuddy::WorkBuddyAdapter;
+pub use windsurf::WindsurfAdapter;
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{AgentAdapter, DetectContext, DetectionStatus, OhMyPiAdapter, Platform, PlatformContext};
+    use super::{
+        AgentAdapter, AugmentAdapter, CodeBuddyAdapter, DetectContext, DetectionStatus, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, RooCodeAdapter, WindsurfAdapter,
+        OhMyPiAdapter, OpenClawAdapter, Platform, PlatformContext, QoderAdapter, QwenCodeAdapter, TraeAdapter, TraeCnAdapter, WorkBuddyAdapter,
+    };
 
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn tempdir() -> std::path::PathBuf {
         let id = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("asm-oh-my-pi-{id}"));
+        // Include the process and timestamp: a plain counter restarts at zero on
+        // each `cargo test` invocation, which previously let stale roots from an
+        // earlier run leak into the negative detection cases.
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before Unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "asm-adapter-test-{}-{nonce}-{id}",
+            std::process::id()
+        ));
         std::fs::create_dir_all(&path).unwrap();
         path
     }
@@ -336,6 +382,206 @@ mod tests {
         assert_eq!(Platform::current(), Some(Platform::Linux));
         #[cfg(target_os = "windows")]
         assert_eq!(Platform::current(), Some(Platform::Windows));
+    }
+
+    #[test]
+    fn github_copilot_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".copilot/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = GitHubCopilotAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn droid_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".factory/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = DroidAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn qoder_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".qoder/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = QoderAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn qwen_code_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".qwen/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+        let detection = QwenCodeAdapter.detect(&DetectContext { platform: &context, custom_path: None });
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn hermes_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".hermes/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = HermesAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn openclaw_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".openclaw/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = OpenClawAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn workbuddy_detects_personal_skills_root() {
+        let home = tempdir();
+        let marketplace_root = home.join(".workbuddy/skills-marketplace/skills");
+        std::fs::create_dir_all(&marketplace_root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = WorkBuddyAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots.len(), 1);
+        assert_eq!(detection.roots[0].display_path, marketplace_root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn codebuddy_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".codebuddy/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = CodeBuddyAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn kimi_code_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".kimi-code/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = KimiCodeAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn augment_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".augment/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = AugmentAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn roo_code_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".roo/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = RooCodeAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn windsurf_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".codeium/windsurf/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = WindsurfAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
     }
 
     #[test]
@@ -366,5 +612,104 @@ mod tests {
         });
 
         assert_eq!(detection.status, DetectionStatus::Unavailable);
+    }
+
+    #[test]
+    fn grok_detects_user_skills_root() {
+        let home = tempdir();
+        let root = home.join(".grok/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = GrokAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots.len(), 1);
+        assert_eq!(detection.roots[0].display_path, root);
+    }
+
+    #[test]
+    fn grok_is_unavailable_without_user_skills_root() {
+        let home = tempdir();
+        let context = platform_context(&home);
+
+        let detection = GrokAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Unavailable);
+    }
+
+    #[test]
+    fn kiro_detects_user_skills_root() {
+        let home = tempdir();
+        let root = home.join(".kiro/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = KiroAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots.len(), 1);
+        assert_eq!(detection.roots[0].display_path, root);
+    }
+
+    #[test]
+    fn kiro_is_unavailable_without_user_skills_root() {
+        let home = tempdir();
+        let context = platform_context(&home);
+
+        let detection = KiroAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Unavailable);
+    }
+
+    #[test]
+    fn trae_adapters_require_their_app_bundle_in_addition_to_a_skills_root() {
+        let home = tempdir();
+        let trae_root = home.join(".trae/skills");
+        let trae_cn_root = home.join(".trae-cn/skills");
+        std::fs::create_dir_all(&trae_root).unwrap();
+        std::fs::create_dir_all(&trae_cn_root).unwrap();
+        let context = platform_context(&home);
+
+        let trae = TraeAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+        let trae_cn = TraeCnAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(trae.status, DetectionStatus::Unavailable);
+        assert_eq!(trae_cn.status, DetectionStatus::Unavailable);
+
+        std::fs::create_dir_all(home.join("Applications/TRAE.app")).unwrap();
+        std::fs::create_dir_all(home.join("Applications/TRAE CN.app")).unwrap();
+
+        let trae = TraeAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+        let trae_cn = TraeCnAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(trae.status, DetectionStatus::Detected);
+        assert_eq!(trae.roots[0].display_path, trae_root);
+        assert_eq!(trae_cn.status, DetectionStatus::Detected);
+        assert_eq!(trae_cn.roots[0].display_path, trae_cn_root);
     }
 }

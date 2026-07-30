@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { searchGlobalSkills } from "./globalSkillsSearch";
+import { getOnlineSkillDetailPath, searchGlobalSkills } from "./globalSkillsSearch";
 import { SKILLS_SH_LEADERBOARD } from "./skillsShApi";
 
 describe("Global Skills Search API", () => {
@@ -9,6 +9,19 @@ describe("Global Skills Search API", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("preserves the marketplace origin in a featured skill detail path", () => {
+    const path = getOnlineSkillDetailPath({
+      id: "vercel-labs/skills/find-skills",
+      name: "find-skills",
+      ownerRepo: "vercel-labs/skills",
+      description: "Find skills",
+      installsText: "2.7M installs",
+      repoUrl: "https://github.com/vercel-labs/skills",
+    }, "marketplace");
+
+    expect(path).toContain("origin=marketplace");
   });
 
   it("searches and returns paginated merged items from skills.sh and GitHub topic API", async () => {

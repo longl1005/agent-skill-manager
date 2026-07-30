@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
+use std::time::UNIX_EPOCH;
 
 use crate::modules::platform::user_home_dir;
 use crate::modules::util::parse_frontmatter;
@@ -11,6 +12,9 @@ pub struct MasterSkillReport {
     pub name: String,
     pub description: String,
     pub path: String,
+    /// Filesystem modification time. Used to surface newly installed skills
+    /// before the long-standing alphabetical inventory.
+    pub modified_at: u64,
     pub linked_agents: HashMap<String, bool>,
 }
 
@@ -19,9 +23,21 @@ pub fn master_repo_dir() -> PathBuf {
     home.join(".asm").join("skills")
 }
 
+pub fn expand_config_path(path: &str) -> PathBuf {
+    if path == "~" {
+        return user_home_dir().unwrap_or_else(|| PathBuf::from(path));
+    }
+    if let Some(rest) = path.strip_prefix("~/") {
+        return user_home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .join(rest);
+    }
+    PathBuf::from(path)
+}
+
 pub fn get_master_dir(custom_paths: Option<&HashMap<String, String>>) -> PathBuf {
     if let Some(path_str) = custom_paths.and_then(|m| m.get("master")) {
-        PathBuf::from(path_str)
+        expand_config_path(path_str)
     } else {
         master_repo_dir()
     }
@@ -36,7 +52,9 @@ pub fn ensure_master_repo_dir() -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
-pub fn ensure_master_dir_with_custom(custom_paths: Option<&HashMap<String, String>>) -> std::io::Result<PathBuf> {
+pub fn ensure_master_dir_with_custom(
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<PathBuf> {
     let dir = get_master_dir(custom_paths);
     if !dir.exists() {
         fs::create_dir_all(&dir)?;
@@ -49,11 +67,24 @@ pub fn get_agent_skills_dir(
     custom_paths: Option<&HashMap<String, String>>,
 ) -> Option<PathBuf> {
     if let Some(custom) = custom_paths.and_then(|m| m.get(agent_id)) {
-        return Some(PathBuf::from(custom));
+        return Some(expand_config_path(custom));
     }
     let home = user_home_dir()?;
     match agent_id {
         "claude-code" => Some(home.join(".claude").join("skills")),
+        "cline" => Some(home.join(".agents").join("skills")),
+        "codebuddy" => Some(home.join(".codebuddy").join("skills")),
+        "github-copilot" => Some(home.join(".copilot").join("skills")),
+        "droid" => Some(home.join(".factory").join("skills")),
+        "qoder" => Some(home.join(".qoder").join("skills")),
+        "qwen-code" => Some(home.join(".qwen").join("skills")),
+        "hermes" => Some(home.join(".hermes").join("skills")),
+        "openclaw" => Some(home.join(".openclaw").join("skills")),
+        "workbuddy" => Some(home.join(".workbuddy").join("skills")),
+        "kimi-code" => Some(home.join(".kimi-code").join("skills")),
+        "augment" => Some(home.join(".augment").join("skills")),
+        "roo-code" => Some(home.join(".roo").join("skills")),
+        "windsurf" => Some(home.join(".codeium").join("windsurf").join("skills")),
         "codex" => Some(home.join(".codex").join("skills")),
         "antigravity" => Some(home.join(".gemini").join("antigravity").join("skills")),
         "pi-agent" => {
@@ -69,6 +100,10 @@ pub fn get_agent_skills_dir(
             }
         }
         "oh-my-pi" => Some(home.join(".omp").join("agent").join("skills")),
+        "grok" => Some(home.join(".grok").join("skills")),
+        "kiro" => Some(home.join(".kiro").join("skills")),
+        "trae" => Some(home.join(".trae").join("skills")),
+        "trae-cn" => Some(home.join(".trae-cn").join("skills")),
         "opencode" | "open-code" => {
             let cfg_dir = home.join(".config").join("opencode").join("skills");
             let dot_dir = home.join(".opencode").join("skills");
@@ -101,7 +136,10 @@ pub fn get_agent_skills_dir(
     }
 }
 
-pub fn create_skill_symlink(master_skill_path: &Path, target_symlink: &Path) -> std::io::Result<()> {
+pub fn create_skill_symlink(
+    master_skill_path: &Path,
+    target_symlink: &Path,
+) -> std::io::Result<()> {
     if let Some(parent) = target_symlink.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent)?;
@@ -137,7 +175,10 @@ pub fn is_valid_symlink_to(target_symlink: &Path, master_path: &Path) -> bool {
             return true;
         }
     }
-    if let (Ok(canon_target), Ok(canon_master)) = (fs::canonicalize(target_symlink), fs::canonicalize(master_path)) {
+    if let (Ok(canon_target), Ok(canon_master)) = (
+        fs::canonicalize(target_symlink),
+        fs::canonicalize(master_path),
+    ) {
         if canon_target == canon_master {
             return true;
         }
@@ -157,7 +198,32 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
     };
 
     let mut reports = Vec::new();
-    let known_agents = ["claude-code", "codex", "antigravity", "pi-agent", "oh-my-pi", "opencode", "cursor"];
+    let known_agents = [
+        "claude-code",
+        "cline",
+        "codebuddy",
+        "github-copilot",
+        "droid",
+        "qoder",
+        "qwen-code",
+        "hermes",
+        "openclaw",
+        "workbuddy",
+        "kimi-code",
+        "augment",
+        "roo-code",
+        "windsurf",
+        "codex",
+        "antigravity",
+        "pi-agent",
+        "oh-my-pi",
+        "grok",
+        "kiro",
+        "trae",
+        "trae-cn",
+        "opencode",
+        "cursor",
+    ];
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -191,26 +257,6 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
                 let target_symlink = agent_dir.join(&file_name);
                 if is_valid_symlink_to(&target_symlink, &path) {
                     true
-                } else if target_symlink.exists() || fs::symlink_metadata(&target_symlink).is_ok() {
-                    let fp_input_tgt = FingerprintInput {
-                        root: target_symlink.clone(),
-                        comparable_extensions: &[],
-                        exclude_names: &[],
-                    };
-                    let fp_input_mst = FingerprintInput {
-                        root: path.clone(),
-                        comparable_extensions: &[],
-                        exclude_names: &[],
-                    };
-                    let tgt_fp = compute_fingerprint(&fp_input_tgt).map(|(h, _)| h).unwrap_or_default();
-                    let mst_fp = compute_fingerprint(&fp_input_mst).map(|(h, _)| h).unwrap_or_default();
-                    if !tgt_fp.is_empty() && tgt_fp == mst_fp {
-                        let _ = remove_skill_symlink(&target_symlink);
-                        let _ = create_skill_symlink(&path, &target_symlink);
-                        true
-                    } else {
-                        false
-                    }
                 } else {
                     false
                 }
@@ -233,11 +279,24 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
             name,
             description,
             path: path.to_string_lossy().into_owned(),
+            modified_at: fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis() as u64)
+                .unwrap_or(0),
             linked_agents,
         });
     }
 
-    reports.sort_by(|a, b| a.name.cmp(&b.name));
+    // The master library is an installation workspace, not a dictionary.
+    // Show the newest folder first so a just-installed skill is immediately
+    // visible; names are only the stable tie-breaker.
+    reports.sort_by(|a, b| {
+        b.modified_at
+            .cmp(&a.modified_at)
+            .then_with(|| a.name.cmp(&b.name))
+    });
     reports
 }
 
@@ -249,8 +308,12 @@ pub fn toggle_skill_symlink(
 ) -> std::io::Result<bool> {
     let master_dir = get_master_dir(custom_paths);
     let master_skill_path = master_dir.join(skill_name);
-    let agent_dir = get_agent_skills_dir(agent_id, custom_paths)
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {}", agent_id)))?;
+    let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Unknown agent: {}", agent_id),
+        )
+    })?;
 
     let target_symlink = agent_dir.join(skill_name);
 
@@ -258,7 +321,10 @@ pub fn toggle_skill_symlink(
         if !master_skill_path.exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Master skill '{}' does not exist at {:?}", skill_name, master_skill_path),
+                format!(
+                    "Master skill '{}' does not exist at {:?}",
+                    skill_name, master_skill_path
+                ),
             ));
         }
         if !agent_dir.exists() {
@@ -280,8 +346,228 @@ pub fn toggle_skill_symlink(
     Ok(true)
 }
 
+/// Applies a skill link change for multiple Agents in one command invocation.
+/// The filesystem work remains per-Agent, but the desktop bridge and UI refresh
+/// occur only once, which keeps "link all" responsive for large Agent lists.
+pub fn toggle_skill_symlinks_batch(
+    agent_ids: &[String],
+    skill_name: &str,
+    enable: bool,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<usize> {
+    let mut changed = 0;
+    for agent_id in agent_ids {
+        toggle_skill_symlink(agent_id, skill_name, enable, custom_paths)?;
+        changed += 1;
+    }
+    Ok(changed)
+}
+
+pub fn replace_agent_local_skill_with_symlink(
+    agent_id: &str,
+    skill_name: &str,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<bool> {
+    if skill_name.is_empty()
+        || skill_name == "."
+        || skill_name == ".."
+        || skill_name.contains('/')
+        || skill_name.contains('\\')
+    {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid skill name"));
+    }
+
+    let master_skill_path = get_master_dir(custom_paths).join(skill_name);
+    if !master_skill_path.is_dir() {
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Master skill does not exist"));
+    }
+    let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {agent_id}"))
+    })?;
+    let target = agent_dir.join(skill_name);
+    let metadata = fs::symlink_metadata(&target)?;
+    if metadata.file_type().is_symlink() {
+        return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Refusing to replace a symlink"));
+    }
+
+    if metadata.is_dir() {
+        fs::remove_dir_all(&target)?;
+    } else {
+        fs::remove_file(&target)?;
+    }
+    create_skill_symlink(&master_skill_path, &target)?;
+
+    if let Ok(conn) = crate::modules::db::open_db(None) {
+        let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, "linked");
+        let _ = crate::modules::db::log_activity(&conn, "REPLACE_LOCAL_SKILL_WITH_SYMLINK", skill_name, agent_id);
+    }
+    Ok(true)
+}
+
+/// Delete one skill entry from an Agent's configured skills directory.
+///
+/// A symlink is removed as a link only; its target is never followed or deleted.
+/// Real skill directories are removed recursively, but only after validating that
+/// `skill_name` is a single direct child of the Agent skills directory.
+pub fn delete_agent_skill(
+    agent_id: &str,
+    skill_name: &str,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<bool> {
+    if skill_name.is_empty()
+        || skill_name == "."
+        || skill_name == ".."
+        || skill_name.contains('/')
+        || skill_name.contains('\\')
+    {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid skill name"));
+    }
+
+    let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {agent_id}"))
+    })?;
+    let target = agent_dir.join(skill_name);
+    let metadata = fs::symlink_metadata(&target)?;
+
+    if metadata.file_type().is_symlink() || metadata.is_file() {
+        fs::remove_file(&target)?;
+    } else if metadata.is_dir() {
+        fs::remove_dir_all(&target)?;
+    } else {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Unsupported skill entry"));
+    }
+
+    if let Ok(conn) = crate::modules::db::open_db(None) {
+        let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, "unlinked");
+        let _ = crate::modules::db::log_activity(&conn, "DELETE_AGENT_SKILL", skill_name, agent_id);
+    }
+    Ok(true)
+}
+
+/// Remove only ASM-managed skill symlinks from one Agent directory.
+pub fn unlink_all_agent_skills(
+    agent_id: &str,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<usize> {
+    let master_dir = get_master_dir(custom_paths);
+    let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Unknown agent: {}", agent_id),
+        )
+    })?;
+    let mut removed = 0;
+    if !master_dir.exists() || !agent_dir.exists() {
+        return Ok(0);
+    }
+    for entry in fs::read_dir(&master_dir)? {
+        let entry = entry?;
+        let master_skill = entry.path();
+        if !master_skill.is_dir() {
+            continue;
+        }
+        let target = agent_dir.join(entry.file_name());
+        if is_valid_symlink_to(&target, &master_skill) {
+            remove_skill_symlink(&target)?;
+            removed += 1;
+            if let Ok(conn) = crate::modules::db::open_db(None) {
+                let skill_name = entry.file_name().to_string_lossy().to_string();
+                let _ = crate::modules::db::upsert_agent_symlink(
+                    &conn,
+                    agent_id,
+                    &skill_name,
+                    "unlinked",
+                );
+                let _ =
+                    crate::modules::db::log_activity(&conn, "UNLINK_SKILL", &skill_name, agent_id);
+            }
+        }
+    }
+    Ok(removed)
+}
+
+/// Atomically move ASM-managed links from the previous effective directory to a new Skills directory.
+pub fn migrate_agent_skills_dir(
+    agent_id: &str,
+    old_custom_path: Option<&str>,
+    new_path: &Path,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<usize> {
+    let master_dir = get_master_dir(custom_paths);
+    let old_dir = old_custom_path
+        .map(expand_config_path)
+        .unwrap_or_else(|| get_agent_skills_dir(agent_id, None).unwrap_or_default());
+    fs::create_dir_all(new_path)?;
+    if !master_dir.exists() {
+        return Ok(0);
+    }
+    let mut links: Vec<(PathBuf, PathBuf, PathBuf)> = Vec::new();
+    for entry in fs::read_dir(&master_dir)? {
+        let entry = entry?;
+        let master = entry.path();
+        if !master.is_dir() {
+            continue;
+        }
+        let old_link = old_dir.join(entry.file_name());
+        if is_valid_symlink_to(&old_link, &master) {
+            links.push((old_link, new_path.join(entry.file_name()), master));
+        }
+    }
+    for (_, target, master) in &links {
+        if target.exists() || fs::symlink_metadata(target).is_ok() {
+            if !is_valid_symlink_to(target, master) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    format!("Target conflict: {}", target.display()),
+                ));
+            }
+        }
+    }
+    let mut created: Vec<PathBuf> = Vec::new();
+    for (_, target, master) in &links {
+        if !is_valid_symlink_to(target, master) {
+            if let Err(error) = create_skill_symlink(master, target) {
+                for path in created {
+                    let _ = remove_skill_symlink(&path);
+                }
+                return Err(error);
+            }
+            created.push(target.clone());
+        }
+    }
+    for (old, _, _) in &links {
+        remove_skill_symlink(old)?;
+    }
+    Ok(links.len())
+}
+
 /// Known agent IDs for symlink cleanup during skill deletion.
-const ALL_AGENT_IDS: &[&str] = &["claude-code", "codex", "antigravity", "pi-agent", "oh-my-pi", "opencode", "cursor"];
+const ALL_AGENT_IDS: &[&str] = &[
+    "claude-code",
+    "cline",
+    "codebuddy",
+    "github-copilot",
+    "droid",
+    "qoder",
+    "qwen-code",
+    "hermes",
+    "openclaw",
+    "workbuddy",
+    "kimi-code",
+    "augment",
+    "roo-code",
+    "windsurf",
+    "codex",
+    "antigravity",
+    "pi-agent",
+    "oh-my-pi",
+    "grok",
+    "kiro",
+    "trae",
+    "trae-cn",
+    "opencode",
+    "cursor",
+];
 
 /// Delete a master skill entirely: remove all agent symlinks first, then delete the master directory.
 pub fn delete_master_skill(
@@ -302,8 +588,15 @@ pub fn delete_master_skill(
 
                 // Update DB
                 if let Ok(conn) = crate::modules::db::open_db(None) {
-                    let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, "unlinked");
-                    let _ = crate::modules::db::log_activity(&conn, "UNLINK_SKILL", skill_name, agent_id);
+                    let _ = crate::modules::db::upsert_agent_symlink(
+                        &conn, agent_id, skill_name, "unlinked",
+                    );
+                    let _ = crate::modules::db::log_activity(
+                        &conn,
+                        "UNLINK_SKILL",
+                        skill_name,
+                        agent_id,
+                    );
                 }
             }
         }
@@ -347,6 +640,62 @@ fn uuid_simple() -> String {
     format!("{}-{}", since_the_epoch.as_millis(), std::process::id())
 }
 
+pub fn export_master_skill_zip(
+    skill_name: &str,
+    destination: &Path,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<PathBuf> {
+    let source = get_master_dir(custom_paths).join(skill_name);
+    if !source.is_dir() || !source.join("SKILL.md").is_file() {
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Master skill does not exist or has no SKILL.md"));
+    }
+    let file = fs::File::create(destination)?;
+    let mut writer = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    for entry in walkdir::WalkDir::new(&source).follow_links(false) {
+        let entry = entry.map_err(|error| std::io::Error::other(error.to_string()))?;
+        let path = entry.path();
+        let relative = path.strip_prefix(&source).map_err(|error| std::io::Error::other(error.to_string()))?;
+        let archive_path = Path::new(skill_name).join(relative).to_string_lossy().replace('\\', "/");
+        if entry.file_type().is_dir() {
+            if !relative.as_os_str().is_empty() { writer.add_directory(format!("{archive_path}/"), options)?; }
+        } else if entry.file_type().is_file() {
+            writer.start_file(archive_path, options)?;
+            let mut input = fs::File::open(path)?;
+            std::io::copy(&mut input, &mut writer)?;
+        }
+    }
+    writer.finish()?;
+    Ok(destination.to_path_buf())
+}
+
+fn extract_skill_zip(source: &Path) -> std::io::Result<(PathBuf, PathBuf)> {
+    let temp_root = std::env::temp_dir().join(format!("asm-zip-{}", uuid_simple()));
+    fs::create_dir_all(&temp_root)?;
+    let result = (|| -> std::io::Result<PathBuf> {
+        let file = fs::File::open(source)?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?;
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?;
+            let enclosed = entry.enclosed_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "ZIP contains an unsafe path"))?;
+            let output = temp_root.join(enclosed);
+            if entry.is_dir() {
+                fs::create_dir_all(&output)?;
+            } else {
+                if let Some(parent) = output.parent() { fs::create_dir_all(parent)?; }
+                let mut file = fs::File::create(output)?;
+                std::io::copy(&mut entry, &mut file)?;
+            }
+        }
+        find_first_skill_dir(&temp_root).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "ZIP does not contain SKILL.md"))
+    })();
+    match result {
+        Ok(skill_dir) => Ok((temp_root, skill_dir)),
+        Err(error) => { let _ = fs::remove_dir_all(&temp_root); Err(error) }
+    }
+}
+
 fn find_skill_dir_in_tree(root: &Path, target_skill: &str) -> Option<PathBuf> {
     if !root.exists() || !root.is_dir() {
         return None;
@@ -362,7 +711,9 @@ fn find_skill_dir_in_tree(root: &Path, target_skill: &str) -> Option<PathBuf> {
                         let name_str = name.to_string_lossy();
                         if name_str.eq_ignore_ascii_case(target_skill) {
                             let candidate = entry.path();
-                            if candidate.join("SKILL.md").exists() || candidate.join("skill.md").exists() {
+                            if candidate.join("SKILL.md").exists()
+                                || candidate.join("skill.md").exists()
+                            {
                                 return Some(candidate);
                             }
                         }
@@ -382,6 +733,20 @@ fn find_skill_dir_in_tree(root: &Path, target_skill: &str) -> Option<PathBuf> {
     None
 }
 
+fn find_first_skill_dir(root: &Path) -> Option<PathBuf> {
+    if root.join("SKILL.md").is_file() || root.join("skill.md").is_file() {
+        return Some(root.to_path_buf());
+    }
+    fs::read_dir(root).ok()?.flatten().find_map(|entry| {
+        let path = entry.path();
+        if path.is_dir() && (path.join("SKILL.md").is_file() || path.join("skill.md").is_file()) {
+            Some(path)
+        } else {
+            None
+        }
+    })
+}
+
 pub fn install_skill_to_master(
     skill_name: &str,
     source: Option<&str>,
@@ -394,7 +759,10 @@ pub fn install_skill_to_master(
     let is_dummy_placeholder = if target_dir.exists() {
         let skill_md = target_dir.join("SKILL.md");
         if let Ok(metadata) = fs::metadata(&skill_md) {
-            metadata.len() < 350 && fs::read_dir(&target_dir).map(|d| d.count() <= 1).unwrap_or(false)
+            metadata.len() < 350
+                && fs::read_dir(&target_dir)
+                    .map(|d| d.count() <= 1)
+                    .unwrap_or(false)
         } else {
             false
         }
@@ -411,7 +779,13 @@ pub fn install_skill_to_master(
 
         if let Some(src_str) = source {
             let src_path = PathBuf::from(src_str);
-            if src_path.exists() && src_path.is_dir() {
+            if src_path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("zip")) {
+                let (temp_root, skill_dir) = extract_skill_zip(&src_path)?;
+                let copy_result = copy_dir_all(&skill_dir, &target_dir);
+                let _ = fs::remove_dir_all(temp_root);
+                copy_result?;
+                installed = true;
+            } else if src_path.exists() && src_path.is_dir() {
                 let dir_to_copy = find_skill_dir_in_tree(&src_path, skill_name).unwrap_or(src_path);
                 copy_dir_all(&dir_to_copy, &target_dir)?;
                 installed = true;
@@ -421,7 +795,13 @@ pub fn install_skill_to_master(
                 let _ = fs::remove_dir_all(&temp_dir);
 
                 let status = std::process::Command::new("git")
-                    .args(["clone", "--depth", "1", &repo_url, temp_dir.to_str().unwrap()])
+                    .args([
+                        "clone",
+                        "--depth",
+                        "1",
+                        &repo_url,
+                        temp_dir.to_str().unwrap(),
+                    ])
                     .status();
 
                 if let Ok(st) = status {
@@ -429,7 +809,9 @@ pub fn install_skill_to_master(
                         if let Some(skill_dir) = find_skill_dir_in_tree(&temp_dir, skill_name) {
                             copy_dir_all(&skill_dir, &target_dir)?;
                             installed = true;
-                        } else if temp_dir.join("SKILL.md").exists() || temp_dir.join("skill.md").exists() {
+                        } else if temp_dir.join("SKILL.md").exists()
+                            || temp_dir.join("skill.md").exists()
+                        {
                             copy_dir_all(&temp_dir, &target_dir)?;
                             let _ = fs::remove_dir_all(target_dir.join(".git"));
                             installed = true;
@@ -454,7 +836,14 @@ pub fn install_skill_to_master(
     if let Ok(conn) = crate::modules::db::open_db(None) {
         let desc = format!("Skill '{}'", skill_name);
         let file_count = fs::read_dir(&target_dir).map(|d| d.count()).unwrap_or(1);
-        let _ = crate::modules::db::upsert_master_skill(&conn, skill_name, &desc, "", source.unwrap_or(""), file_count);
+        let _ = crate::modules::db::upsert_master_skill(
+            &conn,
+            skill_name,
+            &desc,
+            "",
+            source.unwrap_or(""),
+            file_count,
+        );
     }
 
     Ok(target_dir)
@@ -515,14 +904,21 @@ pub fn import_skill_to_master_with_mode(
     custom_paths: Option<&HashMap<String, String>>,
 ) -> std::io::Result<ImportResult> {
     let master_dir = ensure_master_dir_with_custom(custom_paths)?;
-    let agent_dir = get_agent_skills_dir(agent_id, custom_paths)
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {}", agent_id)))?;
+    let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Unknown agent: {}", agent_id),
+        )
+    })?;
 
     let source_path = agent_dir.join(skill_name);
     if !source_path.exists() && fs::symlink_metadata(&source_path).is_err() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            format!("Source skill '{}' not found at {:?}", skill_name, source_path),
+            format!(
+                "Source skill '{}' not found at {:?}",
+                skill_name, source_path
+            ),
         ));
     }
 
@@ -551,8 +947,12 @@ pub fn import_skill_to_master_with_mode(
                     exclude_names: &[],
                 };
 
-                let src_fp = compute_fingerprint(&fp_input_src).map(|(h, _)| h).unwrap_or_default();
-                let mst_fp = compute_fingerprint(&fp_input_mst).map(|(h, _)| h).unwrap_or_default();
+                let src_fp = compute_fingerprint(&fp_input_src)
+                    .map(|(h, _)| h)
+                    .unwrap_or_default();
+                let mst_fp = compute_fingerprint(&fp_input_mst)
+                    .map(|(h, _)| h)
+                    .unwrap_or_default();
 
                 if !src_fp.is_empty() && src_fp == mst_fp {
                     remove_skill_symlink(&source_path)?;
@@ -608,11 +1008,16 @@ pub fn import_skill_to_master_with_mode(
             create_skill_symlink(&master_skill_path, &source_path)?;
             Ok(ImportResult::Success)
         }
-        ImportMode::RenameNew { new_name: ref _name } => {
+        ImportMode::RenameNew {
+            new_name: ref _name,
+        } => {
             if master_skill_path.exists() {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::AlreadyExists,
-                    format!("Master skill with new name '{}' already exists", target_name),
+                    format!(
+                        "Master skill with new name '{}' already exists",
+                        target_name
+                    ),
                 ));
             }
             if source_path.is_dir() {
@@ -657,7 +1062,11 @@ mod tests {
         let tmp = temp_dir();
         let master_skill = tmp.join("master").join("my-skill");
         fs::create_dir_all(&master_skill).unwrap();
-        fs::write(master_skill.join("SKILL.md"), "---\nname: my-skill\ndescription: Test skill\n---\n").unwrap();
+        fs::write(
+            master_skill.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: Test skill\n---\n",
+        )
+        .unwrap();
 
         let agent_symlink = tmp.join("claude").join("my-skill");
         create_skill_symlink(&master_skill, &agent_symlink).unwrap();
@@ -684,13 +1093,23 @@ mod tests {
         fs::write(
             master_dir.join("skill-a").join("SKILL.md"),
             "---\nname: skill-a\ndescription: Skill A desc\n---\n",
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut custom_paths = HashMap::new();
-        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
-        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "master".to_string(),
+            master_dir.to_string_lossy().to_string(),
+        );
+        custom_paths.insert(
+            "claude-code".to_string(),
+            claude_dir.to_string_lossy().to_string(),
+        );
         custom_paths.insert("codex".to_string(), codex_dir.to_string_lossy().to_string());
-        custom_paths.insert("antigravity".to_string(), ag_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "antigravity".to_string(),
+            ag_dir.to_string_lossy().to_string(),
+        );
         custom_paths.insert("pi-agent".to_string(), pi_dir.to_string_lossy().to_string());
 
         let reports = scan_master_repo(Some(&custom_paths));
@@ -702,14 +1121,137 @@ mod tests {
         toggle_skill_symlink("claude-code", "skill-a", true, Some(&custom_paths)).unwrap();
 
         let reports_after = scan_master_repo(Some(&custom_paths));
-        assert_eq!(reports_after[0].linked_agents.get("claude-code"), Some(&true));
+        assert_eq!(
+            reports_after[0].linked_agents.get("claude-code"),
+            Some(&true)
+        );
         assert_eq!(reports_after[0].linked_agents.get("codex"), Some(&false));
 
         toggle_skill_symlink("claude-code", "skill-a", false, Some(&custom_paths)).unwrap();
         let reports_after_untoggle = scan_master_repo(Some(&custom_paths));
-        assert_eq!(reports_after_untoggle[0].linked_agents.get("claude-code"), Some(&false));
+        assert_eq!(
+            reports_after_untoggle[0].linked_agents.get("claude-code"),
+            Some(&false)
+        );
 
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn batch_toggle_links_each_requested_agent() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let claude_dir = tmp.join("claude_skills");
+        let codex_dir = tmp.join("codex_skills");
+        fs::create_dir_all(master_dir.join("skill-a")).unwrap();
+        fs::write(master_dir.join("skill-a").join("SKILL.md"), "# Skill A").unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+        custom_paths.insert("codex".to_string(), codex_dir.to_string_lossy().to_string());
+        let agent_ids = vec!["claude-code".to_string(), "codex".to_string()];
+
+        assert_eq!(
+            toggle_skill_symlinks_batch(&agent_ids, "skill-a", true, Some(&custom_paths)).unwrap(),
+            2,
+        );
+        assert!(is_valid_symlink_to(&claude_dir.join("skill-a"), &master_dir.join("skill-a")));
+        assert!(is_valid_symlink_to(&codex_dir.join("skill-a"), &master_dir.join("skill-a")));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn unlink_all_agent_skills_removes_only_asm_links() {
+        let tmp = temp_dir();
+        let master = tmp.join("master");
+        let agent = tmp.join("agent");
+        let skill = master.join("managed");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "---\nname: managed\n---").unwrap();
+        create_skill_symlink(&skill, &agent.join("managed")).unwrap();
+        fs::create_dir_all(agent.join("personal")).unwrap();
+        let mut paths = HashMap::new();
+        paths.insert("master".into(), master.to_string_lossy().to_string());
+        paths.insert("claude-code".into(), agent.to_string_lossy().to_string());
+        assert_eq!(
+            unlink_all_agent_skills("claude-code", Some(&paths)).unwrap(),
+            1
+        );
+        assert!(!agent.join("managed").exists());
+        assert!(agent.join("personal").exists());
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn replacement_deletes_only_a_real_agent_skill_and_creates_master_symlink() {
+        let tmp = temp_dir();
+        let master = tmp.join("master");
+        let agent = tmp.join("agent");
+        let master_skill = master.join("skill-a");
+        let local_skill = agent.join("skill-a");
+        fs::create_dir_all(&master_skill).unwrap();
+        fs::write(master_skill.join("SKILL.md"), "---\nname: skill-a\n---").unwrap();
+        fs::create_dir_all(&local_skill).unwrap();
+        fs::write(local_skill.join("local.txt"), "local copy").unwrap();
+        let mut paths = HashMap::new();
+        paths.insert("master".into(), master.to_string_lossy().to_string());
+        paths.insert("claude-code".into(), agent.to_string_lossy().to_string());
+
+        assert!(replace_agent_local_skill_with_symlink("claude-code", "skill-a", Some(&paths)).unwrap());
+        assert!(is_valid_symlink_to(&local_skill, &master_skill));
+        assert!(!local_skill.join("local.txt").exists());
+        assert!(replace_agent_local_skill_with_symlink("claude-code", "../skill-a", Some(&paths)).is_err());
+
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn replacement_refuses_to_delete_an_existing_symlink() {
+        let tmp = temp_dir();
+        let master = tmp.join("master");
+        let agent = tmp.join("agent");
+        let master_skill = master.join("skill-a");
+        fs::create_dir_all(&master_skill).unwrap();
+        fs::write(master_skill.join("SKILL.md"), "---\nname: skill-a\n---").unwrap();
+        create_skill_symlink(&master_skill, &agent.join("skill-a")).unwrap();
+        let mut paths = HashMap::new();
+        paths.insert("master".into(), master.to_string_lossy().to_string());
+        paths.insert("claude-code".into(), agent.to_string_lossy().to_string());
+
+        assert!(replace_agent_local_skill_with_symlink("claude-code", "skill-a", Some(&paths)).is_err());
+        assert!(is_valid_symlink_to(&agent.join("skill-a"), &master_skill));
+
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn delete_agent_skill_removes_local_entries_without_following_external_symlinks() {
+        let tmp = temp_dir();
+        let agent = tmp.join("agent");
+        let local_skill = agent.join("local-skill");
+        let external_target = tmp.join("external-skill");
+        fs::create_dir_all(&local_skill).unwrap();
+        fs::write(local_skill.join("SKILL.md"), "local").unwrap();
+        fs::create_dir_all(&external_target).unwrap();
+        fs::write(external_target.join("SKILL.md"), "external").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&external_target, agent.join("external-skill")).unwrap();
+
+        let mut paths = HashMap::new();
+        paths.insert("claude-code".into(), agent.to_string_lossy().to_string());
+
+        assert!(delete_agent_skill("claude-code", "local-skill", Some(&paths)).unwrap());
+        assert!(!local_skill.exists());
+        #[cfg(unix)]
+        {
+            assert!(delete_agent_skill("claude-code", "external-skill", Some(&paths)).unwrap());
+            assert!(external_target.exists());
+        }
+        assert!(delete_agent_skill("claude-code", "../external-skill", Some(&paths)).is_err());
+
+        let _ = fs::remove_dir_all(tmp);
     }
 
     #[test]
@@ -723,11 +1265,18 @@ mod tests {
         fs::write(
             source_skill.join("SKILL.md"),
             "---\nname: imported-skill\ndescription: Imported desc\n---\n",
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut custom_paths = HashMap::new();
-        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
-        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "master".to_string(),
+            master_dir.to_string_lossy().to_string(),
+        );
+        custom_paths.insert(
+            "claude-code".to_string(),
+            claude_dir.to_string_lossy().to_string(),
+        );
 
         let res = import_skill_to_master("claude-code", "imported-skill", Some(&custom_paths));
         assert!(res.is_ok());

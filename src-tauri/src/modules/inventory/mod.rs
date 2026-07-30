@@ -246,8 +246,11 @@ mod tests {
             description: format!("{name} description"),
             license: None,
             location: format!("/skills/{name}"),
+            modified_at: 0,
             fingerprint_short: fingerprint.to_owned(),
             file_count: 1,
+            is_symlink: false,
+            symlink_target: None,
             issues: vec![],
         }
     }

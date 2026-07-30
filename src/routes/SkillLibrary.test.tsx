@@ -1,12 +1,25 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import SkillLibrary from "./SkillLibrary";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useI18nStore } from "../stores/i18nStore";
+import { useScanStore } from "../stores/scanStore";
+import { useAgentConfigStore } from "../stores/agentConfigStore";
+import { openSkillDirectory } from "../ipc/commands";
+
+function LocationDisplay() {
+  const location = useLocation();
+  return <output data-testid="location-display">{location.pathname}</output>;
+}
 
 vi.mock("../stores/masterRepoStore", () => ({
   useMasterRepoStore: vi.fn(),
+}));
+
+vi.mock("../ipc/commands", () => ({
+  exportMasterSkillZip: vi.fn(),
+  openSkillDirectory: vi.fn(),
 }));
 
 const mockMasterSkills = [
@@ -37,13 +50,25 @@ const mockMasterSkills = [
 describe("SkillLibrary Route", () => {
   let fetchMasterSkillsMock: ReturnType<typeof vi.fn>;
   let toggleAgentSkillMock: ReturnType<typeof vi.fn>;
+  let toggleAgentSkillsBatchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     useI18nStore.setState({ lang: "en" });
+    useAgentConfigStore.setState({ disabledAgentIds: [] });
+    useScanStore.setState({
+      report: {
+        scan_id: "test-scan", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,
+        agents: [
+          { agent_id: "claude-code", display_name: "Claude Code", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "Completed" },
+          { agent_id: "codex", display_name: "Codex", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "Completed" },
+        ],
+      },
+    });
 
     fetchMasterSkillsMock = vi.fn();
     toggleAgentSkillMock = vi.fn().mockResolvedValue(true);
+    toggleAgentSkillsBatchMock = vi.fn().mockResolvedValue(1);
 
     vi.mocked(useMasterRepoStore).mockReturnValue({
       skills: mockMasterSkills,
@@ -51,8 +76,15 @@ describe("SkillLibrary Route", () => {
       error: null,
       fetchMasterSkills: fetchMasterSkillsMock,
       toggleAgentSkill: toggleAgentSkillMock,
+      toggleAgentSkillsBatch: toggleAgentSkillsBatchMock,
       importToMaster: vi.fn(),
     });
+  });
+
+  it("omits disabled Agents from the distribution matrix", () => {
+    useAgentConfigStore.setState({ disabledAgentIds: ["codex"] });
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+    expect(screen.queryByTestId("agent-badge-web-search-pro-codex")).not.toBeInTheDocument();
   });
 
   it("fetches master skills on mount and renders master skill cards", () => {
@@ -68,6 +100,16 @@ describe("SkillLibrary Route", () => {
     expect(screen.getByText("code-analyzer")).toBeInTheDocument();
     expect(screen.getByText("~/.asm/skills/web-search-pro")).toBeInTheDocument();
     expect(screen.getByText("Advanced web searching skill")).toBeInTheDocument();
+  });
+
+  it("shows the total number of master skills beside the library title", () => {
+    render(
+      <MemoryRouter>
+        <SkillLibrary />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("2 skills")).toBeVisible();
   });
 
   it("renders agent link distribution matrix badges with correct states", () => {
@@ -102,6 +144,16 @@ describe("SkillLibrary Route", () => {
     expect(toggleAgentSkillMock).toHaveBeenCalledWith("codex", "web-search-pro", true);
   });
 
+  it("uses one batch operation when linking every discovered Agent", () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Link all Agents for code-analyzer" }));
+
+    expect(toggleAgentSkillsBatchMock).toHaveBeenCalledWith(
+      ["claude-code", "codex"], "code-analyzer", true,
+    );
+  });
+
   it("filters skills by search query", () => {
     render(
       <MemoryRouter>
@@ -116,46 +168,41 @@ describe("SkillLibrary Route", () => {
     expect(screen.getByText("code-analyzer")).toBeInTheDocument();
   });
 
-  it("filters skills by status (Linked / Unlinked)", () => {
+  it("keeps link state in the matrix instead of offering redundant link filters", () => {
     render(
       <MemoryRouter>
         <SkillLibrary />
       </MemoryRouter>
     );
-
-    const linkedFilterBtn = screen.getByRole("button", { name: "Linked" });
-    fireEvent.click(linkedFilterBtn);
 
     expect(screen.getByText("web-search-pro")).toBeInTheDocument();
-    expect(screen.queryByText("code-analyzer")).not.toBeInTheDocument();
-
-    const unlinkedFilterBtn = screen.getByRole("button", { name: "Unlinked" });
-    fireEvent.click(unlinkedFilterBtn);
-
-    expect(screen.queryByText("web-search-pro")).not.toBeInTheDocument();
     expect(screen.getByText("code-analyzer")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Linked" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unlinked" })).not.toBeInTheDocument();
   });
 
-  it("copies skill path when clicking copy button", async () => {
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: writeTextMock,
-      },
-    });
-
+  it("opens the skill directory when clicking the folder button", () => {
     render(
       <MemoryRouter>
         <SkillLibrary />
       </MemoryRouter>
     );
 
-    const copyBtn = screen.getByRole("button", { name: "Copy path for web-search-pro" });
-    fireEvent.click(copyBtn);
+    fireEvent.click(screen.getByRole("button", { name: "Open directory for web-search-pro" }));
+    expect(openSkillDirectory).toHaveBeenCalledWith("~/.asm/skills/web-search-pro");
+  });
 
-    expect(writeTextMock).toHaveBeenCalledWith("~/.asm/skills/web-search-pro");
-    await waitFor(() => {
-      expect(screen.getByText("Copied!")).toBeInTheDocument();
-    });
+  it("opens skill detail when clicking a master skill card", () => {
+    render(
+      <MemoryRouter>
+        <SkillLibrary />
+        <LocationDisplay />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId("skill-card-web-search-pro"));
+
+    expect(screen.getByTestId("location-display")).toHaveTextContent("/library/skills/web-search-pro");
+    expect(screen.getByText("web-search-pro").closest("a")).toBeNull();
   });
 });

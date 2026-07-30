@@ -34,8 +34,11 @@ export interface SkillReport {
   description: string;
   license: string | null;
   location: string;
+  modified_at?: number;
   fingerprint_short: string;
   file_count: number;
+  is_symlink?: boolean;
+  symlink_target?: string | null;
   issues: IssueReport[];
 }
 
@@ -53,6 +56,7 @@ export interface MasterSkillReport {
   name: string;
   description: string;
   path: string;
+  modified_at?: number;
   linked_agents: Record<string, boolean>;
 }
 

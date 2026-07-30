@@ -5,6 +5,7 @@ import Dashboard from "./Dashboard";
 import { useScanStore } from "../stores/scanStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useI18nStore } from "../stores/i18nStore";
+import { useAgentConfigStore } from "../stores/agentConfigStore";
 
 vi.mock("../stores/scanStore", () => ({
   useScanStore: vi.fn(),
@@ -37,6 +38,7 @@ describe("Dashboard Route Redesign", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useI18nStore.setState({ lang: "en" });
+    useAgentConfigStore.setState({ disabledAgentIds: [] });
 
     vi.mocked(useScanStore).mockReturnValue({
       report: mockReport,
@@ -88,6 +90,13 @@ describe("Dashboard Route Redesign", () => {
 
     expect(screen.getByText("Claude Code")).toBeInTheDocument();
     expect(screen.getByText(/1\s+skills/i)).toBeInTheDocument();
+  });
+
+  it("omits disabled Agents from dashboard metrics and cards", () => {
+    useAgentConfigStore.setState({ disabledAgentIds: ["claude-code"] });
+    render(<MemoryRouter><Dashboard /></MemoryRouter>);
+    expect(screen.queryByText("Claude Code")).not.toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
   });
 
   it("renders navigation shortcuts and supports Chinese language switching", () => {

@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 
 import { useScanStore } from "../stores/scanStore";
 import { useI18nStore } from "../stores/i18nStore";
+import { useAgentConfigStore } from "../stores/agentConfigStore";
+import { useUiStore } from "../stores/uiStore";
 import AppSidebar from "./AppSidebar";
 
 const reportFixture = {
@@ -20,6 +22,8 @@ const reportFixture = {
 beforeEach(() => {
   useScanStore.setState({ report: reportFixture, scanning: false, error: null });
   useI18nStore.getState().setLanguage("zh");
+  useAgentConfigStore.setState({ disabledAgentIds: [] });
+  useUiStore.setState({ sidebarCollapsed: false });
 });
 
 describe("AppSidebar", () => {
@@ -59,6 +63,21 @@ describe("AppSidebar", () => {
     expect(screen.queryByRole("link", { name: "Failed Agent" })).not.toBeInTheDocument();
   });
 
+  it("hides disabled Agents from the discovered menu", () => {
+    useAgentConfigStore.setState({ disabledAgentIds: ["codex"] });
+    render(<MemoryRouter initialEntries={["/agents"]}><AppSidebar /></MemoryRouter>);
+    expect(screen.queryByRole("link", { name: /Codex/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the settings navigation outside the scrollable Agent list", () => {
+    render(<MemoryRouter initialEntries={["/agents"]}><AppSidebar /></MemoryRouter>);
+
+    expect(screen.getByRole("navigation", { name: "设置" })).toHaveClass("sidebar-settings-navigation");
+    const agentNavigation = screen.getByRole("navigation", { name: "所有智能体" });
+    expect(agentNavigation).toHaveClass("sidebar-agent-navigation");
+    expect(agentNavigation.parentElement).toHaveClass("sidebar-agent-scroll-shell");
+  });
+
   it("updates sidebar labels when language changes", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -71,7 +90,7 @@ describe("AppSidebar", () => {
     expect(screen.getByRole("link", { name: "安装技能" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "所有智能体" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
-    expect(screen.getByText("已发现智能体")).toBeInTheDocument();
+    expect(screen.queryByText("已发现智能体")).not.toBeInTheDocument();
 
     act(() => {
       useI18nStore.getState().setLanguage("en");
@@ -82,7 +101,15 @@ describe("AppSidebar", () => {
     expect(screen.getByRole("link", { name: "Install Skills" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "All Agents" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Discovered Agents")).toBeInTheDocument();
+    expect(screen.queryByText("Discovered Agents")).not.toBeInTheDocument();
+  });
+
+  it("hides the full navigation when the sidebar is collapsed", () => {
+    useUiStore.setState({ sidebarCollapsed: true });
+    render(<MemoryRouter initialEntries={["/"]}><AppSidebar /></MemoryRouter>);
+
+    const sidebar = screen.getByRole("complementary");
+    expect(sidebar).toHaveClass("is-collapsed");
+    expect(screen.queryByRole("link", { name: "仪表盘" })).not.toBeInTheDocument();
   });
 });
-

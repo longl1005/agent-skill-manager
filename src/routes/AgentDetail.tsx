@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { AgentIdentityMark, AgentStatus } from "../components/AgentVisual";
@@ -7,6 +7,7 @@ import type { ImportMode } from "../ipc/types";
 import { useI18nStore } from "../stores/i18nStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
+import { openSkillDirectory } from "../ipc/commands";
 
 function BreadcrumbSeparator() {
   return (
@@ -27,6 +28,8 @@ function StatusWithDot({ status }: { status: string }) {
   );
 }
 
+type SkillSort = "recent" | "name";
+
 export default function AgentDetail() {
   const { agentId } = useParams();
   const { report, error, scanning, scan } = useScanStore();
@@ -34,6 +37,8 @@ export default function AgentDetail() {
   const masterSkills = useMasterRepoStore((state) => state.skills);
   const fetchMasterSkills = useMasterRepoStore((state) => state.fetchMasterSkills);
   const importToMaster = useMasterRepoStore((state) => state.importToMaster);
+  const replaceAgentLocalSkillWithSymlink = useMasterRepoStore((state) => state.replaceAgentLocalSkillWithSymlink);
+  const deleteAgentSkill = useMasterRepoStore((state) => state.deleteAgentSkill);
 
   const [importingSkill, setImportingSkill] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<{
@@ -42,12 +47,24 @@ export default function AgentDetail() {
     incomingFp: string;
   } | null>(null);
   const [renameInput, setRenameInput] = useState<string>("");
+  const [unlinkConfirm, setUnlinkConfirm] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+  const [replaceConfirm, setReplaceConfirm] = useState<string | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [skillSort, setSkillSort] = useState<SkillSort>("recent");
 
   useEffect(() => {
     void fetchMasterSkills();
   }, [fetchMasterSkills]);
 
   const agent = report?.agents.find((item) => item.agent_id === agentId);
+  const sortedSkills = useMemo(() => {
+    const skills = agent?.skills ?? [];
+    return [...skills].sort((a, b) => {
+      if (skillSort === "name") return a.name.localeCompare(b.name);
+      return (b.modified_at ?? 0) - (a.modified_at ?? 0) || a.name.localeCompare(b.name);
+    });
+  }, [agent?.skills, skillSort]);
 
   const handleImport = async (e: React.MouseEvent, skillName: string) => {
     e.preventDefault();
@@ -80,6 +97,13 @@ export default function AgentDetail() {
       setImportingSkill(null);
     }
   };
+  const handleRefresh = async () => {
+    if (scanning) return;
+    await scan();
+    await fetchMasterSkills();
+  };
+  const handleUnlink = async () => { if (!agent || !unlinkConfirm) return; setUnlinking(true); try { await deleteAgentSkill(agent.agent_id, unlinkConfirm); } finally { setUnlinking(false); setUnlinkConfirm(null); } };
+  const handleReplace = async () => { if (!agent || !replaceConfirm) return; setReplacing(true); try { await replaceAgentLocalSkillWithSymlink(agent.agent_id, replaceConfirm); } finally { setReplacing(false); setReplaceConfirm(null); } };
 
   if (!agent) {
     return (
@@ -132,9 +156,24 @@ export default function AgentDetail() {
         <AgentIdentityMark agentId={agent.agent_id} />
         <div className="agent-detail__identity">
           <h1>{agent.display_name}</h1>
-          <code className="agent-detail__root agent-detail__root--truncate" title={primaryRoot}>{primaryRoot}</code>
+          {agent.roots.length <= 1 ? (
+            <code className="agent-detail__root agent-detail__root--truncate" title={primaryRoot}>{primaryRoot}</code>
+          ) : (
+            <div className="agent-detail__roots" aria-label={lang === "zh" ? "已扫描目录" : "Scanned directories"}>
+              <span className="agent-detail__roots-label">{lang === "zh" ? `已扫描 ${agent.roots.length} 个目录` : `${agent.roots.length} scanned directories`}</span>
+              {agent.roots.map((root) => <button key={root.root_id} type="button" className="agent-detail__root-button" title={root.display_path} onClick={() => void openSkillDirectory(root.display_path)}>{root.root_id === "marketplace-skills" ? (lang === "zh" ? "市场技能目录" : "Marketplace skills") : (lang === "zh" ? "主技能目录" : "Primary skills")}</button>)}
+            </div>
+          )}
           <StatusWithDot status={agent.detection_status} />
         </div>
+        <button
+          className="btn console-scan-button agent-detail__refresh-button"
+          disabled={scanning}
+          onClick={() => void handleRefresh()}
+          type="button"
+        >
+          {scanning ? t("agentDetail.refreshing", lang) : t("agentDetail.refresh", lang)}
+        </button>
       </header>
 
       {agent.issues.length > 0 && (
@@ -151,12 +190,33 @@ export default function AgentDetail() {
       )}
 
       <section aria-labelledby="installed-skills-heading" className="agent-detail__skills">
-        <h2 id="installed-skills-heading">{t("agentDetail.installedSkills", lang)} ({agent.skills.length})</h2>
+        <div className="agent-detail__skills-header">
+          <h2 id="installed-skills-heading">{t("agentDetail.installedSkills", lang)} ({agent.skills.length})</h2>
+          <div className="status-filter-group skill-sort-group" role="group" aria-label={lang === "zh" ? "技能排序" : "Skill sort"}>
+            <button
+              className={`filter-btn ${skillSort === "recent" ? "is-active" : ""}`}
+              onClick={() => setSkillSort("recent")}
+              type="button"
+            >
+              {t("skillLibrary.sortRecent", lang)}
+            </button>
+            <button
+              className={`filter-btn ${skillSort === "name" ? "is-active" : ""}`}
+              onClick={() => setSkillSort("name")}
+              type="button"
+            >
+              {t("skillLibrary.sortName", lang)}
+            </button>
+          </div>
+        </div>
         {agent.skills.length > 0 ? (
           <ul className="agent-detail__skill-grid">
-            {agent.skills.map((skill) => {
+            {sortedSkills.map((skill) => {
               const masterSkill = masterSkills.find((m) => m.name.toLowerCase() === skill.name.toLowerCase());
-              const isManaged = Boolean(masterSkill);
+              const isSymlink = skill.is_symlink === true;
+              const isMasterSymlink = Boolean(masterSkill && isSymlink && skill.symlink_target === masterSkill.path);
+              const isLocalCopy = Boolean(masterSkill && !isSymlink);
+              const isExternalSymlink = isSymlink && !isMasterSymlink;
               const isImporting = importingSkill === skill.name;
 
               return (
@@ -169,6 +229,7 @@ export default function AgentDetail() {
                         </svg>
                       </div>
                       <h3 className="agent-detail__skill-name" title={skill.name}>{skill.name}</h3>
+                      <button type="button" className="agent-detail__skill-unlink-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUnlinkConfirm(skill.name); }} aria-label={`Remove ${skill.name} from ${agent.display_name}`} title="Remove from this Agent"><svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
                     </div>
                     <p className="agent-detail__skill-description" title={skill.description || t("agentDetail.noDescription", lang)}>
                       {skill.description || t("agentDetail.noDescription", lang)}
@@ -182,10 +243,17 @@ export default function AgentDetail() {
                         {t("agentDetail.fileCount", lang).replace("{count}", String(skill.file_count))}
                       </span>
 
-                      {isManaged ? (
-                        <span className="agent-detail__skill-managed-badge">
-                          {t("skillCard.managed", lang)}
+                      {isMasterSymlink ? (
+                        <span className="agent-detail__skill-managed-badge">{t("skillCard.masterSymlink", lang)}</span>
+                      ) : isLocalCopy ? (
+                        <span className="agent-detail__skill-source-actions">
+                          <span className="agent-detail__skill-local-copy-badge">{t("skillCard.localCopy", lang)}</span>
+                          <button type="button" className="agent-detail__skill-upload-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setReplaceConfirm(skill.name); }}>
+                            {t("skillCard.replaceSymlink", lang)}
+                          </button>
                         </span>
+                      ) : isExternalSymlink ? (
+                        <span className="agent-detail__skill-external-link-badge">{t("skillCard.externalSymlink", lang)}</span>
                       ) : (
                         <button
                           type="button"
@@ -289,6 +357,8 @@ export default function AgentDetail() {
           </div>
         </div>
       )}
+      {unlinkConfirm && <div className="modal-overlay" onClick={() => !unlinking && setUnlinkConfirm(null)}><div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}><div className="delete-confirm-header"><div><h3>从当前 Agent 删除 Skill</h3><p><code>{unlinkConfirm}</code></p></div></div><div className="delete-confirm-body"><p>这会删除当前 Agent 中的该技能目录或软链接。若为外部软链接，只会删除链接本身，不会删除外部目标；主技能仓库和其他 Agent 不受影响。</p></div><div className="delete-confirm-footer"><button type="button" className="btn secondary" onClick={() => setUnlinkConfirm(null)}>取消</button><button type="button" className="btn danger" disabled={unlinking} onClick={() => void handleUnlink()}>{unlinking ? "删除中" : "确认删除"}</button></div></div></div>}
+      {replaceConfirm && <div className="modal-overlay" onClick={() => !replacing && setReplaceConfirm(null)}><div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}><div className="delete-confirm-header"><div><h3>替换为软链接</h3><p><code>{replaceConfirm}</code></p></div></div><div className="delete-confirm-body"><p>这会永久删除当前 Agent 目录中的本地副本，并替换为指向主技能库的软链接。主技能库和其他 Agent 不受影响。</p></div><div className="delete-confirm-footer"><button type="button" className="btn secondary" disabled={replacing} onClick={() => setReplaceConfirm(null)}>取消</button><button type="button" className="btn danger" disabled={replacing} onClick={() => void handleReplace()}>{replacing ? t("skillCard.replacingSymlink", lang) : t("skillCard.replaceSymlink", lang)}</button></div></div></div>}
     </section>
   );
 }

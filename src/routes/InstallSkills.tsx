@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
@@ -7,14 +8,24 @@ import { getFeaturedSkillsByCategory, type FeaturedSkill } from "../data/feature
 import { parseSkillsShInput } from "../utils/skillsShParser";
 import { SUPPORTED_AGENTS } from "./SkillLibrary";
 import { AgentIdentityMark } from "../components/AgentVisual";
-import { searchGlobalSkills, type GlobalSkillItem } from "../api/globalSkillsSearch";
+import { getOnlineSkillDetailPath, searchGlobalSkills, type GlobalSkillItem } from "../api/globalSkillsSearch";
+import { isDiscoveredAgent } from "../agentDiscovery";
+import { useScanStore } from "../stores/scanStore";
+import { useAgentConfigStore } from "../stores/agentConfigStore";
 
 export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
+type InstallProgress =
+  | { stage: "installing" }
+  | { stage: "distributing"; completed: number; total: number; agentName: string };
 
 export default function InstallSkills() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const lang = useI18nStore((s) => s.lang);
   const { skills: masterSkills, toggleAgentSkill, installSkillToMaster } = useMasterRepoStore();
+  const scanReport = useScanStore((state) => state.report);
+  const disabledAgentIds = useAgentConfigStore((state) => state.disabledAgentIds);
 
   const [toast, setToast] = useState<{
     type: "success" | "error";
@@ -24,7 +35,9 @@ export default function InstallSkills() {
     message?: string;
   } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<InstallTab>("marketplace");
+  const [activeTab, setActiveTab] = useState<InstallTab>(() => (
+    new URLSearchParams(location.search).get("tab") === "online" ? "online" : "marketplace"
+  ));
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
   const [urlInput, setUrlInput] = useState("");
   const [localPath, setLocalPath] = useState("");
@@ -35,6 +48,21 @@ export default function InstallSkills() {
   const [onlineResults, setOnlineResults] = useState<GlobalSkillItem[]>([]);
   const [totalOnlineCount, setTotalOnlineCount] = useState(0);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
+
+  const onlineRegistryLabel = totalOnlineCount > 0
+    ? (lang === "zh"
+      ? `🌐 全网 ${totalOnlineCount.toLocaleString()} 技能库`
+      : `🌐 Global ${totalOnlineCount.toLocaleString()} Registry`)
+    : t("installSkills.tabOnline", lang);
+
+  const fileCountLabel = (fileCount?: number) => lang === "zh"
+    ? `${fileCount ?? 1} 个文件`
+    : `${fileCount ?? 1} file${fileCount === 1 ? "" : "s"}`;
+
+  const installsLabel = (installsText?: string) => {
+    if (!installsText || /indexed on skills\.sh/i.test(installsText)) return null;
+    return installsText.replace(/^⚡\s*/, "");
+  };
 
   useEffect(() => {
     if (activeTab !== "online") return;
@@ -72,6 +100,8 @@ export default function InstallSkills() {
   const [targetSkillSource, setTargetSkillSource] = useState<string>("");
   const [selectedAgents, setSelectedAgents] = useState<Record<string, boolean>>({});
   const [installing, setInstalling] = useState(false);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
+  const openedRequestedInstall = useRef(false);
 
   const installedSkillNames = useMemo(() => {
     return new Set(masterSkills.map((s) => s.name));
@@ -82,8 +112,19 @@ export default function InstallSkills() {
   }, [activeCategory]);
 
   const availableAgents = useMemo(() => {
-    return SUPPORTED_AGENTS;
-  }, []);
+    const scannedAgents = scanReport?.agents ?? [];
+    return SUPPORTED_AGENTS.filter((agent) =>
+      !disabledAgentIds.includes(agent.id)
+      && scannedAgents.some((report) => report.agent_id === agent.id && isDiscoveredAgent(report)),
+    );
+  }, [disabledAgentIds, scanReport]);
+  const selectedAgentCount = availableAgents.filter((agent) => selectedAgents[agent.id]).length;
+  const selectedAgentsLabel = lang === "zh"
+    ? `已选择 ${selectedAgentCount} 个 Agent`
+    : `${selectedAgentCount} selected`;
+  const distributeLabel = lang === "zh"
+    ? `分发至 ${selectedAgentCount} 个 Agent`
+    : `Distribute to ${selectedAgentCount} Agents`;
 
   const handleOpenInstallModal = (skillName: string, source?: string) => {
     setTargetSkillName(skillName);
@@ -95,6 +136,17 @@ export default function InstallSkills() {
     setSelectedAgents(initialSelected);
     setModalOpen(true);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedSkill = params.get("install");
+    if (!requestedSkill || openedRequestedInstall.current) return;
+
+    openedRequestedInstall.current = true;
+    setActiveTab("online");
+    handleOpenInstallModal(requestedSkill, params.get("source") || requestedSkill);
+    navigate("/install?tab=online", { replace: true });
+  }, [location.search, navigate, availableAgents]);
 
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +166,22 @@ export default function InstallSkills() {
     handleOpenInstallModal(folderName, normalized);
   };
 
+  const handleBrowseLocalDirectory = async () => {
+    const selectedPath = await open({ directory: true, multiple: false });
+    if (typeof selectedPath !== "string") return;
+
+    setLocalPath(selectedPath);
+    handleLocalSubmit(selectedPath);
+  };
+
+  const handleBrowseLocalZip = async () => {
+    const selectedPath = await open({ directory: false, multiple: false, filters: [{ name: "ZIP", extensions: ["zip"] }] });
+    if (typeof selectedPath !== "string") return;
+    setLocalPath(selectedPath);
+    const fileName = selectedPath.split(/[/\\]/).pop()?.replace(/\.zip$/i, "") || "local-skill";
+    handleOpenInstallModal(fileName, selectedPath);
+  };
+
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgents((prev) => ({
       ...prev,
@@ -124,14 +192,32 @@ export default function InstallSkills() {
   const handleConfirmInstall = async () => {
     if (!targetSkillName) return;
     const installedSkill = targetSkillName;
-    const targetAgentIds = Object.keys(selectedAgents).filter((id) => selectedAgents[id]);
-    const agentNames = SUPPORTED_AGENTS.filter((a) => targetAgentIds.includes(a.id)).map((a) => a.name);
+    const targetAgentIds = availableAgents
+      .filter((agent) => selectedAgents[agent.id])
+      .map((agent) => agent.id);
+    const agentNames = availableAgents.filter((agent) => targetAgentIds.includes(agent.id)).map((agent) => agent.name);
 
     setInstalling(true);
+    setInstallProgress({ stage: "installing" });
     try {
-      await installSkillToMaster(installedSkill, targetSkillSource || installedSkill);
-      for (const agentId of targetAgentIds) {
+      const installedPath = await installSkillToMaster(installedSkill, targetSkillSource || installedSkill);
+      if (!installedPath) {
+        throw new Error(lang === "zh" ? "无法安装到主技能仓库。" : "Unable to install the skill to the master repository.");
+      }
+      for (const [index, agentId] of targetAgentIds.entries()) {
+        setInstallProgress({
+          stage: "distributing",
+          completed: index,
+          total: targetAgentIds.length,
+          agentName: agentNames[index] ?? agentId,
+        });
         await toggleAgentSkill(agentId, installedSkill, true);
+        setInstallProgress({
+          stage: "distributing",
+          completed: index + 1,
+          total: targetAgentIds.length,
+          agentName: agentNames[index] ?? agentId,
+        });
       }
       setToast({
         type: "success",
@@ -149,6 +235,7 @@ export default function InstallSkills() {
       });
     } finally {
       setInstalling(false);
+      setInstallProgress(null);
       setModalOpen(false);
       setUrlInput("");
       setLocalPath("");
@@ -258,7 +345,7 @@ export default function InstallSkills() {
           className={`install-tab-btn ${activeTab === "online" ? "is-active" : ""}`}
           onClick={() => setActiveTab("online")}
         >
-          {t("installSkills.tabOnline", lang)}
+          {onlineRegistryLabel}
         </button>
         <button
           role="tab"
@@ -311,8 +398,32 @@ export default function InstallSkills() {
           <div className="install-card-grid">
             {featuredSkillsList.map((skill: FeaturedSkill) => {
               const isInstalled = installedSkillNames.has(skill.name);
+              const detailSkill: GlobalSkillItem = {
+                id: skill.ownerRepo ? `${skill.ownerRepo}/${skill.name}` : skill.id,
+                name: skill.name,
+                ownerRepo: skill.ownerRepo || skill.author,
+                description: skill.description[lang] || skill.description.en,
+                installsText: skill.installsText || "",
+                repoUrl: skill.repoUrl,
+                isVerifiedSkillsSh: true,
+                fileCount: skill.fileCount,
+              };
               return (
-                <div className="install-card" key={skill.id} data-testid={`featured-card-${skill.name}`}>
+                <div
+                  className="install-card install-card--interactive"
+                  key={skill.id}
+                  data-testid={`featured-card-${skill.name}`}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={skill.name}
+                  onClick={() => navigate(getOnlineSkillDetailPath(detailSkill, "marketplace"))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(getOnlineSkillDetailPath(detailSkill, "marketplace"));
+                    }
+                  }}
+                >
                   <div className="install-card-header">
                     <div className="install-card-title-group">
                       <h3 className="install-card-title">{skill.name}</h3>
@@ -320,16 +431,16 @@ export default function InstallSkills() {
                         <span className="install-card-owner-repo">{skill.ownerRepo}</span>
                       )}
                     </div>
-                    <span className="skills-sh-badge">skills.sh Verified</span>
+                    <span className="skills-sh-badge">{lang === "zh" ? "来自 skills.sh" : "From skills.sh"}</span>
                   </div>
                   <p className="install-card-desc">
                     {skill.description[lang] || skill.description["en"]}
                   </p>
                   <div className="install-card-footer">
                     <div className="install-card-meta">
-                      <span className="install-card-files">{skill.fileCount} files</span>
-                      {skill.installsText && (
-                        <span className="skills-sh-installs">⚡ {skill.installsText}</span>
+                      <span className="install-card-files">{fileCountLabel(skill.fileCount)}</span>
+                      {installsLabel(skill.installsText) && (
+                        <span className="skills-sh-installs">⚡ {installsLabel(skill.installsText)}</span>
                       )}
                     </div>
                     {isInstalled ? (
@@ -339,7 +450,10 @@ export default function InstallSkills() {
                     ) : (
                       <button
                         className="btn primary install-btn"
-                        onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl);
+                        }}
                         data-testid={`install-btn-${skill.name}`}
                       >
                         {t("nav.install", lang)}
@@ -405,8 +519,23 @@ export default function InstallSkills() {
               <div className="install-card-grid" data-testid="online-card-grid">
                 {onlineResults.map((skill: GlobalSkillItem) => {
                   const isInstalled = installedSkillNames.has(skill.name);
+                  const skillInstallsLabel = installsLabel(skill.installsText);
                   return (
-                    <div className="install-card" key={skill.id} data-testid={`online-card-${skill.name}`}>
+                    <div
+                      className="install-card install-card--interactive"
+                      key={skill.id}
+                      data-testid={`online-card-${skill.name}`}
+                      role="link"
+                      tabIndex={0}
+                      aria-label={skill.name}
+                      onClick={() => navigate(getOnlineSkillDetailPath(skill))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          navigate(getOnlineSkillDetailPath(skill));
+                        }
+                      }}
+                    >
                       <div className="install-card-header">
                         <div className="install-card-title-group">
                           <h3 className="install-card-title">{skill.name}</h3>
@@ -415,7 +544,7 @@ export default function InstallSkills() {
                           )}
                         </div>
                         {skill.isVerifiedSkillsSh ? (
-                          <span className="skills-sh-badge">skills.sh Verified</span>
+                          <span className="skills-sh-badge">{lang === "zh" ? "来自 skills.sh" : "From skills.sh"}</span>
                         ) : (
                           <span className="github-badge">GitHub</span>
                         )}
@@ -423,20 +552,8 @@ export default function InstallSkills() {
                       <p className="install-card-desc">{skill.description}</p>
                       <div className="install-card-footer">
                         <div className="install-card-meta">
-                          {skill.installsText && (
-                            <span className="skills-sh-installs">{skill.installsText}</span>
-                          )}
-                          {(skill.repoUrl || skill.skillsShUrl) && (
-                            <a
-                              href={skill.repoUrl || skill.skillsShUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="muted"
-                              style={{ textDecoration: "none", fontSize: "12px" }}
-                            >
-                              🔗 ↗
-                            </a>
-                          )}
+                          <span className="install-card-files">{fileCountLabel(skill.fileCount)}</span>
+                          {skillInstallsLabel && <span className="skills-sh-installs">⚡ {skillInstallsLabel}</span>}
                         </div>
                         {isInstalled ? (
                           <span className="installed-badge" data-testid={`installed-badge-${skill.name}`}>
@@ -445,7 +562,10 @@ export default function InstallSkills() {
                         ) : (
                           <button
                             className="btn primary install-btn"
-                            onClick={() => handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl || skill.skillsShUrl)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleOpenInstallModal(skill.name, skill.ownerRepo || skill.repoUrl || skill.skillsShUrl);
+                            }}
                             data-testid={`install-btn-${skill.name}`}
                           >
                             {t("nav.install", lang)}
@@ -513,26 +633,19 @@ export default function InstallSkills() {
       {/* Tab 3: Local Import */}
       {activeTab === "local" && (
         <div className="install-tab-content" data-testid="local-content">
-          <div
-            className="install-local-dropzone"
-            onClick={() => {
-              const inputPath = prompt("Enter local folder path:");
-              if (inputPath) {
-                setLocalPath(inputPath);
-                handleLocalSubmit(inputPath);
-              }
-            }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                const folderName = e.dataTransfer.files[0].name || "local-skill";
-                handleLocalSubmit(folderName);
-              }
-            }}
-          >
-            <div className="dropzone-icon">📁</div>
-            <p className="dropzone-text">{t("installSkills.localPrompt", lang)}</p>
+          <div className="install-local-import-panel">
+            <div className="install-local-import-heading">
+              <span className="dropzone-icon">📁</span>
+              <div><h2>{lang === "zh" ? "导入本地技能" : "Import Local Skill"}</h2><p>{t("installSkills.localPrompt", lang)}</p></div>
+            </div>
+            <div className="install-local-import-actions">
+              <button type="button" className="install-local-choice" onClick={() => void handleBrowseLocalDirectory()}>
+                <span className="install-local-choice-icon">📁</span><span><strong>{lang === "zh" ? "选择文件夹" : "Choose Folder"}</strong><small>{lang === "zh" ? "导入一个技能目录" : "Import a skill directory"}</small></span>
+              </button>
+              <button type="button" className="install-local-choice" onClick={() => void handleBrowseLocalZip()}>
+                <span className="install-local-choice-icon">🗜️</span><span><strong>{lang === "zh" ? "选择 ZIP 文件" : "Choose ZIP File"}</strong><small>{lang === "zh" ? "导入已分享的技能包" : "Import a shared skill package"}</small></span>
+              </button>
+            </div>
             {localPath && <code className="dropzone-path">{localPath}</code>}
           </div>
         </div>
@@ -541,34 +654,37 @@ export default function InstallSkills() {
       {/* Target Agent Distribution Modal */}
       {modalOpen && (
         <div className="modal-overlay" data-testid="target-agent-modal">
-          <div className="modal-content install-target-modal">
+          <div className="modal-content install-target-modal" role="dialog" aria-modal="true" aria-labelledby="target-agent-modal-title">
             <div className="modal-header-row">
               <div>
-                <h2>{t("installSkills.targetModalTitle", lang)}</h2>
+                <h2 id="target-agent-modal-title">{t("installSkills.targetModalTitle", lang)}</h2>
                 <p className="modal-subtitle">
                   Target Skill: <code className="target-skill-chip">{targetSkillName}</code>
                 </p>
               </div>
-              <div className="modal-select-actions">
-                <button
-                  type="button"
-                  className="modal-text-btn"
-                  onClick={() => {
-                    const all: Record<string, boolean> = {};
-                    availableAgents.forEach((a) => (all[a.id] = true));
-                    setSelectedAgents(all);
-                  }}
-                >
-                  {lang === "zh" ? "全选" : "Select All"}
-                </button>
-                <span className="divider">•</span>
-                <button
-                  type="button"
-                  className="modal-text-btn"
-                  onClick={() => setSelectedAgents({})}
-                >
-                  {lang === "zh" ? "清空" : "Clear"}
-                </button>
+              <div className="modal-header-actions">
+                <span className="modal-selection-count" aria-live="polite">{selectedAgentsLabel}</span>
+                <div className="modal-select-actions">
+                  <button
+                    type="button"
+                    className="modal-text-btn"
+                    onClick={() => {
+                      const all: Record<string, boolean> = {};
+                      availableAgents.forEach((a) => (all[a.id] = true));
+                      setSelectedAgents(all);
+                    }}
+                  >
+                    {lang === "zh" ? "全选" : "Select All"}
+                  </button>
+                  <span className="divider" aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    className="modal-text-btn"
+                    onClick={() => setSelectedAgents({})}
+                  >
+                    {lang === "zh" ? "清空" : "Clear"}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -576,13 +692,15 @@ export default function InstallSkills() {
               {availableAgents.map((agent) => {
                 const isSelected = Boolean(selectedAgents[agent.id]);
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={agent.id}
                     className={`target-agent-card ${isSelected ? "is-selected" : ""}`}
                     onClick={() => toggleAgentSelection(agent.id)}
+                    disabled={installing}
                     role="checkbox"
                     aria-checked={isSelected}
-                    tabIndex={0}
+                    aria-label={`${agent.name}, ${isSelected ? (lang === "zh" ? "已选择" : "selected") : (lang === "zh" ? "未选择" : "not selected")}`}
                   >
                     <div className="target-agent-card-left">
                       <AgentIdentityMark agentId={agent.id} />
@@ -593,14 +711,46 @@ export default function InstallSkills() {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
-                      )}
-                    </span>
-                  </div>
+                        )}
+                      </span>
+                  </button>
                 );
               })}
             </div>
 
+            {installProgress && (
+              <div className="install-progress-panel" aria-live="polite" data-testid="install-progress">
+                <div className="install-progress-copy">
+                  <span className="install-progress-title">{t("installSkills.progressTitle", lang)}</span>
+                  <span className="install-progress-status">
+                    {installProgress.stage === "installing"
+                      ? t("installSkills.progressInstalling", lang)
+                      : t("installSkills.progressDistributing", lang)
+                          .replace("{completed}", String(installProgress.completed))
+                          .replace("{total}", String(installProgress.total))
+                          .replace("{agent}", installProgress.agentName)}
+                  </span>
+                </div>
+                <div
+                  className={`install-progress-track ${installProgress.stage === "installing" ? "is-indeterminate" : ""}`}
+                  role="progressbar"
+                  aria-label={t("installSkills.progressTitle", lang)}
+                  aria-valuemin={0}
+                  aria-valuemax={installProgress.stage === "distributing" ? installProgress.total : undefined}
+                  aria-valuenow={installProgress.stage === "distributing" ? installProgress.completed : undefined}
+                >
+                  <span
+                    className="install-progress-fill"
+                    style={installProgress.stage === "distributing"
+                      ? { width: `${Math.max(8, (installProgress.completed / installProgress.total) * 100)}%` }
+                      : undefined}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="modal-actions">
+              <span className="modal-actions-summary">{selectedAgentsLabel}</span>
               <button
                 type="button"
                 className="btn secondary"
@@ -611,12 +761,12 @@ export default function InstallSkills() {
               </button>
               <button
                 type="button"
-                className="btn primary confirm-btn"
+                className="btn primary confirm-btn install-distribute-btn"
                 onClick={handleConfirmInstall}
-                disabled={installing}
+                disabled={installing || selectedAgentCount === 0}
                 data-testid="confirm-install-btn"
               >
-                {installing ? "Installing..." : `✨ ${t("installSkills.targetModalConfirm", lang)}`}
+                {installing ? t("installSkills.installing", lang) : distributeLabel}
               </button>
             </div>
           </div>

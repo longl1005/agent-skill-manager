@@ -3,6 +3,7 @@ import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
+import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
 
 function DirectorySkeleton() {
   return <div aria-hidden="true" className="agent-card agent-directory-card agent-directory-skeleton" data-testid="agent-directory-skeleton" />;
@@ -11,6 +12,8 @@ function DirectorySkeleton() {
 export default function Agents() {
   const { report, scanning, error, scan } = useScanStore();
   const lang = useI18nStore((state) => state.lang);
+  const disabledAgentIds = useAgentConfigStore((state) => state.disabledAgentIds);
+  const agentOrder = useAgentConfigStore((state) => state.agentOrder);
 
   if (scanning && report === null) {
     return (
@@ -39,7 +42,7 @@ export default function Agents() {
     );
   }
 
-  const detectedAgents = report?.agents.filter(isDiscoveredAgent) ?? [];
+  const detectedAgents = orderAgents(report?.agents.filter((agent) => isDiscoveredAgent(agent) && !disabledAgentIds.includes(agent.agent_id)) ?? [], agentOrder);
 
   return (
     <section className="page agent-directory">
@@ -69,6 +72,7 @@ export default function Agents() {
           <p>{t("agents.emptyDesc", lang)}</p>
         </div>
       )}
+
     </section>
   );
 }

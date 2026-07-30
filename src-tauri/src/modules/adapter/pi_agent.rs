@@ -59,7 +59,8 @@ impl AgentAdapter for PiAgentAdapter {
 
         if let Some(custom_path) = ctx.custom_path {
             if !custom_path.as_os_str().is_empty() {
-                let exists = std::fs::metadata(custom_path).is_ok() || std::fs::symlink_metadata(custom_path).is_ok();
+                let exists = std::fs::metadata(custom_path).is_ok()
+                    || std::fs::symlink_metadata(custom_path).is_ok();
                 if exists {
                     return DetectionResult {
                         agent: self.id(),
@@ -83,7 +84,10 @@ impl AgentAdapter for PiAgentAdapter {
                             severity: IssueSeverity::Error,
                             phase: IssuePhase::Detect,
                             path: Some(custom_path.to_path_buf()),
-                            message: format!("Custom path does not exist: {}", custom_path.display()),
+                            message: format!(
+                                "Custom path does not exist: {}",
+                                custom_path.display()
+                            ),
                             recoverable: true,
                         }],
                         observed_at: now,
@@ -123,7 +127,8 @@ impl AgentAdapter for PiAgentAdapter {
 
         let mut roots = Vec::new();
         for path in &candidate_roots {
-            let present = std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
+            let present =
+                std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
             if present {
                 roots.push(SkillRoot {
                     root_id: "user-skills".into(),
