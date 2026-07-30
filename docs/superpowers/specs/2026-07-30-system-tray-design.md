@@ -1,64 +1,68 @@
-# System Tray Design
+# 系统托盘功能设计
 
-## Goal
+## 目标
 
-Add a native system tray experience for Agent Skill Manager on macOS and Windows. Closing the main window hides it to the tray so background work can continue; quitting remains an explicit action from the tray menu.
+为 Agent Skill Manager 增加 macOS 菜单栏与 Windows 系统托盘功能。关闭主窗口时，应用隐藏到托盘并继续在后台运行；只有在托盘中明确选择“退出应用”时，进程才会终止。
 
-## Scope
+## 实现范围
 
-- Enable Tauri 2's `tray-icon` feature and create one Rust-managed tray icon at application startup.
-- Use the current application icon on Windows. Supply a monochrome macOS template icon for the menu bar.
-- Keep the tray icon alive for the full application lifetime.
-- Intercept a main-window close request and hide the window instead of terminating the process.
+- 启用 Tauri 2 的 `tray-icon` 能力，在应用启动时由 Rust 创建并管理唯一的托盘图标。
+- Windows 使用现有应用彩色图标；macOS 额外提供单色模板图标，以符合菜单栏图标规范。
+- 托盘图标在应用生命周期内保持有效。
+- 拦截主窗口关闭请求：隐藏窗口，不退出应用。
 
-## Tray interactions
+## 托盘交互
 
-### Mouse behavior
+### 鼠标行为
 
-- Left click: show and focus the main window. If visible, hide it.
-- Right click: open the native tray menu.
+- 左键点击：显示并聚焦主窗口；窗口已显示时则隐藏窗口。
+- 右键点击：显示原生托盘菜单。
 
-### Menu
+### 菜单项
 
-1. **显示 / 隐藏主窗口** — toggles main-window visibility and focuses it when shown.
-2. **立即刷新** — emits a frontend event. The frontend runs the existing Agent scan and master-skill repository refresh, whether the window is visible or hidden.
-3. **打开主技能仓库** — shows and focuses the main window, then emits a navigation event that routes to `/library`.
-4. **退出应用** — performs an explicit app exit. This is the only close path that terminates the background process.
+1. **显示 / 隐藏主窗口**：切换主窗口可见性；显示时自动聚焦。
+2. **立即刷新**：向前端发送刷新事件；无论主窗口是否隐藏，均执行 Agent 扫描与主技能仓库刷新。
+3. **打开主技能仓库**：显示并聚焦主窗口，然后跳转到“主技能仓库”页面。
+4. **退出应用**：显式结束应用进程；这是唯一会真正退出后台进程的操作。
 
-Menu labels are localized from the selected application language. The initial tray menu uses Chinese, and a language change updates menu item labels without recreating the tray icon.
+菜单文案随应用语言切换而更新。首次创建菜单时使用当前界面语言；用户变更语言后，仅更新菜单文本，不重建托盘图标。
 
-## Architecture and data flow
+## 架构与数据流
 
 ```text
-Native tray menu / click
+原生托盘菜单 / 图标点击
           |
-          +-- show/hide window: Rust Window API
+          +-- 显示或隐藏窗口：Rust Window API
           |
-          +-- refresh: emit "tray:refresh" --> scanStore.scan + masterRepoStore.fetchMasterSkills
+          +-- 立即刷新：发送 "tray:refresh"
+          |       --> scanStore.scan()
+          |       --> masterRepoStore.fetchMasterSkills()
           |
-          +-- open library: show/focus --> emit "tray:open-library" --> HashRouter /library
+          +-- 打开主技能仓库：显示并聚焦窗口
+          |       --> 发送 "tray:open-library"
+          |       --> HashRouter 跳转至 /library
           |
-          +-- quit: app.exit(0)
+          +-- 退出应用：app.exit(0)
 ```
 
-- Rust owns native menu creation, click handling, icon lifecycle, and window-close interception.
-- React owns route navigation and reuses the existing stores for scanning and master repository data.
-- A small command updates localized menu labels when the frontend language changes.
+- Rust 负责原生菜单、鼠标事件、图标生命周期及窗口关闭拦截。
+- React 负责页面跳转，并复用已有 Store 完成扫描与主技能仓库刷新。
+- 前端通过一个轻量命令，在语言切换时更新 Rust 菜单文案。
 
-## Error handling
+## 异常处理
 
-- A failed refresh preserves the current visible data and uses existing store error states; it does not close or disable the tray.
-- Missing main window is ignored safely by tray handlers.
-- If tray setup fails during startup, application launch fails with the Tauri error rather than silently running without the requested background controls.
+- 刷新失败时保留当前界面数据，并沿用现有 Store 的错误状态；托盘与后台进程继续可用。
+- 找不到主窗口时，托盘事件安全忽略，不导致应用崩溃。
+- 托盘初始化失败时，应用启动直接返回 Tauri 错误，不静默降级为无托盘模式。
 
-## Testing
+## 测试方案
 
-- Rust unit tests cover menu-event routing decisions independently from platform UI.
-- Frontend tests verify tray refresh invokes both existing store refresh functions and tray navigation routes to `/library`.
-- Manual macOS and Windows checks verify close-to-tray, left-click restoration, native right-click menu, refresh behavior, library navigation, and explicit exit.
+- Rust 单元测试：验证菜单事件到窗口操作、刷新事件与退出事件的路由。
+- 前端测试：验证 `tray:refresh` 会调用已有的 Agent 扫描和主仓库刷新；验证 `tray:open-library` 会跳转至 `/library`。
+- macOS 与 Windows 手工验证：关闭隐藏、左键恢复、右键原生菜单、刷新、打开主技能仓库及显式退出。
 
-## Non-goals
+## 非目标
 
-- No background scheduler or periodic sync is introduced.
-- No Linux tray behavior is included in this scope.
-- No notification-center alerts are added.
+- 不增加后台定时任务或周期性同步。
+- 不包含 Linux 托盘适配。
+- 不增加系统通知中心提醒。
