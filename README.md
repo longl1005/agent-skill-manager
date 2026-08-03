@@ -12,14 +12,14 @@ Agent Skill Manager (ASM) is a Tauri desktop application for discovering AI-agen
 - Import a local Agent Skill into the master library, resolve import conflicts, and redirect that Agent to the master copy.
 - Install a Skill into the master library from a local directory, ZIP archive, or Git repository source; distribute it to selected Agents with symlinks.
 - Export a master Skill as a ZIP archive, open its local directory, and remove the master Skill together with only ASM-managed links that point to it.
-- Review scan history and configure language, appearance, Agent visibility/order, and custom Skill paths.
+- Configure language, appearance, and the visibility, order, and custom Skill paths of detected Agents.
 
 ## Quick start
 
 ### Prerequisites
 
 - Rust 1.77 or newer
-- Node.js 20 or newer
+- Node.js 22 or newer
 - pnpm 9 or newer
 - A supported desktop environment for Tauri 2. Linux users also need the [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/).
 
@@ -34,7 +34,7 @@ The development command starts the Vite frontend and the Tauri desktop window.
 
 ## Workflow
 
-1. Start ASM. It scans the supported Agent Skill locations, plus any custom paths you configure.
+1. Start ASM. It scans the supported Agent Skill locations, plus custom paths configured for detected Agents.
 2. Review discovered Skills by Agent or in the Agent Matrix.
 3. Import an existing Agent Skill into the master library, or install a new one from a local folder, ZIP archive, or Git source.
 4. In the master library, link a Skill to one or more detected Agents. ASM creates symlinks in their Skill directories.
@@ -44,11 +44,11 @@ The development command starts the Vite frontend and the Tauri desktop window.
 
 ASM currently registers adapters for these Agents: Claude Code, Cline, CodeBuddy, GitHub Copilot, Droid, Qoder, Qwen Code, Hermes Agent, OpenClaw, WorkBuddy, Kimi Code CLI, Augment, Roo Code, Windsurf, Codex, Antigravity, Pi Agent, Oh My Pi (OPM), Grok, Kiro CLI, TRAE, TRAE CN, Open Code, and Cursor.
 
-Detection is based on each Agent's local Skill directory. An Agent without an available configured directory remains unavailable until its path exists or you set a custom path.
+Detection is based on each Agent's local Skill directory. You can configure a custom Skill path for a detected Agent in Settings.
 
 ## Safety and privacy
 
-ASM manages Skills on the local filesystem. The default master library is `~/.asm/skills`; you can configure a different master or Agent Skill path in Settings.
+ASM manages Skills on the local filesystem. The master library is stored at `~/.asm/skills`.
 
 - Importing an external Skill symlink copies its target into `~/.asm/skills` and redirects only the current Agent symlink. The external target remains unchanged.
 - Deleting a master Skill removes the master copy and only ASM-managed links that target that master copy. It does not remove unrelated Agent Skills or external symlink targets.
