@@ -582,7 +582,7 @@ pub fn delete_master_skill(
     for &agent_id in ALL_AGENT_IDS {
         if let Some(agent_dir) = get_agent_skills_dir(agent_id, custom_paths) {
             let symlink_path = agent_dir.join(skill_name);
-            if symlink_path.exists() || fs::symlink_metadata(&symlink_path).is_ok() {
+            if is_valid_symlink_to(&symlink_path, &master_skill_path) {
                 remove_skill_symlink(&symlink_path)?;
                 removed_agents.push(agent_id.to_string());
 
@@ -931,6 +931,22 @@ pub fn import_skill_to_master_with_mode(
 
     if is_valid_symlink_to(&source_path, &master_skill_path) {
         return Ok(ImportResult::Success);
+    }
+
+    let source_is_external_symlink = fs::symlink_metadata(&source_path)
+        .map(|metadata| metadata.file_type().is_symlink())
+        .unwrap_or(false);
+    if source_is_external_symlink {
+        let external_target = fs::canonicalize(&source_path)?;
+        if !external_target.is_dir() || !external_target.join("SKILL.md").is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "External symlink target for '{}' must be a Skill directory containing SKILL.md",
+                    skill_name
+                ),
+            ));
+        }
     }
 
     match mode {
@@ -1284,6 +1300,102 @@ mod tests {
         let master_skill_path = master_dir.join("imported-skill");
         assert!(master_skill_path.exists());
         assert!(is_valid_symlink_to(&source_skill, &master_skill_path));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn deleting_master_skill_preserves_same_named_external_agent_symlink() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let claude_dir = tmp.join("claude_skills");
+        let skill_name = "delete-external-only";
+        let master_skill = master_dir.join(skill_name);
+        let external_skill = tmp.join("external-skill");
+        fs::create_dir_all(&master_skill).unwrap();
+        fs::write(master_skill.join("SKILL.md"), "# Master skill").unwrap();
+        fs::create_dir_all(&external_skill).unwrap();
+        fs::write(external_skill.join("SKILL.md"), "# External skill").unwrap();
+        fs::create_dir_all(&claude_dir).unwrap();
+        let agent_link = claude_dir.join(skill_name);
+        std::os::unix::fs::symlink(&external_skill, &agent_link).unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+
+        let removed_agents = delete_master_skill(skill_name, Some(&custom_paths)).unwrap();
+
+        assert!(removed_agents.is_empty());
+        assert!(!master_skill.exists());
+        assert!(agent_link.exists());
+        assert_eq!(fs::read_to_string(external_skill.join("SKILL.md")).unwrap(), "# External skill");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn import_external_symlink_requires_a_skill_manifest() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let claude_dir = tmp.join("claude_skills");
+        let external_target = tmp.join("external-skill");
+        fs::create_dir_all(&external_target).unwrap();
+        fs::write(external_target.join("notes.md"), "not a skill").unwrap();
+        fs::create_dir_all(&claude_dir).unwrap();
+        std::os::unix::fs::symlink(&external_target, claude_dir.join("external-skill")).unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+
+        assert!(import_skill_to_master(
+            "claude-code",
+            "external-skill",
+            Some(&custom_paths),
+        )
+        .is_err());
+        assert!(external_target.exists());
+        assert!(!master_dir.join("external-skill").exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn import_external_symlink_copies_to_master_and_preserves_external_target() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let claude_dir = tmp.join("claude_skills");
+        let external_target = tmp.join("external-skill");
+        fs::create_dir_all(&external_target).unwrap();
+        fs::write(external_target.join("SKILL.md"), "# External skill").unwrap();
+        fs::write(external_target.join("reference.md"), "keep this external copy").unwrap();
+        fs::create_dir_all(&claude_dir).unwrap();
+        let source_link = claude_dir.join("external-skill");
+        std::os::unix::fs::symlink(&external_target, &source_link).unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert("claude-code".to_string(), claude_dir.to_string_lossy().to_string());
+
+        assert_eq!(
+            import_skill_to_master_with_mode(
+                "claude-code",
+                "external-skill",
+                ImportMode::Auto,
+                Some(&custom_paths),
+            )
+            .unwrap(),
+            ImportResult::Success,
+        );
+
+        let master_skill = master_dir.join("external-skill");
+        assert_eq!(fs::read_to_string(master_skill.join("reference.md")).unwrap(), "keep this external copy");
+        assert!(is_valid_symlink_to(&source_link, &master_skill));
+        assert_eq!(fs::read_to_string(external_target.join("reference.md")).unwrap(), "keep this external copy");
 
         let _ = fs::remove_dir_all(&tmp);
     }

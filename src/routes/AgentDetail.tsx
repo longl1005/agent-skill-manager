@@ -47,6 +47,7 @@ export default function AgentDetail() {
     incomingFp: string;
   } | null>(null);
   const [renameInput, setRenameInput] = useState<string>("");
+  const [externalImportConfirm, setExternalImportConfirm] = useState<string | null>(null);
   const [unlinkConfirm, setUnlinkConfirm] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState(false);
   const [replaceConfirm, setReplaceConfirm] = useState<string | null>(null);
@@ -66,9 +67,7 @@ export default function AgentDetail() {
     });
   }, [agent?.skills, skillSort]);
 
-  const handleImport = async (e: React.MouseEvent, skillName: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const importSkill = async (skillName: string) => {
     if (!agent) return;
     setImportingSkill(skillName);
     try {
@@ -253,13 +252,24 @@ export default function AgentDetail() {
                           </button>
                         </span>
                       ) : isExternalSymlink ? (
-                        <span className="agent-detail__skill-external-link-badge">{t("skillCard.externalSymlink", lang)}</span>
+                        <span className="agent-detail__skill-source-actions">
+                          <span className="agent-detail__skill-external-link-badge">{t("skillCard.externalSymlink", lang)}</span>
+                          <button
+                            type="button"
+                            className="agent-detail__skill-external-import-btn--compact"
+                            disabled={isImporting}
+                            aria-label={t("skillCard.upload", lang)}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExternalImportConfirm(skill.name); }}
+                          >
+                            {isImporting ? t("skillCard.uploading", lang) : lang === "zh" ? "导入" : "Import"}
+                          </button>
+                        </span>
                       ) : (
                         <button
                           type="button"
                           className="agent-detail__skill-upload-btn"
                           disabled={isImporting}
-                          onClick={(e) => handleImport(e, skill.name)}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void importSkill(skill.name); }}
                           title="Import this skill to ~/.asm/skills"
                         >
                           <svg aria-hidden="true" fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -353,6 +363,25 @@ export default function AgentDetail() {
               <button type="button" className="conflict-cancel-btn" onClick={() => setConflictData(null)}>
                 取消 / Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {externalImportConfirm && (
+        <div className="modal-overlay" onClick={() => setExternalImportConfirm(null)}>
+          <div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}>
+            <div className="delete-confirm-header">
+              <div>
+                <h3>{lang === "zh" ? "导入外部软链接 Skill" : "Import external symlink"}</h3>
+                <p><code>{externalImportConfirm}</code></p>
+              </div>
+            </div>
+            <div className="delete-confirm-body">
+              <p>{lang === "zh" ? "将把外部目标的 Skill 复制到主技能库，并把当前 Agent 的软链接改为指向主技能库。外部目标不会被删除或修改。" : "The external target will not be deleted or modified. Its Skill will be copied into the master library, then this Agent's symlink will point to the master copy."}</p>
+            </div>
+            <div className="delete-confirm-footer">
+              <button type="button" className="btn secondary" onClick={() => setExternalImportConfirm(null)}>{lang === "zh" ? "取消" : "Cancel"}</button>
+              <button type="button" className="btn" onClick={() => { const skillName = externalImportConfirm; setExternalImportConfirm(null); void importSkill(skillName); }}>{lang === "zh" ? "确认导入" : "Import to Master"}</button>
             </div>
           </div>
         </div>

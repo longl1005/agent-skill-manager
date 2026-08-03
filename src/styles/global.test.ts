@@ -15,3 +15,9 @@ describe("settings layout", () => {
     expect(styles).toContain(".settings-page {\n  width: 100%;\n}");
   });
 });
+
+describe("external Skill actions", () => {
+  it("keeps the compact master-library import control beside the external-link badge", () => {
+    expect(styles).toContain(".agent-detail__skill-external-import-btn--compact");
+  });
+});

@@ -94,7 +94,7 @@ describe("AgentDetail", () => {
     expect(screen.getByText(/永久删除/)).toBeVisible();
   });
 
-  it("shows an external symlink with a remove action", () => {
+  it("requires confirmation before importing an external symlink into the master library", () => {
     useScanStore.setState({
       report: {
         ...reportFixture,
@@ -112,6 +112,8 @@ describe("AgentDetail", () => {
 
     expect(screen.getByText("External symlink")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Replace with symlink" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Import to Master" }));
+    expect(screen.getByText(/external target will not be deleted/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Remove frontend-design from Claude Code" })).toBeVisible();
   });
 
