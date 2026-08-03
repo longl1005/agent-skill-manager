@@ -151,6 +151,7 @@ dist/
 # Local IDE and assistant-session artifacts
 .idea/
 .superpowers/
+docs/superpowers/
 
 # Local Rust dependency resolution state
 src-tauri/Cargo.lock
