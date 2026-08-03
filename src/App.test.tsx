@@ -12,6 +12,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 vi.mock("./ipc/commands", () => ({
   setTrayLanguage: vi.fn().mockResolvedValue(undefined),
+  setTrayStatistics: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./stores/scanStore", () => ({
