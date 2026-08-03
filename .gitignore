@@ -152,6 +152,3 @@ dist/
 .idea/
 .superpowers/
 docs/superpowers/
-
-# Local Rust dependency resolution state
-src-tauri/Cargo.lock
