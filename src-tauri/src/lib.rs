@@ -40,9 +40,14 @@ pub fn run() {
             commands::get_db_summary,
             commands::get_activity_logs
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            use tauri::Manager;
             #[cfg(any(target_os = "macos", target_os = "windows"))]
-            tray::setup(_app)?;
+            tray::setup(app)?;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

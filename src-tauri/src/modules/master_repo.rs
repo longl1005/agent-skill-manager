@@ -150,6 +150,70 @@ pub fn create_skill_symlink(
     {
         std::os::unix::fs::symlink(master_skill_path, target_symlink)?;
     }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::{symlink_dir, symlink_file};
+
+        if master_skill_path.is_dir() {
+            match symlink_dir(master_skill_path, target_symlink) {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    if e.raw_os_error() == Some(1314) {
+                        // ERROR_PRIVILEGE_NOT_HELD - try junction instead
+                        create_junction(master_skill_path, target_symlink)?;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            symlink_file(master_skill_path, target_symlink)?;
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        if master_skill_path.is_dir() {
+            copy_dir_recursive(master_skill_path, target_symlink)?;
+        } else {
+            fs::copy(master_skill_path, target_symlink)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn create_junction(source: &Path, junction: &Path) -> std::io::Result<()> {
+    // Use Windows junction (directory symlink that doesn't require admin)
+    // Implemented via symlink_dir with specific flags
+    use std::process::Command;
+    let output = Command::new("cmd")
+        .args(["/C", "mklink", "/J", &junction.to_string_lossy(), &source.to_string_lossy()])
+        .output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "Failed to create junction: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ))
+    }
+}
+
+#[cfg(not(unix))]
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
     Ok(())
 }
 
@@ -167,6 +231,20 @@ pub fn is_valid_symlink_to(target_symlink: &Path, master_path: &Path) -> bool {
         Ok(m) => m,
         Err(_) => return false,
     };
+    // On Windows, junctions don't report as symlinks but canonicalize still works
+    #[cfg(windows)]
+    {
+        if !metadata.file_type().is_symlink() {
+            // Check via canonicalization for junctions on Windows
+            if let (Ok(canon_target), Ok(canon_master)) =
+                (fs::canonicalize(target_symlink), fs::canonicalize(master_path))
+            {
+                return canon_target == canon_master;
+            }
+            return false;
+        }
+    }
+    #[cfg(not(windows))]
     if !metadata.file_type().is_symlink() {
         return false;
     }
@@ -175,10 +253,9 @@ pub fn is_valid_symlink_to(target_symlink: &Path, master_path: &Path) -> bool {
             return true;
         }
     }
-    if let (Ok(canon_target), Ok(canon_master)) = (
-        fs::canonicalize(target_symlink),
-        fs::canonicalize(master_path),
-    ) {
+    if let (Ok(canon_target), Ok(canon_master)) =
+        (fs::canonicalize(target_symlink), fs::canonicalize(master_path))
+    {
         if canon_target == canon_master {
             return true;
         }

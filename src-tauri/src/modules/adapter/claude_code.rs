@@ -121,11 +121,34 @@ impl AgentAdapter for ClaudeCodeAdapter {
             }
         };
 
-        let user_root = home.join(".claude").join("skills");
+        let claude_dir = home.join(".claude");
+        let user_root = claude_dir.join("skills");
+        let claude_dir_present = std::fs::symlink_metadata(&claude_dir)
+            .map(|m| m.file_type().is_dir())
+            .unwrap_or(false);
         let user_present = std::fs::symlink_metadata(&user_root)
             .map(|m| m.file_type().is_dir())
             .unwrap_or(false);
 
+        if !claude_dir_present {
+            // App not installed
+            return DetectionResult {
+                agent: self.id(),
+                status: DetectionStatus::Unavailable,
+                roots: vec![],
+                issues: vec![ScanIssue {
+                    code: "NO_SKILLS_ROOTS".into(),
+                    severity: IssueSeverity::Info,
+                    phase: IssuePhase::Detect,
+                    path: None,
+                    message: "no Claude Code Skills roots found".into(),
+                    recoverable: true,
+                }],
+                observed_at: now,
+            };
+        }
+
+        // App config directory exists - app is installed
         let mut roots = Vec::new();
         if user_present {
             roots.push(SkillRoot {
@@ -139,7 +162,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         let status = if user_present {
             DetectionStatus::Detected
         } else {
-            DetectionStatus::Unavailable
+            DetectionStatus::Detected
         };
 
         let mut issues = Vec::new();

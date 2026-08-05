@@ -114,10 +114,27 @@ pub(crate) fn detect(
         };
     }
 
-    let root = ctx.platform.home_dir.join(dir).join("skills");
-    if exists(&root) {
-        found(agent.clone(), root, RootScope::User, observed_at)
+    let base_dir = ctx.platform.home_dir.join(dir);
+    let root = base_dir.join("skills");
+    let base_dir_present = exists(&base_dir);
+    let skills_present = exists(&root);
+
+    if base_dir_present {
+        // App config directory exists - app is installed
+        if skills_present {
+            found(agent.clone(), root, RootScope::User, observed_at)
+        } else {
+            // App installed but no skills directory - still detected but with no roots
+            DetectionResult {
+                agent: agent.clone(),
+                status: DetectionStatus::Detected,
+                roots: vec![],
+                issues: vec![],
+                observed_at,
+            }
+        }
     } else {
+        // App not installed
         DetectionResult {
             agent: agent.clone(),
             status: DetectionStatus::Unavailable,

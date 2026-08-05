@@ -4,21 +4,21 @@
   "version": "0.1.0",
   "identifier": "com.agentskillmanager.app",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1421",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Agent Skill Manager",
+        "visible": true,
         "width": 1280,
         "height": 800,
         "minWidth": 960,
-        "minHeight": 600,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "minHeight": 600
       }
     ],
     "security": {
