@@ -6,6 +6,7 @@ import { useScanStore } from "../stores/scanStore";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useThemeStore, type ThemeMode } from "../stores/themeStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
+import { useUpdateStore } from "../stores/updateStore";
 import { migrateAgentSkillsDir, resetAgentSkillsDir } from "../ipc/commands";
 import { t, type Language, type TranslationKey } from "../locales/dict";
 
@@ -92,6 +93,8 @@ export default function Settings() {
   const unlinkAllAgentSkills = useMasterRepoStore((state) => state.unlinkAllAgentSkills);
   const scan = useScanStore((state) => state.scan);
   const report = useScanStore((state) => state.report);
+  const checkForUpdates = useUpdateStore((state) => state.checkForUpdates);
+  const updateStatus = useUpdateStore((state) => state.status);
 
   // Local state for path inputs
   const [inputPaths, setInputPaths] = useState<Record<string, string>>(() => ({
@@ -306,6 +309,20 @@ export default function Settings() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="settings-section" style={{ marginTop: 32 }}>
+        <div className="settings-section__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h2 className="settings-section__title">{t("settings.update.title", lang)}</h2>
+            <p className="settings-section__desc">{t("settings.update.desc", lang)}</p>
+          </div>
+          <button type="button" className="settings-reset-all-btn" onClick={() => void checkForUpdates(false)} disabled={updateStatus === "checking"}>
+            {updateStatus === "checking" ? t("settings.update.checking", lang) : t("settings.update.check", lang)}
+          </button>
+        </div>
+        {updateStatus === "upToDate" && <p className="settings-section__desc">{t("settings.update.upToDate", lang)}</p>}
+        {updateStatus === "error" && <p className="settings-agent-toggle-error" role="alert">{t("settings.update.checkFailed", lang)}</p>}
       </div>
 
       <div className="settings-section" style={{ marginTop: 32 }}>

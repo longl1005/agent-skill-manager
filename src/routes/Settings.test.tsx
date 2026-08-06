@@ -67,6 +67,11 @@ describe("Settings route & i18n / Theme Switcher", () => {
     expect(screen.getByText("Agent Skills Directory Configurations")).toBeInTheDocument();
   });
 
+  it("renders a manual update-check control", () => {
+    render(<Settings />);
+    expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
+  });
+
   it("keeps undetected Agents collapsed and read-only until they are detected", () => {
     render(<Settings />);
 
