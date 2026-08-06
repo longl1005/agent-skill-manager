@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import SkillLibrary from "./SkillLibrary";
@@ -152,6 +152,36 @@ describe("SkillLibrary Route", () => {
     expect(toggleAgentSkillsBatchMock).toHaveBeenCalledWith(
       ["claude-code", "codex"], "code-analyzer", true,
     );
+  });
+
+  it("shows localized tips for every master-skill icon action", () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    const card = screen.getByTestId("skill-card-web-search-pro");
+    const [linkAll, openFolder, exportSkill, deleteSkill] = within(card).getAllByRole("button").slice(0, 4);
+
+    fireEvent.focus(linkAll);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Link all Agents");
+    fireEvent.blur(linkAll);
+    fireEvent.focus(openFolder);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Open Folder");
+    fireEvent.blur(openFolder);
+    fireEvent.focus(exportSkill);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Export skill");
+    fireEvent.blur(exportSkill);
+    fireEvent.focus(deleteSkill);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Delete skill");
+  });
+
+  it("shows Chinese tooltip copy when Chinese is active", () => {
+    useI18nStore.setState({ lang: "zh" });
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    const card = screen.getByTestId("skill-card-web-search-pro");
+    const [linkAll] = within(card).getAllByRole("button");
+    fireEvent.focus(linkAll);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("关联全部 Agent");
   });
 
   it("filters skills by search query", () => {

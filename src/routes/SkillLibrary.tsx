@@ -4,6 +4,7 @@ import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { t } from "../locales/dict";
 import { AgentIdentityMark } from "../components/AgentVisual";
+import { Tooltip } from "../components/Tooltip";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
 import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
@@ -236,51 +237,58 @@ export default function SkillLibrary() {
                       const allLinked = supportedAgents.length > 0 && linkedCount === supportedAgents.length;
                       const partiallyLinked = linkedCount > 0 && !allLinked;
                       const batchBusy = batchTogglingSkill === skill.name;
-                      return <button className={`copy-path-btn skill-link-all-btn ${partiallyLinked ? "is-partial" : ""}`} type="button" disabled={batchBusy || supportedAgents.length === 0} onClick={(event) => { event.stopPropagation(); void handleToggleAllAgents(skill.name, !allLinked); }} title={allLinked ? (lang === "zh" ? "取消关联全部 Agent" : "Unlink all Agents") : (lang === "zh" ? "关联全部 Agent" : "Link all Agents")} aria-label={allLinked ? `Unlink all Agents for ${skill.name}` : `Link all Agents for ${skill.name}`}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" />{allLinked ? <path d="m7 12 3 3 7-7" /> : partiallyLinked ? <path d="M8 12h8" /> : null}</svg>
-                      </button>;
+                      return (
+                        <Tooltip content={t(allLinked ? "skillLibrary.unlinkAllAgents" : "skillLibrary.linkAllAgents", lang)}>
+                          <button className={`copy-path-btn skill-link-all-btn ${partiallyLinked ? "is-partial" : ""}`} type="button" disabled={batchBusy || supportedAgents.length === 0} onClick={(event) => { event.stopPropagation(); void handleToggleAllAgents(skill.name, !allLinked); }} aria-label={allLinked ? `Unlink all Agents for ${skill.name}` : `Link all Agents for ${skill.name}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" />{allLinked ? <path d="m7 12 3 3 7-7" /> : partiallyLinked ? <path d="M8 12h8" /> : null}</svg>
+                          </button>
+                        </Tooltip>
+                      );
                     })()}
-                    <button
-                      className="copy-path-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenDirectory(skill.path);
-                      }}
-                      title={t("skillLibrary.openDirectory", lang)}
-                      aria-label={`Open directory for ${skill.name}`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-                      </svg>
-                    </button>
-                    <button
-                      className="copy-path-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleShare(skill.name);
-                      }}
-                      title={lang === "zh" ? "分享技能" : "Share skill"}
-                      aria-label={`Share ${skill.name}`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
-                    </button>
-                    <button
-                      className="delete-skill-btn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDeleteClick(skill.name);
-                      }}
-                      title={lang === "zh" ? "删除技能" : "Delete skill"}
-                      aria-label={`Delete skill ${skill.name}`}
-                      data-testid={`delete-btn-${skill.name}`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
-                      </svg>
-                    </button>
+                    <Tooltip content={t("skillLibrary.openDirectory", lang)}>
+                      <button
+                        className="copy-path-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenDirectory(skill.path);
+                        }}
+                        aria-label={`Open directory for ${skill.name}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                        </svg>
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t("skillLibrary.exportSkill", lang)}>
+                      <button
+                        className="copy-path-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleShare(skill.name);
+                        }}
+                        aria-label={`Share ${skill.name}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t("skillLibrary.deleteSkill", lang)}>
+                      <button
+                        className="delete-skill-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteClick(skill.name);
+                        }}
+                        aria-label={`Delete skill ${skill.name}`}
+                        data-testid={`delete-btn-${skill.name}`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 
