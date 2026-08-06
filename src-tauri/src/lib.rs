@@ -36,6 +36,7 @@ pub fn run() {
             commands::set_agent_config,
             commands::set_agent_sort_order,
             commands::import_to_master,
+            commands::inspect_git_skills,
             commands::install_skill_to_master,
             commands::export_master_skill_zip,
             commands::delete_master_skill,

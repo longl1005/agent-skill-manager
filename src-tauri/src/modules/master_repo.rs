@@ -18,6 +18,13 @@ pub struct MasterSkillReport {
     pub linked_agents: HashMap<String, bool>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct GitSkillCandidate {
+    pub name: String,
+    pub description: String,
+    pub relative_path: String,
+}
+
 pub fn master_repo_dir() -> PathBuf {
     let home = user_home_dir().unwrap_or_else(|| PathBuf::from("/"));
     home.join(".asm").join("skills")
@@ -810,6 +817,82 @@ fn find_skill_dir_in_tree(root: &Path, target_skill: &str) -> Option<PathBuf> {
     None
 }
 
+fn skill_entry_exists(dir: &Path) -> bool {
+    dir.join("SKILL.md").is_file() || dir.join("skill.md").is_file()
+}
+
+pub fn discover_skill_candidates(root: &Path) -> std::io::Result<Vec<GitSkillCandidate>> {
+    let mut candidates = Vec::new();
+    for entry in walkdir::WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name() != ".git")
+    {
+        let entry = entry.map_err(|error| std::io::Error::other(error.to_string()))?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let filename = entry.file_name().to_string_lossy();
+        if !filename.eq_ignore_ascii_case("SKILL.md") {
+            continue;
+        }
+        let skill_dir = entry.path().parent().ok_or_else(|| std::io::Error::other("SKILL.md has no parent directory"))?;
+        let relative_path = skill_dir
+            .strip_prefix(root)
+            .map_err(|error| std::io::Error::other(error.to_string()))?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = fs::read_to_string(entry.path())?;
+        let frontmatter = parse_frontmatter(&text).unwrap_or_default();
+        let directory_name = skill_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("skill")
+            .to_string();
+        candidates.push(GitSkillCandidate {
+            name: frontmatter.name.unwrap_or(directory_name),
+            description: frontmatter.description.unwrap_or_default(),
+            relative_path: if relative_path.is_empty() { ".".to_string() } else { relative_path },
+        });
+    }
+    candidates.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
+    candidates.dedup_by(|left, right| left.relative_path == right.relative_path);
+    Ok(candidates)
+}
+
+pub fn selected_skill_dir(root: &Path, relative_path: &str) -> std::io::Result<PathBuf> {
+    let relative = Path::new(relative_path);
+    if !relative.is_relative() || relative.components().any(|component| matches!(component, std::path::Component::ParentDir)) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Skill path must be a relative path inside the repository"));
+    }
+    let canonical_root = fs::canonicalize(root)?;
+    let selected = fs::canonicalize(root.join(relative))?;
+    if !selected.starts_with(&canonical_root) || !skill_entry_exists(&selected) {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Selected directory is not a Skill inside the repository"));
+    }
+    Ok(selected)
+}
+
+fn clone_git_source(source: &str) -> std::io::Result<PathBuf> {
+    let temp_dir = std::env::temp_dir().join(format!("asm-clone-{}", uuid_simple()));
+    let _ = fs::remove_dir_all(&temp_dir);
+    let status = std::process::Command::new("git")
+        .args(["clone", "--depth", "1", &parse_git_url(source), temp_dir.to_str().unwrap()])
+        .status()?;
+    if !status.success() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err(std::io::Error::other("Unable to clone the Git repository"));
+    }
+    Ok(temp_dir)
+}
+
+pub fn inspect_git_skills(source: &str) -> std::io::Result<Vec<GitSkillCandidate>> {
+    let temp_dir = clone_git_source(source)?;
+    let result = discover_skill_candidates(&temp_dir);
+    let _ = fs::remove_dir_all(temp_dir);
+    result
+}
+
 fn find_first_skill_dir(root: &Path) -> Option<PathBuf> {
     if root.join("SKILL.md").is_file() || root.join("skill.md").is_file() {
         return Some(root.to_path_buf());
@@ -827,6 +910,7 @@ fn find_first_skill_dir(root: &Path) -> Option<PathBuf> {
 pub fn install_skill_to_master(
     skill_name: &str,
     source: Option<&str>,
+    source_subdir: Option<&str>,
     custom_paths: Option<&HashMap<String, String>>,
 ) -> std::io::Result<PathBuf> {
     let master_dir = ensure_master_dir_with_custom(custom_paths)?;
@@ -852,54 +936,39 @@ pub fn install_skill_to_master(
             let _ = fs::remove_dir_all(&target_dir);
         }
 
-        let mut installed = false;
-
-        if let Some(src_str) = source {
+        let installed = if let Some(src_str) = source {
             let src_path = PathBuf::from(src_str);
             if src_path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("zip")) {
                 let (temp_root, skill_dir) = extract_skill_zip(&src_path)?;
                 let copy_result = copy_dir_all(&skill_dir, &target_dir);
                 let _ = fs::remove_dir_all(temp_root);
                 copy_result?;
-                installed = true;
+                true
             } else if src_path.exists() && src_path.is_dir() {
                 let dir_to_copy = find_skill_dir_in_tree(&src_path, skill_name).unwrap_or(src_path);
                 copy_dir_all(&dir_to_copy, &target_dir)?;
-                installed = true;
+                true
             } else {
-                let repo_url = parse_git_url(src_str);
-                let temp_dir = std::env::temp_dir().join(format!("asm-clone-{}", uuid_simple()));
-                let _ = fs::remove_dir_all(&temp_dir);
-
-                let status = std::process::Command::new("git")
-                    .args([
-                        "clone",
-                        "--depth",
-                        "1",
-                        &repo_url,
-                        temp_dir.to_str().unwrap(),
-                    ])
-                    .status();
-
-                if let Ok(st) = status {
-                    if st.success() {
-                        if let Some(skill_dir) = find_skill_dir_in_tree(&temp_dir, skill_name) {
-                            copy_dir_all(&skill_dir, &target_dir)?;
-                            installed = true;
-                        } else if temp_dir.join("SKILL.md").exists()
-                            || temp_dir.join("skill.md").exists()
-                        {
-                            copy_dir_all(&temp_dir, &target_dir)?;
-                            let _ = fs::remove_dir_all(target_dir.join(".git"));
-                            installed = true;
+                let temp_dir = clone_git_source(src_str)?;
+                let result = (|| {
+                    let skill_dir = match source_subdir {
+                        Some(relative_path) => selected_skill_dir(&temp_dir, relative_path)?,
+                        None => {
+                            let candidates = discover_skill_candidates(&temp_dir)?;
+                            match candidates.as_slice() {
+                                [candidate] => selected_skill_dir(&temp_dir, &candidate.relative_path)?,
+                                [] => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Repository does not contain SKILL.md")),
+                                _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Repository contains multiple Skills; select one before installing")),
+                            }
                         }
-                    }
-                }
+                    };
+                    copy_dir_all(&skill_dir, &target_dir)
+                })();
                 let _ = fs::remove_dir_all(&temp_dir);
+                result?;
+                true
             }
-        }
-
-        if !installed {
+        } else {
             fs::create_dir_all(&target_dir)?;
             let desc = format!("Skill '{}'", skill_name);
             let skill_md_content = format!(
@@ -907,6 +976,11 @@ pub fn install_skill_to_master(
                 skill_name, desc, skill_name, desc
             );
             fs::write(target_dir.join("SKILL.md"), skill_md_content)?;
+            true
+        };
+
+        if !installed {
+            return Err(std::io::Error::other("Unable to install the Skill"));
         }
     }
 
@@ -1142,6 +1216,33 @@ mod tests {
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn git_skill_discovery_finds_nested_skill_metadata() {
+        let repo = temp_dir();
+        let skill = repo.join("skills/dashi-ppt");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: dashi-ppt\ndescription: Slides\n---\n# Dashi",
+        )
+        .unwrap();
+
+        let candidates = discover_skill_candidates(&repo).unwrap();
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].name, "dashi-ppt");
+        assert_eq!(candidates[0].description, "Slides");
+        assert_eq!(candidates[0].relative_path, "skills/dashi-ppt");
+        let _ = fs::remove_dir_all(&repo);
+    }
+
+    #[test]
+    fn selected_skill_path_rejects_parent_traversal() {
+        let repo = temp_dir();
+        assert!(selected_skill_dir(&repo, "../outside").is_err());
+        let _ = fs::remove_dir_all(&repo);
     }
 
     #[test]

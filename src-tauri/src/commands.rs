@@ -568,15 +568,24 @@ pub fn import_to_master(
 pub fn install_skill_to_master(
     skill_name: String,
     source: Option<String>,
+    source_subdir: Option<String>,
     custom_paths: Option<std::collections::HashMap<String, String>>,
 ) -> Result<String, String> {
     crate::modules::master_repo::install_skill_to_master(
         &skill_name,
         source.as_deref(),
+        source_subdir.as_deref(),
         custom_paths.as_ref(),
     )
     .map(|path| path.to_string_lossy().into_owned())
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn inspect_git_skills(
+    source: String,
+) -> Result<Vec<crate::modules::master_repo::GitSkillCandidate>, String> {
+    crate::modules::master_repo::inspect_git_skills(&source).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
