@@ -24,6 +24,6 @@ describe("external Skill actions", () => {
 
 describe("Git URL input focus styling", () => {
   it("uses its focused border without the global focus-visible outline", () => {
-    expect(styles).toContain(".install-url-input:focus-visible {\n  outline: none;\n  outline-offset: 0;\n}");
+    expect(styles).toContain("input.install-url-input:focus-visible {\n  outline: none;\n  outline-offset: 0;\n}");
   });
 });
