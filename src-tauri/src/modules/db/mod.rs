@@ -7,6 +7,7 @@ use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DbMasterSkill {
     pub id: i64,
@@ -18,6 +19,7 @@ pub struct DbMasterSkill {
     pub installed_at: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DbAgentSymlink {
     pub id: i64,
@@ -216,6 +218,7 @@ pub fn log_activity(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn get_all_master_skills(conn: &Connection) -> Result<Vec<DbMasterSkill>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, author, repo_url, file_count, installed_at

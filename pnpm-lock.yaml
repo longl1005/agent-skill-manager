@@ -14,6 +14,12 @@ importers:
       '@tauri-apps/plugin-dialog':
         specifier: ~2.7.2
         version: 2.7.2
+      '@tauri-apps/plugin-process':
+        specifier: ^2.3.1
+        version: 2.3.1
+      '@tauri-apps/plugin-updater':
+        specifier: ^2.10.1
+        version: 2.10.1
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -42,6 +48,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@types/node':
+        specifier: ^26.1.2
+        version: 26.1.2
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.31
@@ -50,7 +59,7 @@ importers:
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
         specifier: ^4.3.0
-        version: 4.6.0(vite@5.4.0(@types/node@26.1.1))
+        version: 4.6.0(vite@5.4.0(@types/node@26.1.2))
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
@@ -59,10 +68,10 @@ importers:
         version: 5.8.3
       vite:
         specifier: ^5.4.0
-        version: 5.4.0(@types/node@26.1.1)
+        version: 5.4.0(@types/node@26.1.2)
       vitest:
         specifier: ^2.1.9
-        version: 2.1.9(@types/node@26.1.1)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@26.1.2)(jsdom@25.0.1)
 
 packages:
 
@@ -555,6 +564,12 @@ packages:
   '@tauri-apps/plugin-dialog@2.7.2':
     resolution: {integrity: sha512-pX0IGm1I3I6wc+zeKYcq1GSqogK6okCNX5fOdaNU5ab1AjGS6l1E5wFNjEb7meg7ZFSp0JUs+0jQGQNyOvLrsg==}
 
+  '@tauri-apps/plugin-process@2.3.1':
+    resolution: {integrity: sha512-nCa4fGVaDL/B9ai03VyPOjfAHRHSBz5v6F/ObsB73r/dA3MHHhZtldaDMIc0V/pnUw9ehzr2iEG+XkSEyC0JJA==}
+
+  '@tauri-apps/plugin-updater@2.10.1':
+    resolution: {integrity: sha512-NFYMg+tWOZPJdzE/PpFj2qfqwAWwNS3kXrb1tm1gnBJ9mYzZ4WDRrwy8udzWoAnfGCHLuePNLY1WVCNHnh3eRA==}
+
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
     engines: {node: '>=18'}
@@ -622,8 +637,8 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@26.1.1':
-    resolution: {integrity: sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==}
+  '@types/node@26.1.2':
+    resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -1731,7 +1746,7 @@ snapshots:
     dependencies:
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 26.1.1
+      '@types/node': 26.1.2
       '@types/yargs': 16.0.11
       chalk: 4.1.2
 
@@ -1898,6 +1913,14 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
+  '@tauri-apps/plugin-process@2.3.1':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  '@tauri-apps/plugin-updater@2.10.1':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
   '@testing-library/dom@10.4.1':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -1982,7 +2005,7 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@26.1.1':
+  '@types/node@26.1.2':
     dependencies:
       undici-types: 8.3.0
 
@@ -2009,7 +2032,7 @@ snapshots:
 
   '@ungap/structured-clone@1.3.3': {}
 
-  '@vitejs/plugin-react@4.6.0(vite@5.4.0(@types/node@26.1.1))':
+  '@vitejs/plugin-react@4.6.0(vite@5.4.0(@types/node@26.1.2))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -2017,7 +2040,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.19
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 5.4.0(@types/node@26.1.1)
+      vite: 5.4.0(@types/node@26.1.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -2028,13 +2051,13 @@ snapshots:
       chai: 5.1.2
       tinyrainbow: 1.2.0
 
-  '@vitest/mocker@2.1.9(vite@5.4.0(@types/node@26.1.1))':
+  '@vitest/mocker@2.1.9(vite@5.4.0(@types/node@26.1.2))':
     dependencies:
       '@vitest/spy': 2.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.12
     optionalDependencies:
-      vite: 5.4.0(@types/node@26.1.1)
+      vite: 5.4.0(@types/node@26.1.2)
 
   '@vitest/pretty-format@2.1.9':
     dependencies:
@@ -3065,13 +3088,13 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-node@2.1.9(@types/node@26.1.1):
+  vite-node@2.1.9(@types/node@26.1.2):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3
       es-module-lexer: 1.5.4
       pathe: 1.1.2
-      vite: 5.4.0(@types/node@26.1.1)
+      vite: 5.4.0(@types/node@26.1.2)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -3083,19 +3106,19 @@ snapshots:
       - supports-color
       - terser
 
-  vite@5.4.0(@types/node@26.1.1):
+  vite@5.4.0(@types/node@26.1.2):
     dependencies:
       esbuild: 0.21.3
       postcss: 8.5.20
       rollup: 4.62.2
     optionalDependencies:
-      '@types/node': 26.1.1
+      '@types/node': 26.1.2
       fsevents: 2.3.3
 
-  vitest@2.1.9(@types/node@26.1.1)(jsdom@25.0.1):
+  vitest@2.1.9(@types/node@26.1.2)(jsdom@25.0.1):
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(vite@5.4.0(@types/node@26.1.1))
+      '@vitest/mocker': 2.1.9(vite@5.4.0(@types/node@26.1.2))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9
@@ -3111,11 +3134,11 @@ snapshots:
       tinyexec: 0.3.1
       tinypool: 1.0.1
       tinyrainbow: 1.2.0
-      vite: 5.4.0(@types/node@26.1.1)
-      vite-node: 2.1.9(@types/node@26.1.1)
+      vite: 5.4.0(@types/node@26.1.2)
+      vite-node: 2.1.9(@types/node@26.1.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 26.1.1
+      '@types/node': 26.1.2
       jsdom: 25.0.1
     transitivePeerDependencies:
       - less

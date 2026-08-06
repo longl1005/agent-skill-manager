@@ -210,6 +210,7 @@ fn create_junction(source: &Path, junction: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(not(unix))]
+#[allow(dead_code)]
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -1037,6 +1038,7 @@ pub enum ImportMode {
     RenameNew { new_name: String },
 }
 
+#[allow(dead_code)]
 pub fn import_skill_to_master(
     agent_id: &str,
     skill_name: &str,
