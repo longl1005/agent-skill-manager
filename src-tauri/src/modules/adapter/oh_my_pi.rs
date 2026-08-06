@@ -73,14 +73,29 @@ impl AgentAdapter for OhMyPiAdapter {
             };
         }
 
-        let root = ctx
-            .platform
-            .home_dir
-            .join(".omp")
-            .join("agent")
-            .join("skills");
-        if path_exists(&root) {
-            detected(self.id(), root, RootScope::User, observed_at)
+        let base_dir = ctx.platform.home_dir.join(".omp");
+        let root = base_dir.join("agent").join("skills");
+        let base_present = path_exists(&base_dir);
+        let root_present = path_exists(&root);
+
+        if base_present || root_present {
+            let roots = if root_present {
+                vec![SkillRoot {
+                    root_id: "user-skills".into(),
+                    display_path: root.clone(),
+                    canonical_path: root,
+                    scope: RootScope::User,
+                }]
+            } else {
+                vec![]
+            };
+            DetectionResult {
+                agent: self.id(),
+                status: DetectionStatus::Detected,
+                roots,
+                issues: vec![],
+                observed_at,
+            }
         } else {
             DetectionResult {
                 agent: self.id(),
@@ -91,7 +106,7 @@ impl AgentAdapter for OhMyPiAdapter {
                     severity: IssueSeverity::Info,
                     phase: IssuePhase::Detect,
                     path: None,
-                    message: "no Oh My Pi Skills roots found".into(),
+                    message: "no Oh My Pi (OPM) Skills roots found".into(),
                     recoverable: true,
                 }],
                 observed_at,

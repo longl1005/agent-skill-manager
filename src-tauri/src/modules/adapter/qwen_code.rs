@@ -12,9 +12,67 @@ impl AgentAdapter for QwenCodeAdapter {
     fn capabilities(&self) -> CapabilitySet { CapabilitySet { detect: SupportLevel::Supported, scan: SupportLevel::Supported, compare_content: CompareConfidence::Reliable, watch: SupportLevel::Unsupported, install_planning: SupportLevel::Unsupported, uninstall_planning: SupportLevel::Unsupported, update_planning: SupportLevel::Unsupported, sync_planning: SupportLevel::Unsupported, supported_platforms: vec![Platform::MacOs, Platform::Linux, Platform::Windows], notes: vec!["user-scope $HOME/.qwen/skills".into()] } }
     fn detect(&self, ctx: &DetectContext) -> DetectionResult {
         let now = SystemTime::now();
-        let root = ctx.custom_path.map(|path| path.to_path_buf()).unwrap_or_else(|| { let home = if ctx.platform.home_dir.as_os_str().is_empty() { user_home_dir().unwrap_or_default() } else { ctx.platform.home_dir.clone() }; home.join(".qwen").join("skills") });
-        let exists = std::fs::symlink_metadata(&root).map(|metadata| metadata.file_type().is_dir()).unwrap_or(false);
-        DetectionResult { agent: self.id(), status: if exists { DetectionStatus::Detected } else { DetectionStatus::Unavailable }, roots: if exists { vec![SkillRoot { root_id: if ctx.custom_path.is_some() { "custom-skills".into() } else { "user-skills".into() }, display_path: root.clone(), canonical_path: root, scope: if ctx.custom_path.is_some() { RootScope::Custom } else { RootScope::User } }] } else { vec![] }, issues: vec![], observed_at: now }
+
+        if let Some(custom_path) = ctx.custom_path {
+            if !custom_path.as_os_str().is_empty() {
+                let exists = std::fs::metadata(custom_path).is_ok()
+                    || std::fs::symlink_metadata(custom_path).is_ok();
+                if exists {
+                    return DetectionResult {
+                        agent: self.id(),
+                        status: DetectionStatus::Detected,
+                        roots: vec![SkillRoot {
+                            root_id: "custom-skills".into(),
+                            display_path: custom_path.to_path_buf(),
+                            canonical_path: custom_path.to_path_buf(),
+                            scope: RootScope::Custom,
+                        }],
+                        issues: vec![],
+                        observed_at: now,
+                    };
+                }
+            }
+        }
+
+        let home = if !ctx.platform.home_dir.as_os_str().is_empty() {
+            ctx.platform.home_dir.clone()
+        } else {
+            user_home_dir().unwrap_or_default()
+        };
+
+        let base_dir = home.join(".qwen");
+        let alt_base_dir = home.join(".qwen-code");
+        let root = base_dir.join("skills");
+        let base_present = std::fs::metadata(&base_dir).is_ok()
+            || std::fs::symlink_metadata(&base_dir).is_ok()
+            || std::fs::metadata(&alt_base_dir).is_ok()
+            || std::fs::symlink_metadata(&alt_base_dir).is_ok();
+        let root_present = std::fs::metadata(&root).is_ok() || std::fs::symlink_metadata(&root).is_ok();
+
+        let status = if base_present || root_present {
+            DetectionStatus::Detected
+        } else {
+            DetectionStatus::Unavailable
+        };
+
+        let roots = if root_present {
+            vec![SkillRoot {
+                root_id: "user-skills".into(),
+                display_path: root.clone(),
+                canonical_path: root,
+                scope: RootScope::User,
+            }]
+        } else {
+            vec![]
+        };
+
+        DetectionResult {
+            agent: self.id(),
+            status,
+            roots,
+            issues: vec![],
+            observed_at: now,
+        }
     }
     fn skill_roots(&self, det: &DetectionResult) -> Vec<SkillRoot> { det.roots.clone() }
     fn scan(&self, ctx: &ScanContext) -> ScanResult { let mut result = ClaudeCodeAdapter.scan(ctx); result.agent_id = self.id(); for installation in &mut result.installations { installation.agent_id = self.id(); installation.adapter_id = "qwen-code@1".into(); } result }

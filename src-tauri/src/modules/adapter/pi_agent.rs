@@ -119,6 +119,14 @@ impl AgentAdapter for PiAgentAdapter {
             }
         };
 
+        let base_dirs = [
+            home.join(".pi"),
+            home.join(".pi-agent"),
+        ];
+        let installation_present = base_dirs.iter().any(|d| {
+            std::fs::metadata(d).is_ok() || std::fs::symlink_metadata(d).is_ok()
+        });
+
         let candidate_roots = [
             home.join(".pi").join("agent").join("skills"),
             home.join(".pi").join("skills"),
@@ -140,14 +148,14 @@ impl AgentAdapter for PiAgentAdapter {
             }
         }
 
-        let status = if !roots.is_empty() {
+        let status = if installation_present || !roots.is_empty() {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
         };
 
         let mut issues = Vec::new();
-        if matches!(status, DetectionStatus::Unavailable) {
+        if roots.is_empty() {
             issues.push(ScanIssue {
                 code: "NO_SKILLS_ROOTS".into(),
                 severity: IssueSeverity::Info,

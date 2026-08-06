@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const styles = readFileSync("src/styles/global.css", "utf8");
+const styles = readFileSync("src/styles/global.css", "utf8").replace(/\r\n/g, "\n");
 
 describe("sidebar scrolling", () => {
   it("hides every visual scrollbar for the Agent list", () => {

@@ -155,6 +155,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn fingerprint_skips_symlink() {
         let tmp = tempdir();
         make_skill(&tmp, &[("SKILL.md", "x")]);

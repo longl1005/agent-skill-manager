@@ -119,28 +119,47 @@ impl AgentAdapter for AntigravityAdapter {
             }
         };
 
-        let user_root = home.join(".gemini").join("antigravity").join("skills");
-        let user_present =
-            std::fs::metadata(&user_root).is_ok() || std::fs::symlink_metadata(&user_root).is_ok();
+        let gemini_dir = home.join(".gemini");
+        let antigravity_dir = gemini_dir.join("antigravity");
+        let antigravity_ide_dir = gemini_dir.join("antigravity-ide");
+        let config_dir = gemini_dir.join("config");
+
+        let installation_present = std::fs::metadata(&antigravity_dir).is_ok()
+            || std::fs::symlink_metadata(&antigravity_dir).is_ok()
+            || std::fs::metadata(&antigravity_ide_dir).is_ok()
+            || std::fs::symlink_metadata(&antigravity_ide_dir).is_ok()
+            || std::fs::metadata(&config_dir).is_ok()
+            || std::fs::symlink_metadata(&config_dir).is_ok();
+
+        let candidate_roots = [
+            (antigravity_dir.join("skills"), "user-skills", RootScope::User),
+            (antigravity_dir.join("builtin").join("skills"), "builtin-skills", RootScope::User),
+            (config_dir.join("skills"), "config-skills", RootScope::User),
+            (antigravity_dir.join("global").join("skills"), "global-skills", RootScope::User),
+        ];
 
         let mut roots = Vec::new();
-        if user_present {
-            roots.push(SkillRoot {
-                root_id: "user-skills".into(),
-                display_path: user_root.clone(),
-                canonical_path: user_root,
-                scope: RootScope::User,
-            });
+        for (path, root_id, scope) in &candidate_roots {
+            let present =
+                std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
+            if present {
+                roots.push(SkillRoot {
+                    root_id: (*root_id).to_string(),
+                    display_path: path.clone(),
+                    canonical_path: path.clone(),
+                    scope: *scope,
+                });
+            }
         }
 
-        let status = if user_present {
+        let status = if installation_present || !roots.is_empty() {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
         };
 
         let mut issues = Vec::new();
-        if matches!(status, DetectionStatus::Unavailable) {
+        if roots.is_empty() {
             issues.push(ScanIssue {
                 code: "NO_SKILLS_ROOTS".into(),
                 severity: IssueSeverity::Info,
@@ -436,6 +455,43 @@ mod tests {
         assert_eq!(r.status, DetectionStatus::Detected);
         assert_eq!(r.roots.len(), 1);
         assert_eq!(r.roots[0].scope, RootScope::User);
+    }
+
+    #[test]
+    fn antigravity_detect_builtin_skills() {
+        let tmp = tempdir();
+        let home = tmp.join("home");
+        let builtin_skills = home.join(".gemini/antigravity/builtin/skills");
+        fs::create_dir_all(&builtin_skills).unwrap();
+        let cwd = tmp.join("cwd");
+        fs::create_dir_all(&cwd).unwrap();
+        let ctx = DetectContext {
+            platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
+            custom_path: None,
+        };
+        let r = AntigravityAdapter.detect(&ctx);
+        assert_eq!(r.status, DetectionStatus::Detected);
+        assert_eq!(r.roots.len(), 1);
+        assert_eq!(r.roots[0].root_id, "builtin-skills");
+    }
+
+    #[test]
+    fn antigravity_detect_installed_without_skills() {
+        let tmp = tempdir();
+        let home = tmp.join("home");
+        let ag_dir = home.join(".gemini/antigravity");
+        fs::create_dir_all(&ag_dir).unwrap();
+        let cwd = tmp.join("cwd");
+        fs::create_dir_all(&cwd).unwrap();
+        let ctx = DetectContext {
+            platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
+            custom_path: None,
+        };
+        let r = AntigravityAdapter.detect(&ctx);
+        assert_eq!(r.status, DetectionStatus::Detected);
+        assert_eq!(r.roots.len(), 0);
+        assert_eq!(r.issues.len(), 1);
+        assert_eq!(r.issues[0].code, "NO_SKILLS_ROOTS");
     }
 
     #[test]

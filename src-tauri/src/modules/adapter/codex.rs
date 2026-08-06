@@ -119,7 +119,10 @@ impl AgentAdapter for CodexAdapter {
             }
         };
 
-        let user_root = home.join(".codex").join("skills");
+        let base_dir = home.join(".codex");
+        let user_root = base_dir.join("skills");
+        let base_present =
+            std::fs::metadata(&base_dir).is_ok() || std::fs::symlink_metadata(&base_dir).is_ok();
         let user_present =
             std::fs::metadata(&user_root).is_ok() || std::fs::symlink_metadata(&user_root).is_ok();
 
@@ -133,14 +136,14 @@ impl AgentAdapter for CodexAdapter {
             });
         }
 
-        let status = if user_present {
+        let status = if base_present || user_present {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
         };
 
         let mut issues = Vec::new();
-        if matches!(status, DetectionStatus::Unavailable) {
+        if roots.is_empty() {
             issues.push(ScanIssue {
                 code: "NO_SKILLS_ROOTS".into(),
                 severity: IssueSeverity::Info,

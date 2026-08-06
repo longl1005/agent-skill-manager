@@ -119,6 +119,15 @@ impl AgentAdapter for OpenCodeAdapter {
             }
         };
 
+        let base_dirs = [
+            home.join(".config").join("opencode"),
+            home.join(".opencode"),
+            home.join(".open-code"),
+        ];
+        let installation_present = base_dirs.iter().any(|d| {
+            std::fs::metadata(d).is_ok() || std::fs::symlink_metadata(d).is_ok()
+        });
+
         let candidate_roots = [
             home.join(".config").join("opencode").join("skills"),
             home.join(".opencode").join("skills"),
@@ -140,14 +149,14 @@ impl AgentAdapter for OpenCodeAdapter {
             }
         }
 
-        let status = if !roots.is_empty() {
+        let status = if installation_present || !roots.is_empty() {
             DetectionStatus::Detected
         } else {
             DetectionStatus::Unavailable
         };
 
         let mut issues = Vec::new();
-        if matches!(status, DetectionStatus::Unavailable) {
+        if roots.is_empty() {
             issues.push(ScanIssue {
                 code: "NO_SKILLS_ROOTS".into(),
                 severity: IssueSeverity::Info,

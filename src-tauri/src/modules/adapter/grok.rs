@@ -75,9 +75,29 @@ impl AgentAdapter for GrokAdapter {
             };
         }
 
-        let root = ctx.platform.home_dir.join(".grok").join("skills");
-        if path_exists(&root) {
-            detected(self.id(), root, RootScope::User, observed_at)
+        let base_dir = ctx.platform.home_dir.join(".grok");
+        let root = base_dir.join("skills");
+        let base_present = path_exists(&base_dir);
+        let root_present = path_exists(&root);
+
+        if base_present || root_present {
+            let roots = if root_present {
+                vec![SkillRoot {
+                    root_id: "user-skills".into(),
+                    display_path: root.clone(),
+                    canonical_path: root,
+                    scope: RootScope::User,
+                }]
+            } else {
+                vec![]
+            };
+            DetectionResult {
+                agent: self.id(),
+                status: DetectionStatus::Detected,
+                roots,
+                issues: vec![],
+                observed_at,
+            }
         } else {
             DetectionResult {
                 agent: self.id(),
