@@ -69,6 +69,9 @@ web_modules/
 .env
 .env.*
 !.env.example
+marketing/video/public/voiceover/
+marketing/video/out/
+marketing/video/node_modules/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -152,3 +155,6 @@ dist/
 .idea/
 .superpowers/
 docs/superpowers/
+
+# Local marketing workspace
+/marketing/
