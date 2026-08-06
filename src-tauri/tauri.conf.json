@@ -27,6 +27,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -35,5 +36,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ1RDRBNTUyQTlGRjYzMkQKUldRdFkvK3BVcVhVUmZLVWFXempUWS9WMWp6RUpaaTBMYS9kUXRCYitPM1VuRUVsNFErSUJvT1QK",
+      "endpoints": [
+        "https://github.com/longl1005/agent-skill-manager/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
