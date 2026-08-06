@@ -15,7 +15,7 @@ export interface MasterRepoState {
   deleteAgentSkill: (agentId: string, skillName: string) => Promise<boolean>;
   unlinkAllAgentSkills: (agentId: string) => Promise<number | null>;
   importToMaster: (agentId: string, skillName: string, mode?: ImportMode) => Promise<ImportResult>;
-  installSkillToMaster: (skillName: string, source?: string) => Promise<string | null>;
+  installSkillToMaster: (skillName: string, source?: string, sourceSubdir?: string) => Promise<string | null>;
   deleteMasterSkill: (skillName: string) => Promise<string[]>;
 }
 
@@ -116,11 +116,11 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     }
   },
 
-  installSkillToMaster: async (skillName: string, source?: string) => {
+  installSkillToMaster: async (skillName: string, source?: string, sourceSubdir?: string) => {
     set({ error: null });
     try {
       const customPaths = useAgentConfigStore.getState().customPaths;
-      const result = await installSkillToMaster(skillName, source, customPaths);
+      const result = await installSkillToMaster(skillName, source, sourceSubdir, customPaths);
       await Promise.all([
         get().fetchMasterSkills(),
         useScanStore.getState().scan(),

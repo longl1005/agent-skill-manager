@@ -132,13 +132,25 @@ export async function importToMaster(
 export async function installSkillToMaster(
   skillName: string,
   source?: string,
+  sourceSubdir?: string,
   customPaths?: Record<string, string>
 ): Promise<string> {
   return invoke<string>("install_skill_to_master", {
     skillName,
     source: source ?? null,
+    sourceSubdir: sourceSubdir ?? null,
     customPaths: customPaths ?? null,
   });
+}
+
+export type GitSkillCandidate = {
+  name: string;
+  description: string;
+  relative_path: string;
+};
+
+export async function inspectGitSkills(source: string): Promise<GitSkillCandidate[]> {
+  return invoke<GitSkillCandidate[]>("inspect_git_skills", { source });
 }
 
 export async function exportMasterSkillZip(skillName: string, destination: string, customPaths?: Record<string, string>): Promise<string> {
