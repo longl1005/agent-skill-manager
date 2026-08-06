@@ -4064,6 +4064,11 @@ input.settings-agent-path-input:focus-visible {
   border-color: var(--accent);
 }
 
+.install-url-input:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 .install-local-dropzone {
   border: 2px dashed var(--border);
   border-radius: 12px;

@@ -21,3 +21,9 @@ describe("external Skill actions", () => {
     expect(styles).toContain(".agent-detail__skill-external-import-btn--compact");
   });
 });
+
+describe("Git URL input focus styling", () => {
+  it("uses its focused border without the global focus-visible outline", () => {
+    expect(styles).toContain(".install-url-input:focus-visible {\n  outline: none;\n  outline-offset: 0;\n}");
+  });
+});
