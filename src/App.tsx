@@ -20,6 +20,8 @@ import { useUiStore } from "./stores/uiStore";
 import { useI18nStore } from "./stores/i18nStore";
 import { t } from "./locales/dict";
 import { TrayEventBridge } from "./hooks/useTrayEvents";
+import { UpdateDialog } from "./components/UpdateDialog";
+import { useUpdateStore } from "./stores/updateStore";
 
 export default function App() {
   const initTheme = useThemeStore((s) => s.initTheme);
@@ -30,6 +32,7 @@ export default function App() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const lang = useI18nStore((s) => s.lang);
   const sidebarToggleLabel = t(sidebarCollapsed ? "nav.expandSidebar" : "nav.collapseSidebar", lang);
+  const checkForUpdates = useUpdateStore((state) => state.checkForUpdates);
 
   const startWindowDrag = () => {
     if (!("__TAURI_INTERNALS__" in window)) return;
@@ -39,11 +42,13 @@ export default function App() {
   useEffect(() => {
     initTheme();
     void hydrateAgentConfig().catch(() => undefined).finally(() => { scan(); fetchMasterSkills(); });
-  }, [initTheme, scan, fetchMasterSkills, hydrateAgentConfig]);
+    void checkForUpdates(true);
+  }, [initTheme, scan, fetchMasterSkills, hydrateAgentConfig, checkForUpdates]);
 
   return (
     <HashRouter>
       <TrayEventBridge />
+      <UpdateDialog />
       <div className="app-frame">
         <header
           className="app-titlebar"

@@ -80,6 +80,13 @@ export const dict = {
     "skillLibrary.refresh": "刷新",
     "skillLibrary.refreshing": "刷新中…",
     "skillLibrary.totalSkills": "{count} 个技能",
+    "update.title": "发现新版本",
+    "update.available": "版本 {version} 已可用",
+    "update.later": "稍后",
+    "update.now": "立即更新",
+    "update.downloading": "下载中",
+    "update.preparing": "正在安装更新…",
+    "update.failed": "更新失败，请稍后重试。",
 
     // Dashboard
     "dashboard.title": "仪表盘",
@@ -199,6 +206,13 @@ export const dict = {
     "skillLibrary.refresh": "Refresh",
     "skillLibrary.refreshing": "Refreshing…",
     "skillLibrary.totalSkills": "{count} skills",
+    "update.title": "Update available",
+    "update.available": "Version {version} is available",
+    "update.later": "Later",
+    "update.now": "Update now",
+    "update.downloading": "Downloading",
+    "update.preparing": "Installing update…",
+    "update.failed": "Update failed. Please try again later.",
 
     // Settings
     "settings.title": "Settings",
