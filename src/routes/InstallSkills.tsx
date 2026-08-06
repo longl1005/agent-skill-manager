@@ -12,6 +12,7 @@ import { getOnlineSkillDetailPath, searchGlobalSkills, type GlobalSkillItem } fr
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useScanStore } from "../stores/scanStore";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
+import { inspectGitSkills, type GitSkillCandidate } from "../ipc/commands";
 
 export type InstallTab = "marketplace" | "online" | "url" | "local";
 export type SkillCategory = "all" | "ui" | "search" | "workflow";
@@ -40,6 +41,8 @@ export default function InstallSkills() {
   ));
   const [activeCategory, setActiveCategory] = useState<SkillCategory>("all");
   const [urlInput, setUrlInput] = useState("");
+  const [isResolvingUrl, setIsResolvingUrl] = useState(false);
+  const [urlResolveError, setUrlResolveError] = useState<string | null>(null);
   const [localPath, setLocalPath] = useState("");
 
   const [onlineQuery, setOnlineQuery] = useState("");
@@ -98,6 +101,11 @@ export default function InstallSkills() {
   const [modalOpen, setModalOpen] = useState(false);
   const [targetSkillName, setTargetSkillName] = useState<string>("");
   const [targetSkillSource, setTargetSkillSource] = useState<string>("");
+  const [targetSkillSubdir, setTargetSkillSubdir] = useState<string | undefined>();
+  const [skillPicker, setSkillPicker] = useState<{
+    source: string;
+    candidates: GitSkillCandidate[];
+  } | null>(null);
   const [selectedAgents, setSelectedAgents] = useState<Record<string, boolean>>({});
   const [installing, setInstalling] = useState(false);
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
@@ -126,9 +134,10 @@ export default function InstallSkills() {
     ? `分发至 ${selectedAgentCount} 个 Agent`
     : `Distribute to ${selectedAgentCount} Agents`;
 
-  const handleOpenInstallModal = (skillName: string, source?: string) => {
+  const handleOpenInstallModal = (skillName: string, source?: string, sourceSubdir?: string) => {
     setTargetSkillName(skillName);
     setTargetSkillSource(source || skillName);
+    setTargetSkillSubdir(sourceSubdir);
     const initialSelected: Record<string, boolean> = {};
     availableAgents.forEach((agent) => {
       initialSelected[agent.id] = true;
@@ -148,14 +157,33 @@ export default function InstallSkills() {
     navigate("/install?tab=online", { replace: true });
   }, [location.search, navigate, availableAgents]);
 
-  const handleUrlSubmit = (e: React.FormEvent) => {
+  const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim()) return;
     const parsedUrl = parseSkillsShInput(urlInput);
-    const parts = parsedUrl.trim().replace(/\/+$/, "").split("/");
-    const repoName = parts[parts.length - 1] || "custom-skill";
-    const cleanSkillName = repoName.replace(/\.git$/, "");
-    handleOpenInstallModal(cleanSkillName, parsedUrl);
+    setUrlResolveError(null);
+    setIsResolvingUrl(true);
+    try {
+      const candidates = await inspectGitSkills(parsedUrl);
+      if (candidates.length === 0) {
+        setUrlResolveError(lang === "zh"
+          ? "未在此仓库中找到包含 SKILL.md 的 Skill。"
+          : "No Skill containing SKILL.md was found in this repository.");
+        return;
+      }
+      if (candidates.length === 1) {
+        const candidate = candidates[0];
+        handleOpenInstallModal(candidate.name, parsedUrl, candidate.relative_path);
+        return;
+      }
+      setSkillPicker({ source: parsedUrl, candidates });
+    } catch (err) {
+      setUrlResolveError(lang === "zh"
+        ? `无法解析该 Git 仓库：${String(err)}`
+        : `Unable to inspect this Git repository: ${String(err)}`);
+    } finally {
+      setIsResolvingUrl(false);
+    }
   };
 
   const handleLocalSubmit = (path: string) => {
@@ -200,7 +228,11 @@ export default function InstallSkills() {
     setInstalling(true);
     setInstallProgress({ stage: "installing" });
     try {
-      const installedPath = await installSkillToMaster(installedSkill, targetSkillSource || installedSkill);
+      const installedPath = await installSkillToMaster(
+        installedSkill,
+        targetSkillSource || installedSkill,
+        targetSkillSubdir,
+      );
       if (!installedPath) {
         throw new Error(lang === "zh" ? "无法安装到主技能仓库。" : "Unable to install the skill to the master repository.");
       }
@@ -240,6 +272,7 @@ export default function InstallSkills() {
       setUrlInput("");
       setLocalPath("");
       setTargetSkillSource("");
+      setTargetSkillSubdir(undefined);
     }
   };
 
@@ -616,17 +649,21 @@ export default function InstallSkills() {
               className="install-url-input"
               placeholder={t("installSkills.urlPlaceholder", lang)}
               value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
+              onChange={(e) => {
+                setUrlInput(e.target.value);
+                setUrlResolveError(null);
+              }}
               aria-label="Git or GitHub repository URL"
             />
             <button
               type="submit"
               className="btn primary install-url-submit"
-              disabled={!urlInput.trim()}
+              disabled={!urlInput.trim() || isResolvingUrl}
             >
-              {t("installSkills.urlSubmit", lang)}
+              {isResolvingUrl ? (lang === "zh" ? "解析中…" : "Resolving…") : t("installSkills.urlSubmit", lang)}
             </button>
           </form>
+          {urlResolveError && <p className="install-url-error" role="alert">{urlResolveError}</p>}
         </div>
       )}
 
@@ -647,6 +684,45 @@ export default function InstallSkills() {
               </button>
             </div>
             {localPath && <code className="dropzone-path">{localPath}</code>}
+          </div>
+        </div>
+      )}
+
+      {skillPicker && (
+        <div className="modal-overlay" data-testid="git-skill-picker">
+          <div className="modal-content git-skill-picker-modal" role="dialog" aria-modal="true" aria-labelledby="git-skill-picker-title">
+            <div className="modal-header-row">
+              <div>
+                <h2 id="git-skill-picker-title">{lang === "zh" ? "选择要安装的 Skill" : "Choose a Skill to install"}</h2>
+                <p className="modal-subtitle">
+                  {lang === "zh"
+                    ? "该仓库包含多个 Skill。请选择一个，再决定要分发到哪些 Agent。"
+                    : "This repository contains multiple Skills. Choose one before selecting target Agents."}
+                </p>
+              </div>
+            </div>
+            <div className="git-skill-candidate-list">
+              {skillPicker.candidates.map((candidate) => (
+                <button
+                  type="button"
+                  className="git-skill-candidate"
+                  key={candidate.relative_path}
+                  onClick={() => {
+                    handleOpenInstallModal(candidate.name, skillPicker.source, candidate.relative_path);
+                    setSkillPicker(null);
+                  }}
+                >
+                  <strong>{candidate.name}</strong>
+                  <span>{candidate.description || (lang === "zh" ? "未提供描述" : "No description provided")}</span>
+                  <code>{candidate.relative_path}</code>
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn secondary" onClick={() => setSkillPicker(null)}>
+                {t("installSkills.cancel", lang)}
+              </button>
+            </div>
           </div>
         </div>
       )}

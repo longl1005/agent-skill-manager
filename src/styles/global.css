@@ -4049,6 +4049,13 @@ input.settings-agent-path-input:focus-visible {
   margin-top: 12px;
 }
 
+.install-url-error {
+  max-width: 640px;
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
 .install-url-input {
   flex: 1;
   background: var(--surface);
@@ -4067,6 +4074,45 @@ input.settings-agent-path-input:focus-visible {
 .install-url-input:focus-visible {
   outline: none;
   outline-offset: 0;
+}
+
+.git-skill-picker-modal {
+  width: min(640px, 100%);
+}
+
+.git-skill-candidate-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.git-skill-candidate {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 14px 16px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.git-skill-candidate:hover,
+.git-skill-candidate:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.git-skill-candidate strong {
+  font-size: 15px;
+}
+
+.git-skill-candidate span,
+.git-skill-candidate code {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .install-local-dropzone {

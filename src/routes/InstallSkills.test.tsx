@@ -6,16 +6,24 @@ import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
 import { searchGlobalSkills } from "../api/globalSkillsSearch";
+import { inspectGitSkills } from "../ipc/commands";
 
 function LocationDisplay() {
   const location = useLocation();
   return <output data-testid="location-display">{location.pathname}</output>;
 }
 
-const { openDialogMock } = vi.hoisted(() => ({ openDialogMock: vi.fn() }));
+const { openDialogMock, inspectGitSkillsMock } = vi.hoisted(() => ({
+  openDialogMock: vi.fn(),
+  inspectGitSkillsMock: vi.fn(),
+}));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: openDialogMock,
+}));
+
+vi.mock("../ipc/commands", () => ({
+  inspectGitSkills: inspectGitSkillsMock,
 }));
 
 vi.mock("../stores/masterRepoStore", () => ({
@@ -39,6 +47,9 @@ describe("InstallSkills Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     openDialogMock.mockResolvedValue(null);
+    vi.mocked(inspectGitSkills).mockResolvedValue([
+      { name: "custom-skill", description: "Custom skill", relative_path: "." },
+    ]);
     useAgentConfigStore.setState({ disabledAgentIds: [] });
 
     vi.mocked(searchGlobalSkills).mockResolvedValue({
@@ -159,7 +170,7 @@ describe("InstallSkills Route", () => {
     expect(screen.queryByTestId("featured-card-frontend-design")).not.toBeInTheDocument();
   });
 
-  it("switches to URL import tab and submits repo URL to open modal", () => {
+  it("switches to URL import tab and submits a single-skill repo to open modal", async () => {
     render(
       <MemoryRouter>
         <InstallSkills />
@@ -175,11 +186,15 @@ describe("InstallSkills Route", () => {
     const submitBtn = screen.getByText(/解析并安装|Fetch & Install/i);
     fireEvent.click(submitBtn);
 
-    expect(screen.getByTestId("target-agent-modal")).toBeInTheDocument();
+    await waitFor(() => expect(inspectGitSkills).toHaveBeenCalledWith("https://github.com/user/custom-skill"));
+    expect(await screen.findByTestId("target-agent-modal")).toBeInTheDocument();
     expect(screen.getByText("custom-skill")).toBeInTheDocument();
   });
 
   it("parses shorthand input like anthropics/skills and triggers skill installation", async () => {
+    vi.mocked(inspectGitSkills).mockResolvedValueOnce([
+      { name: "skills", description: "Skill collection", relative_path: "." },
+    ]);
     render(
       <MemoryRouter>
         <InstallSkills />
@@ -195,7 +210,7 @@ describe("InstallSkills Route", () => {
     const submitBtn = screen.getByText(/解析并安装|Fetch & Install/i);
     fireEvent.click(submitBtn);
 
-    expect(screen.getByTestId("target-agent-modal")).toBeInTheDocument();
+    expect(await screen.findByTestId("target-agent-modal")).toBeInTheDocument();
     expect(screen.getByText("skills")).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId("confirm-install-btn");
@@ -204,9 +219,44 @@ describe("InstallSkills Route", () => {
     await waitFor(() => {
       expect(mockInstallSkillToMaster).toHaveBeenCalledWith(
         "skills",
-        "https://github.com/anthropics/skills"
+        "https://github.com/anthropics/skills",
+        "."
       );
       expect(mockToggleAgentSkill).toHaveBeenCalledWith("claude-code", "skills", true);
+    });
+  });
+
+  it("offers multiple Git Skills for selection before opening Agent distribution", async () => {
+    vi.mocked(inspectGitSkills).mockResolvedValueOnce([
+      { name: "dashi-ppt", description: "Create presentation slides", relative_path: "skills/dashi-ppt" },
+      { name: "dashi-doc", description: "Create documents", relative_path: "skills/dashi-doc" },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <InstallSkills />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Git \/ GitHub|Git \/ URL/i }));
+    fireEvent.change(screen.getByPlaceholderText(/Git \/ GitHub/i), {
+      target: { value: "https://github.com/chuspeeism/dashi-ppt-skill" },
+    });
+    fireEvent.click(screen.getByText(/解析并安装|Fetch & Install/i));
+
+    expect(await screen.findByTestId("git-skill-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("target-agent-modal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /dashi-ppt/i }));
+    expect(screen.getByTestId("target-agent-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("confirm-install-btn"));
+    await waitFor(() => {
+      expect(mockInstallSkillToMaster).toHaveBeenCalledWith(
+        "dashi-ppt",
+        "https://github.com/chuspeeism/dashi-ppt-skill",
+        "skills/dashi-ppt",
+      );
     });
   });
 
