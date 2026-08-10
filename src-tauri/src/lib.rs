@@ -7,6 +7,24 @@ mod modules;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod tray;
 
+#[cfg(target_os = "macos")]
+fn should_restore_main_window_on_reopen(has_visible_windows: bool) -> bool {
+    !has_visible_windows
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(target_os = "macos")]
+    use super::should_restore_main_window_on_reopen;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn restores_the_main_window_when_macos_reopens_a_hidden_app() {
+        assert!(should_restore_main_window_on_reopen(false));
+        assert!(!should_restore_main_window_on_reopen(true));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -54,6 +72,18 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building Agent Skill Manager")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } = event
+            {
+                if should_restore_main_window_on_reopen(has_visible_windows) {
+                    tray::show_main_window(app);
+                }
+            }
+        });
 }

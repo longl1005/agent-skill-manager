@@ -287,11 +287,16 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-fn show_main_window(app: &tauri::AppHandle) -> bool {
+pub(crate) fn show_main_window(app: &tauri::AppHandle) -> bool {
     let Some(window) = app.get_webview_window("main") else {
         eprintln!("Cannot show main window: window not found");
         return false;
     };
+
+    if let Err(error) = window.unminimize() {
+        eprintln!("Failed to unminimize main window: {error}");
+        return false;
+    }
 
     if let Err(error) = window.show() {
         eprintln!("Failed to show main window: {error}");

@@ -59,6 +59,8 @@ export default function AgentDetail() {
   }, [fetchMasterSkills]);
 
   const agent = report?.agents.find((item) => item.agent_id === agentId);
+  const unreadableSkillIssues = agent?.issues.filter((issue) => issue.code === "NOT_UTF8") ?? [];
+  const otherIssues = agent?.issues.filter((issue) => issue.code !== "NOT_UTF8") ?? [];
   const sortedSkills = useMemo(() => {
     const skills = agent?.skills ?? [];
     return [...skills].sort((a, b) => {
@@ -177,14 +179,34 @@ export default function AgentDetail() {
 
       {agent.issues.length > 0 && (
         <div className="agent-scan-error" role="alert">
-          <strong>Diagnostics ({agent.issues.length}):</strong>
-          <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
-            {agent.issues.map((issue, idx) => (
+          {unreadableSkillIssues.length > 0 && (
+            <>
+              <strong>{lang === "zh" ? `有 ${unreadableSkillIssues.length} 个技能文件无法读取，已跳过，不影响其他技能。` : `${unreadableSkillIssues.length} skill file${unreadableSkillIssues.length === 1 ? "" : "s"} could not be read and ${unreadableSkillIssues.length === 1 ? "was" : "were"} skipped. Other skills are unaffected.`}</strong>
+              <p style={{ margin: "8px 0 0" }}>{lang === "zh" ? "原因：SKILL.md 不是 UTF-8 编码。" : "Reason: SKILL.md is not UTF-8 encoded."}</p>
+              <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                {unreadableSkillIssues.map((issue, idx) => <li key={`${issue.path}-${idx}`} style={{ marginTop: 4 }}>{lang === "zh" ? "路径：" : "Path: "}<code>{issue.path ?? "SKILL.md"}</code></li>)}
+              </ul>
+              <details style={{ marginTop: 8 }}>
+                <summary>{lang === "zh" ? "查看技术详情" : "View technical details"}</summary>
+                <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                  {unreadableSkillIssues.map((issue, idx) => <li key={`${issue.code}-${idx}`}>[{issue.severity}] {issue.code}: {issue.message}</li>)}
+                </ul>
+              </details>
+            </>
+          )}
+          {otherIssues.length > 0 && (
+            <>
+              {unreadableSkillIssues.length > 0 && <hr />}
+              <strong>Diagnostics ({otherIssues.length}):</strong>
+              <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                {otherIssues.map((issue, idx) => (
               <li key={idx} style={{ marginTop: 4 }}>
                 [{issue.severity}] {issue.code}: {issue.message}
               </li>
             ))}
-          </ul>
+              </ul>
+            </>
+          )}
         </div>
       )}
 

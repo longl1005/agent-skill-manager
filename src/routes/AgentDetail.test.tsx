@@ -134,6 +134,32 @@ describe("AgentDetail", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/latest scan failed/i);
   });
 
+  it("explains unreadable skill files without exposing the raw UTF-8 error by default", () => {
+    useI18nStore.setState({ lang: "zh" });
+    useScanStore.setState({
+      report: {
+        ...reportFixture,
+        agents: [{
+          ...reportFixture.agents[0],
+          issues: [{
+            code: "NOT_UTF8",
+            severity: "Warning",
+            phase: "Read",
+            path: "C:\\Users\\Administrator\\.claude\\skills\\broken\\SKILL.md",
+            message: "invalid utf-8 sequence of 1 bytes from index 18",
+          }],
+        }],
+      },
+    });
+
+    renderDetail("/agents/claude-code");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("有 1 个技能文件无法读取，已跳过，不影响其他技能。");
+    expect(screen.getByRole("alert")).toHaveTextContent("SKILL.md 不是 UTF-8 编码");
+    expect(screen.getByText("C:\\Users\\Administrator\\.claude\\skills\\broken\\SKILL.md")).toBeVisible();
+    expect(screen.queryByText("invalid utf-8 sequence of 1 bytes from index 18")).not.toBeInTheDocument();
+  });
+
   it("offers all-agents and rescan recovery when a scan failure leaves no Agent report", () => {
     const scan = vi.fn().mockResolvedValue(undefined);
     useScanStore.setState({ report: null, error: "The scanner is unavailable", scan });
