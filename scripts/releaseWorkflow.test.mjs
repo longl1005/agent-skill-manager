@@ -12,4 +12,11 @@ describe("release workflow", () => {
     expect(workflow).toContain("- os: macos-15-intel");
     expect(workflow).not.toContain("- os: macos-13");
   });
+
+  it("publishes release assets with the runner-provided GitHub CLI", () => {
+    expect(workflow).toContain('gh release create "${{ github.ref_name }}"');
+    expect(workflow).toContain("release-artifacts/*/*");
+    expect(workflow).toContain("release-artifacts/latest.json");
+    expect(workflow).not.toContain("softprops/action-gh-release");
+  });
 });
