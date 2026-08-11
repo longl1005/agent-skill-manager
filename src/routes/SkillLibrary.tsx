@@ -39,6 +39,7 @@ export const SUPPORTED_AGENTS = [
 ];
 
 type SkillSort = "recent" | "name";
+type SkillView = "card" | "list";
 
 export default function SkillLibrary() {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export default function SkillLibrary() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [skillSort, setSkillSort] = useState<SkillSort>("recent");
+  const [skillView, setSkillView] = useState<SkillView>("card");
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
   const [batchTogglingSkill, setBatchTogglingSkill] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ skillName: string; linkedCount: number } | null>(null);
@@ -193,6 +195,36 @@ export default function SkillLibrary() {
               {t("skillLibrary.sortName", lang)}
             </button>
           </div>
+          <div className="status-filter-group skill-view-group" role="group" aria-label="Skill view">
+            <button
+              aria-label={t("skillLibrary.cardView", lang)}
+              aria-pressed={skillView === "card"}
+              className={`skill-view-toggle ${skillView === "card" ? "is-active" : ""}`}
+              onClick={() => setSkillView("card")}
+              title={t("skillLibrary.cardView", lang)}
+              type="button"
+            >
+              <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
+                <rect height="6" rx="1" stroke="currentColor" strokeWidth="2" width="6" x="3" y="3" />
+                <rect height="6" rx="1" stroke="currentColor" strokeWidth="2" width="6" x="15" y="3" />
+                <rect height="6" rx="1" stroke="currentColor" strokeWidth="2" width="6" x="3" y="15" />
+                <rect height="6" rx="1" stroke="currentColor" strokeWidth="2" width="6" x="15" y="15" />
+              </svg>
+            </button>
+            <button
+              aria-label={t("skillLibrary.listView", lang)}
+              aria-pressed={skillView === "list"}
+              className={`skill-view-toggle ${skillView === "list" ? "is-active" : ""}`}
+              onClick={() => setSkillView("list")}
+              title={t("skillLibrary.listView", lang)}
+              type="button"
+            >
+              <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
+                <path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                <path d="M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -205,11 +237,12 @@ export default function SkillLibrary() {
       ) : filteredSkills.length === 0 ? (
         <p className="empty-hint">{t("skillLibrary.emptySearch", lang)}</p>
       ) : (
-        <div className="master-skill-grid">
+        <div className={`master-skill-grid ${skillView === "list" ? "master-skill-grid--list" : ""}`}>
           {filteredSkills.map((skill) => {
+            const linkedCount = supportedAgents.filter((agent) => skill.linked_agents?.[agent.id]).length;
             return (
               <div
-                className="master-skill-card master-skill-card--interactive"
+                className={`master-skill-card master-skill-card--interactive ${skillView === "list" ? "master-skill-card--list" : ""}`}
                 key={skill.name}
                 data-testid={`skill-card-${skill.name}`}
                 role="link"
@@ -294,6 +327,10 @@ export default function SkillLibrary() {
                 <p className="skill-description">
                   {skill.description || <em className="muted">{t("skillLibrary.noDescription", lang)}</em>}
                 </p>
+
+                <span className="skill-list-link-summary">
+                  {t("skillLibrary.linkedAgentCount", lang).replace("{count}", String(linkedCount))}
+                </span>
 
                 <div className="agent-distribution-section">
                   <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>

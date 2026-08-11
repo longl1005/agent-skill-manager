@@ -124,6 +124,24 @@ describe("SkillLibrary Route", () => {
     expect(screen.getByText("2 skills")).toBeVisible();
   });
 
+  it("switches the visible skills between cards and compact list rows", () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    const skillsContainer = document.querySelector(".master-skill-grid");
+    expect(skillsContainer).not.toHaveClass("master-skill-grid--list");
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+
+    expect(skillsContainer).toHaveClass("master-skill-grid--list");
+    expect(screen.getByTestId("skill-card-web-search-pro")).toHaveClass("master-skill-card--list");
+    expect(screen.getByText("1 linked Agent")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Card view" }));
+
+    expect(skillsContainer).not.toHaveClass("master-skill-grid--list");
+    expect(screen.getByTestId("skill-card-web-search-pro")).not.toHaveClass("master-skill-card--list");
+  });
+
   it("renders agent link distribution matrix badges with correct states", () => {
     render(
       <MemoryRouter>

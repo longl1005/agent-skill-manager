@@ -3013,6 +3013,36 @@ input.settings-agent-path-input:focus-visible {
   outline-offset: 2px;
 }
 
+.skill-view-group {
+  background: var(--surface);
+}
+
+.skill-view-toggle {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 6px 8px;
+}
+
+.skill-view-toggle:hover {
+  color: var(--text);
+}
+
+.skill-view-toggle.is-active {
+  background: var(--control-accent);
+  color: #f8faff;
+}
+
+.skill-view-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .status-filter-group {
   display: inline-flex;
   background: var(--surface);
@@ -3050,6 +3080,12 @@ input.settings-agent-path-input:focus-visible {
   gap: 16px;
 }
 
+.master-skill-grid--list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .master-skill-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3073,6 +3109,55 @@ input.settings-agent-path-input:focus-visible {
 .master-skill-card--interactive:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.master-skill-card--list {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(210px, 1fr) minmax(220px, 1.65fr) minmax(130px, 0.55fr) auto;
+  padding: 12px 16px;
+}
+
+.master-skill-card--list .master-skill-card-header {
+  display: contents;
+}
+
+.master-skill-card--list .title-section {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.master-skill-card--list .skill-description {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  overflow: hidden;
+}
+
+.master-skill-card--list .skill-list-link-summary {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  grid-column: 3;
+  grid-row: 1;
+  white-space: nowrap;
+}
+
+.master-skill-card--list .card-header-actions {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.master-skill-card--list .agent-distribution-section {
+  display: none;
+}
+
+.skill-list-link-summary {
+  display: none;
 }
 
 .master-skill-card-header {
