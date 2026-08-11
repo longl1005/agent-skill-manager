@@ -11,7 +11,7 @@ use crate::modules::adapter::{
     AgentAdapter, AgentId, AntigravityAdapter, AugmentAdapter, ClaudeCodeAdapter, ClineAdapter, CodeBuddyAdapter, CodexAdapter, CursorAdapter,
     DetectContext, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, OhMyPiAdapter, OpenClawAdapter, OpenCodeAdapter, PiAgentAdapter,
     Platform, PlatformContext, QoderAdapter, QwenCodeAdapter, RooCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult, TraeAdapter,
-    TraeCnAdapter, WindsurfAdapter, WorkBuddyAdapter,
+    SkillRoot, TraeCnAdapter, WindsurfAdapter, WorkBuddyAdapter,
 };
 use crate::modules::performance::{
     DiagnosticContext, DiagnosticErrorCategory, DiagnosticOperation, DiagnosticOutcome,
@@ -24,6 +24,8 @@ pub struct AppState {
     pub last_report: Mutex<Option<ScanReport>>,
     pub last_inventory: Mutex<Option<crate::modules::inventory::Inventory>>,
     pub performance_diagnostics_enabled: AtomicBool,
+    performance_diagnostics_hydrated: AtomicBool,
+    performance_diagnostics_hydration_lock: Mutex<()>,
 }
 
 // ============================================================
@@ -126,6 +128,9 @@ fn get_diagnostics_enabled(
     state
         .performance_diagnostics_enabled
         .store(enabled, Ordering::Release);
+    state
+        .performance_diagnostics_hydrated
+        .store(true, Ordering::Release);
     Ok(enabled)
 }
 
@@ -139,7 +144,33 @@ fn set_diagnostics_enabled(
     state
         .performance_diagnostics_enabled
         .store(enabled, Ordering::Release);
+    state
+        .performance_diagnostics_hydrated
+        .store(true, Ordering::Release);
     Ok(())
+}
+
+fn hydrate_diagnostics_enabled<F>(state: &AppState, load_enabled: F) -> bool
+where
+    F: FnOnce() -> Result<bool, String>,
+{
+    if !state.performance_diagnostics_hydrated.load(Ordering::Acquire) {
+        let _guard = state
+            .performance_diagnostics_hydration_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if !state.performance_diagnostics_hydrated.load(Ordering::Acquire) {
+            let enabled = load_enabled().unwrap_or(false);
+            state
+                .performance_diagnostics_enabled
+                .store(enabled, Ordering::Release);
+            state
+                .performance_diagnostics_hydrated
+                .store(true, Ordering::Release);
+        }
+    }
+
+    state.performance_diagnostics_enabled.load(Ordering::Acquire)
 }
 
 #[tauri::command]
@@ -233,6 +264,15 @@ pub struct IssueReport {
     pub message: String,
 }
 
+struct PendingAgentScan {
+    agent_id: AgentId,
+    display_name: String,
+    detection_status: String,
+    roots: Vec<SkillRoot>,
+    detection_issues: Vec<ScanIssue>,
+    scan_result: ScanResult,
+}
+
 #[tauri::command]
 pub fn scan_agents(
     state: tauri::State<'_, AppState>,
@@ -248,7 +288,12 @@ fn operation_recorder(
     operation: DiagnosticOperation,
     diagnostic_context: Option<DiagnosticContext>,
 ) -> OperationRecorder {
-    if state.performance_diagnostics_enabled.load(Ordering::Acquire) {
+    let enabled = hydrate_diagnostics_enabled(state, || {
+        crate::modules::db::open_db(None)
+            .and_then(|conn| crate::modules::db::get_performance_diagnostics_enabled(&conn))
+            .map_err(|error| error.to_string())
+    });
+    if enabled {
         OperationRecorder::enabled(operation, diagnostic_context)
     } else {
         OperationRecorder::disabled()
@@ -300,12 +345,11 @@ fn scan_agents_with_recorder(
         Box::new(CursorAdapter),
     ];
 
-    let mut agent_reports: Vec<AgentReport> = Vec::new();
-    let mut total_skills = 0usize;
-    let mut total_issues = 0usize;
+    let mut pending_scans = Vec::new();
 
     for adapter in &adapters {
-        let custom_path_str = custom_paths.as_ref().and_then(|m| m.get(&adapter.id().0));
+        let adapter_id = adapter.id();
+        let custom_path_str = custom_paths.as_ref().and_then(|m| m.get(&adapter_id.0));
         let custom_pathbuf =
             custom_path_str.map(|path| crate::modules::master_repo::expand_config_path(path));
 
@@ -335,16 +379,6 @@ fn scan_agents_with_recorder(
         let roots = adapter.skill_roots(&det);
         let descriptor = adapter.descriptor();
 
-        // 把 roots 转 DTO
-        let mut root_reports: Vec<RootReport> = roots
-            .iter()
-            .map(|r| RootReport {
-                root_id: r.root_id.clone(),
-                scope: format!("{:?}", r.scope),
-                display_path: r.display_path.to_string_lossy().into_owned(),
-            })
-            .collect();
-
         let scan_id = ScanId::new();
         let scan_result: ScanResult = {
             let _scan_phase = recorder.start_phase(DiagnosticPhase::AdapterScan, None);
@@ -352,7 +386,7 @@ fn scan_agents_with_recorder(
                 // 跳过 scan, 但报告里仍带 issues (detect 的)
                 ScanResult {
                     scan_id,
-                    agent_id: adapter.id(),
+                    agent_id: adapter_id.clone(),
                     outcome: match det.status {
                         crate::modules::adapter::DetectionStatus::Failed => {
                             crate::modules::adapter::ScanOutcome::Failed
@@ -371,7 +405,7 @@ fn scan_agents_with_recorder(
             } else {
                 let scan_ctx = ScanContext {
                     scan_id,
-                    agent: adapter.id(),
+                    agent: adapter_id.clone(),
                     roots: &roots,
                     platform: &platform_ctx,
                     started_at,
@@ -380,12 +414,33 @@ fn scan_agents_with_recorder(
             }
         };
 
-        // 收集 detect + scan 的 issues
-        let mut all_issues: Vec<&ScanIssue> = det.issues.iter().collect();
-        all_issues.extend(scan_result.issues.iter());
+        pending_scans.push(PendingAgentScan {
+            agent_id: adapter_id,
+            display_name: descriptor.display_name,
+            detection_status: format!("{:?}", det.status),
+            roots,
+            detection_issues: det.issues,
+            scan_result,
+        });
+    }
 
-        let serialization_started = Instant::now();
-        let skill_reports: Vec<SkillReport> = scan_result
+    let serialization_started = Instant::now();
+    let mut agent_reports: Vec<AgentReport> = Vec::new();
+    let mut total_skills = 0usize;
+    let mut total_issues = 0usize;
+    let mut fingerprinted_files = 0u64;
+    for pending in pending_scans {
+        let roots = pending
+            .roots
+            .iter()
+            .map(|root| RootReport {
+                root_id: root.root_id.clone(),
+                scope: format!("{:?}", root.scope),
+                display_path: root.display_path.to_string_lossy().into_owned(),
+            })
+            .collect();
+        let skill_reports: Vec<SkillReport> = pending
+            .scan_result
             .installations
             .iter()
             .map(|inst| SkillReport {
@@ -418,39 +473,36 @@ fn scan_agents_with_recorder(
                 issues: inst.diagnostics.iter().map(issue_to_report).collect(),
             })
             .collect();
-        let fingerprinted_files = skill_reports
+        fingerprinted_files += skill_reports
             .iter()
             .map(|skill| skill.file_count as u64)
-            .sum();
-        recorder.record_counted_phase(
-            DiagnosticPhase::ReportSerialization,
-            None,
-            EventCounters {
-                fingerprinted_files,
-                ..EventCounters::default()
-            },
-            serialization_started,
-            DiagnosticOutcome::Success,
-        );
-
+            .sum::<u64>();
+        let mut all_issues: Vec<&ScanIssue> = pending.detection_issues.iter().collect();
+        all_issues.extend(pending.scan_result.issues.iter());
         total_skills += skill_reports.len();
         total_issues += all_issues.len();
-
-        // 排序 issues: Error > Warning > Info
-        let mut sorted_issues: Vec<IssueReport> =
-            all_issues.iter().map(|i| issue_to_report(i)).collect();
-        sorted_issues.sort_by_key(|a| severity_rank(&a.severity));
-
+        let mut issues: Vec<IssueReport> = all_issues.iter().map(|issue| issue_to_report(issue)).collect();
+        issues.sort_by_key(|issue| severity_rank(&issue.severity));
         agent_reports.push(AgentReport {
-            agent_id: agent_id_to_str(&adapter.id()),
-            display_name: descriptor.display_name,
-            detection_status: format!("{:?}", det.status),
-            roots: std::mem::take(&mut root_reports),
+            agent_id: agent_id_to_str(&pending.agent_id),
+            display_name: pending.display_name,
+            detection_status: pending.detection_status,
+            roots,
             skills: skill_reports,
-            issues: sorted_issues,
-            outcome: format!("{:?}", scan_result.outcome),
+            issues,
+            outcome: format!("{:?}", pending.scan_result.outcome),
         });
     }
+    recorder.record_counted_phase(
+        DiagnosticPhase::ReportSerialization,
+        None,
+        EventCounters {
+            fingerprinted_files,
+            ..EventCounters::default()
+        },
+        serialization_started,
+        DiagnosticOutcome::Success,
+    );
 
     let completed = SystemTime::now();
     let report = ScanReport {
@@ -819,6 +871,13 @@ mod tests {
             fs::create_dir_all(&path).unwrap();
             custom_paths.insert(adapter_id.to_string(), path.to_string_lossy().into_owned());
         }
+        let claude_skill = root.join("claude-code").join("diagnostic-skill");
+        fs::create_dir_all(&claude_skill).unwrap();
+        fs::write(
+            claude_skill.join("SKILL.md"),
+            "---\nname: diagnostic-skill\ndescription: Fixture\n---\n",
+        )
+        .unwrap();
         ScanFixture { root, custom_paths }
     }
 
@@ -857,6 +916,37 @@ mod tests {
         assert!(events
             .iter()
             .any(|event| event["operation"] == "scan_agents" && event["eventType"] == "operation"));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event["phase"] == "adapter_scan")
+                .count(),
+            24
+        );
+        let serialization_events: Vec<_> = events
+            .iter()
+            .filter(|event| event["phase"] == "report_serialization")
+            .collect();
+        assert_eq!(serialization_events.len(), 1);
+        assert_eq!(
+            serialization_events[0]["counters"]["fingerprintedFiles"],
+            1
+        );
+    }
+
+    #[test]
+    fn first_automatic_operation_hydrates_a_persisted_enabled_setting() {
+        let state = AppState::default();
+        let conn = crate::modules::db::open_db(Some(Path::new(":memory:"))).unwrap();
+        crate::modules::db::set_performance_diagnostics_enabled(&conn, true).unwrap();
+
+        let enabled = hydrate_diagnostics_enabled(&state, || {
+            crate::modules::db::get_performance_diagnostics_enabled(&conn)
+                .map_err(|error| error.to_string())
+        });
+
+        assert!(enabled);
+        assert!(state.performance_diagnostics_enabled.load(Ordering::Acquire));
     }
 
     #[test]

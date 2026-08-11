@@ -420,30 +420,32 @@ pub fn scan_master_repo(
     );
 
     let sqlite_started = Instant::now();
-    let mut database_writes = 0u64;
+    // Count intended synchronization writes even when SQLite is unavailable; the phase outcome
+    // still records that the writes could not be attempted.
+    let database_writes = reports
+        .iter()
+        .map(|report| 1 + report.linked_agents.len() as u64)
+        .sum();
     let mut sqlite_outcome = DiagnosticOutcome::Success;
     match crate::modules::db::open_db(None) {
         Ok(conn) => {
             for report in &reports {
-                if crate::modules::db::upsert_master_skill(
+                let _ = crate::modules::db::upsert_master_skill(
                     &conn,
                     &report.name,
                     &report.description,
                     "",
                     "",
                     1,
-                )
-                .is_ok()
-                {
-                    database_writes += 1;
-                }
+                );
                 for (agent_id, &is_linked) in &report.linked_agents {
                     let status = if is_linked { "linked" } else { "unlinked" };
-                    if crate::modules::db::upsert_agent_symlink(&conn, agent_id, &report.name, status)
-                        .is_ok()
-                    {
-                        database_writes += 1;
-                    }
+                    let _ = crate::modules::db::upsert_agent_symlink(
+                        &conn,
+                        agent_id,
+                        &report.name,
+                        status,
+                    );
                 }
             }
         }
@@ -1472,10 +1474,17 @@ mod tests {
     fn master_scan_records_link_and_sqlite_aggregates() {
         let events = run_master_scan_with_diagnostics(master_fixture());
 
-        assert!(events
+        let link_event = events
             .iter()
-            .any(|event| event["phase"] == "link_reconciliation"));
-        assert!(events.iter().any(|event| event["phase"] == "sqlite_sync"));
+            .find(|event| event["phase"] == "link_reconciliation")
+            .unwrap();
+        assert_eq!(link_event["counters"]["masterSkills"], 1);
+        assert_eq!(link_event["counters"]["agentLinkChecks"], 24);
+        let sqlite_event = events
+            .iter()
+            .find(|event| event["phase"] == "sqlite_sync")
+            .unwrap();
+        assert_eq!(sqlite_event["counters"]["databaseWrites"], 25);
     }
 
     #[test]
