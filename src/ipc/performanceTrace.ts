@@ -34,7 +34,9 @@ export async function traceDiagnosticRequest<T>(
 
   const inFlightSameOperation = incrementInFlight(operation);
   try {
-    return await request({ operationId: crypto.randomUUID(), inFlightSameOperation });
+    const result = await request({ operationId: crypto.randomUUID(), inFlightSameOperation });
+    await usePerformanceDiagnosticsStore.getState().refreshSummary().catch(() => undefined);
+    return result;
   } finally {
     decrementInFlight(operation);
   }

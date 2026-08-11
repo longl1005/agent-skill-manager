@@ -35,6 +35,8 @@ const reportSummaryFixture = {
   report_directory_label: "~/.asm/diagnostics",
 };
 
+const defaultRefreshDiagnosticsSummary = usePerformanceDiagnosticsStore.getState().refreshSummary;
+
 describe("Settings route & i18n / Theme Switcher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,7 +58,11 @@ describe("Settings route & i18n / Theme Switcher", () => {
     useThemeStore.getState().setThemeMode("system");
     useAgentConfigStore.setState({ customPaths: {}, disabledAgentIds: [], agentOrder: [] });
     useScanStore.setState({ report: null, scanning: false, error: null });
-    usePerformanceDiagnosticsStore.setState({ enabled: false, summary: reportSummaryFixture });
+    usePerformanceDiagnosticsStore.setState({
+      enabled: false,
+      summary: reportSummaryFixture,
+      refreshSummary: defaultRefreshDiagnosticsSummary,
+    });
     vi.mocked(getPerformanceDiagnosticsSummary).mockResolvedValue(reportSummaryFixture);
     saveMock.mockResolvedValue(null);
   });
@@ -154,6 +160,15 @@ describe("Settings route & i18n / Theme Switcher", () => {
     fireEvent.click(toggle);
 
     await waitFor(() => expect(setPerformanceDiagnosticsEnabled).toHaveBeenCalledWith(true));
+  });
+
+  it("refreshes the persisted diagnostics summary when the settings page opens", async () => {
+    const refreshSummary = vi.fn().mockResolvedValue(undefined);
+    usePerformanceDiagnosticsStore.setState({ refreshSummary });
+
+    render(<Settings />);
+
+    await waitFor(() => expect(refreshSummary).toHaveBeenCalled());
   });
 
   it("requires confirmation before clearing diagnostic reports", () => {

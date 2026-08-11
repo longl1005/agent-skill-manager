@@ -11,34 +11,36 @@ import type { PerformanceDiagnosticsSummary } from "../ipc/types";
 export interface PerformanceDiagnosticsState {
   enabled: boolean;
   summary: PerformanceDiagnosticsSummary | null;
+  refreshSummary: () => Promise<void>;
   hydrate: () => Promise<void>;
   setEnabled: (enabled: boolean) => Promise<void>;
   exportReport: (destination: string) => Promise<void>;
   clearReports: () => Promise<void>;
 }
 
-export const usePerformanceDiagnosticsStore = create<PerformanceDiagnosticsState>((set) => ({
+export const usePerformanceDiagnosticsStore = create<PerformanceDiagnosticsState>((set, get) => ({
   enabled: false,
   summary: null,
+  refreshSummary: async () => {
+    const summary = await getPerformanceDiagnosticsSummary();
+    set({ summary });
+  },
   hydrate: async () => {
     const enabled = await getPerformanceDiagnosticsEnabled();
-    const summary = await getPerformanceDiagnosticsSummary();
-    set({ enabled, summary });
+    set({ enabled });
+    await get().refreshSummary();
   },
   setEnabled: async (enabled) => {
     await setPerformanceDiagnosticsEnabled(enabled);
     set({ enabled });
-    const summary = await getPerformanceDiagnosticsSummary();
-    set({ summary });
+    await get().refreshSummary();
   },
   exportReport: async (destination) => {
     await exportPerformanceDiagnostics(destination);
-    const summary = await getPerformanceDiagnosticsSummary();
-    set({ summary });
+    await get().refreshSummary();
   },
   clearReports: async () => {
     await clearPerformanceDiagnostics();
-    const summary = await getPerformanceDiagnosticsSummary();
-    set({ summary });
+    await get().refreshSummary();
   },
 }));

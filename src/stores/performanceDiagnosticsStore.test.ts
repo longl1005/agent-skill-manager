@@ -42,6 +42,14 @@ describe("performanceDiagnosticsStore", () => {
     expect(usePerformanceDiagnosticsStore.getState()).toMatchObject({ enabled: true, summary: enabledSummary });
   });
 
+  it("refreshes the current report summary on demand", async () => {
+    vi.mocked(commands.getPerformanceDiagnosticsSummary).mockResolvedValueOnce(enabledSummary);
+
+    await usePerformanceDiagnosticsStore.getState().refreshSummary();
+
+    expect(usePerformanceDiagnosticsStore.getState().summary).toEqual(enabledSummary);
+  });
+
   it("refreshes the summary after enabling diagnostics", async () => {
     vi.mocked(commands.setPerformanceDiagnosticsEnabled).mockResolvedValueOnce(undefined);
     vi.mocked(commands.getPerformanceDiagnosticsSummary).mockResolvedValueOnce(enabledSummary);

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AgentIdentityMark } from "../components/AgentVisual";
 import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
 import { useI18nStore } from "../stores/i18nStore";
@@ -99,6 +99,7 @@ export default function Settings() {
   const updateStatus = useUpdateStore((state) => state.status);
   const diagnosticsEnabled = usePerformanceDiagnosticsStore((state) => state.enabled);
   const diagnosticsSummary = usePerformanceDiagnosticsStore((state) => state.summary);
+  const refreshDiagnosticsSummary = usePerformanceDiagnosticsStore((state) => state.refreshSummary);
   const setDiagnosticsEnabled = usePerformanceDiagnosticsStore((state) => state.setEnabled);
   const exportDiagnosticsReport = usePerformanceDiagnosticsStore((state) => state.exportReport);
   const clearDiagnosticsReports = usePerformanceDiagnosticsStore((state) => state.clearReports);
@@ -121,6 +122,10 @@ export default function Settings() {
   const [diagnosticsError, setDiagnosticsError] = useState(false);
   const [isClearDiagnosticsDialogOpen, setIsClearDiagnosticsDialogOpen] = useState(false);
   const draggedAgentIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    void refreshDiagnosticsSummary().catch(() => undefined);
+  }, [refreshDiagnosticsSummary]);
 
   const handleInputChange = (agentId: string, val: string) => {
     setInputPaths((prev) => ({ ...prev, [agentId]: val }));

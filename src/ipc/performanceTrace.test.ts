@@ -14,6 +14,7 @@ function diagnosticState(enabled: boolean): PerformanceDiagnosticsState {
   return {
     enabled,
     summary: null,
+    refreshSummary: vi.fn().mockResolvedValue(undefined),
     hydrate: vi.fn(),
     setEnabled: vi.fn(),
     exportReport: vi.fn(),
@@ -35,6 +36,15 @@ describe("traceDiagnosticRequest", () => {
 
     expect(request).toHaveBeenCalledWith({ operationId: "00000000-0000-4000-8000-000000000001", inFlightSameOperation: 1 });
     expect(getInFlightCount("scan_agents")).toBe(0);
+  });
+
+  it("refreshes the diagnostic summary after a traced request completes", async () => {
+    const state = diagnosticState(true);
+    vi.mocked(usePerformanceDiagnosticsStore.getState).mockReturnValue(state);
+
+    await traceDiagnosticRequest("scan_agents", async () => "completed");
+
+    expect(state.refreshSummary).toHaveBeenCalledOnce();
   });
 
   it("decrements the in-flight count when the traced request rejects", async () => {
