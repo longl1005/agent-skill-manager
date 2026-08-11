@@ -137,6 +137,8 @@ describe("SkillLibrary Route", () => {
     expect(localStorage.getItem("asm_skill_library_view")).toBe("list");
     expect(screen.getByTestId("skill-card-web-search-pro")).toHaveClass("master-skill-card--list");
     expect(screen.getByText("1 linked Agent")).toBeVisible();
+    expect(screen.getByTestId("skill-card-web-search-pro").querySelector(".agent-distribution-section"))
+      .toHaveClass("agent-distribution-section--compact");
 
     fireEvent.click(screen.getByRole("button", { name: "Card view" }));
 

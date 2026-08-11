@@ -341,7 +341,7 @@ export default function SkillLibrary() {
                   {t("skillLibrary.linkedAgentCount", lang).replace("{count}", String(linkedCount))}
                 </span>
 
-                <div className="agent-distribution-section">
+                <div className={`agent-distribution-section ${skillView === "list" ? "agent-distribution-section--compact" : ""}`}>
                   <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>
                   <div className="agent-matrix-badges">
                 {supportedAgents.map((agent) => {
@@ -364,7 +364,7 @@ export default function SkillLibrary() {
                           data-testid={`agent-badge-${skill.name}-${agent.id}`}
                         >
                           <div className="badge-agent-info">
-                            <AgentIdentityMark agentId={agent.id} />
+                            <AgentIdentityMark agentId={agent.id} size={skillView === "list" ? 20 : 32} />
                           </div>
                           <span className={`link-status-tag ${isLinked ? "status-linked" : "status-unlinked"}`}>
                             {isToggling
