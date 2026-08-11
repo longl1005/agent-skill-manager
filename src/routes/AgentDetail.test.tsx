@@ -63,6 +63,28 @@ describe("AgentDetail", () => {
     expect(screen.queryByRole("heading", { name: "All Agents" })).not.toBeInTheDocument();
   });
 
+  it("identifies Antigravity configuration and builtin roots by their real paths", () => {
+    useI18nStore.setState({ lang: "zh" });
+    useScanStore.setState({ report: {
+      ...reportFixture,
+      agents: [{
+        ...reportFixture.agents[0],
+        agent_id: "antigravity",
+        display_name: "Antigravity",
+        roots: [
+          { root_id: "config-skills", scope: "User", display_path: "~/.gemini/config/skills" },
+          { root_id: "builtin-skills", scope: "User", display_path: "~/.gemini/antigravity/builtin/skills" },
+        ],
+      }],
+    } });
+
+    renderDetail("/agents/antigravity");
+
+    expect(screen.getByText("已扫描 2 个目录")).toBeVisible();
+    expect(screen.getByRole("button", { name: /配置技能目录.*\.gemini\/config\/skills/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /内置技能目录.*antigravity\/builtin\/skills/ })).toBeVisible();
+  });
+
   it("rescans the Agent inventory and refreshes master skill status from the detail page", async () => {
     const scan = vi.fn().mockResolvedValue(undefined);
     const fetchMasterSkills = vi.fn().mockResolvedValue(undefined);

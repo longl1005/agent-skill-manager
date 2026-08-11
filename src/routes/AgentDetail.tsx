@@ -30,6 +30,17 @@ function StatusWithDot({ status }: { status: string }) {
 
 type SkillSort = "recent" | "name";
 
+function rootLabel(rootId: string, lang: "zh" | "en") {
+  const labels = {
+    "config-skills": ["配置技能目录", "Configuration skills"],
+    "builtin-skills": ["内置技能目录", "Builtin skills"],
+    "global-skills": ["全局技能目录", "Global skills"],
+    "custom-skills": ["自定义技能目录", "Custom skills"],
+    "marketplace-skills": ["市场技能目录", "Marketplace skills"],
+  } as const;
+  return labels[rootId as keyof typeof labels]?.[lang === "zh" ? 0 : 1] ?? (lang === "zh" ? "主技能目录" : "Primary skills");
+}
+
 export default function AgentDetail() {
   const { agentId } = useParams();
   const { report, error, scanning, scan } = useScanStore();
@@ -162,7 +173,7 @@ export default function AgentDetail() {
           ) : (
             <div className="agent-detail__roots" aria-label={lang === "zh" ? "已扫描目录" : "Scanned directories"}>
               <span className="agent-detail__roots-label">{lang === "zh" ? `已扫描 ${agent.roots.length} 个目录` : `${agent.roots.length} scanned directories`}</span>
-              {agent.roots.map((root) => <button key={root.root_id} type="button" className="agent-detail__root-button" title={root.display_path} onClick={() => void openSkillDirectory(root.display_path)}>{root.root_id === "marketplace-skills" ? (lang === "zh" ? "市场技能目录" : "Marketplace skills") : (lang === "zh" ? "主技能目录" : "Primary skills")}</button>)}
+              {agent.roots.map((root) => <button key={root.root_id} type="button" className="agent-detail__root-button" title={root.display_path} onClick={() => void openSkillDirectory(root.display_path)}>{rootLabel(root.root_id, lang)} · <code>{root.display_path}</code></button>)}
             </div>
           )}
           <StatusWithDot status={agent.detection_status} />

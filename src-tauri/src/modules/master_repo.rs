@@ -96,7 +96,7 @@ pub fn get_agent_skills_dir(
         "roo-code" => Some(home.join(".roo").join("skills")),
         "windsurf" => Some(home.join(".codeium").join("windsurf").join("skills")),
         "codex" => Some(home.join(".codex").join("skills")),
-        "antigravity" => Some(home.join(".gemini").join("antigravity").join("skills")),
+        "antigravity" => Some(home.join(".gemini").join("config").join("skills")),
         "pi-agent" => {
             let pi_agent_dir = home.join(".pi").join("agent").join("skills");
             let pi_dir = home.join(".pi").join("skills");

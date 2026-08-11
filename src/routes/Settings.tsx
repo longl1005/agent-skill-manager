@@ -77,7 +77,7 @@ const knownAgents: AgentPathItem[] = [
   { id: "roo-code", name: "Roo Code", defaultPath: "~/.roo/skills" },
   { id: "windsurf", name: "Windsurf", defaultPath: "~/.codeium/windsurf/skills" },
   { id: "codex", name: "Codex", defaultPath: "~/.codex/skills" },
-  { id: "antigravity", name: "Antigravity", defaultPath: "~/.gemini/antigravity/skills" },
+  { id: "antigravity", name: "Antigravity", defaultPath: "~/.gemini/config/skills" },
   { id: "pi-agent", name: "Pi Agent", defaultPath: "~/.pi/agent/skills" },
   { id: "oh-my-pi", name: "Oh My Pi (OPM)", defaultPath: "~/.omp/agent/skills" },
   { id: "grok", name: "Grok", defaultPath: "~/.grok/skills" },
@@ -295,6 +295,7 @@ export default function Settings() {
 
         {isConfigurable && !isDetectedAndDisabled ? (
           <div className="settings-agent-path-card__body">
+            {agent.id === "antigravity" && <p className="settings-agent-path-hint">{t("settings.paths.antigravityHint", lang)}</p>}
             <label className="settings-agent-path-label" htmlFor={`agent-path-${agent.id}`}>
               {t("settings.paths.inputLabel", lang)}
             </label>

@@ -132,6 +132,18 @@ describe("Settings route & i18n / Theme Switcher", () => {
     expect(screen.queryByText("已关闭，重新开启后不会自动恢复 Skills 链接。")).not.toBeInTheDocument();
   });
 
+  it("uses Antigravity's writable configuration directory as the settings default", () => {
+    useScanStore.setState({ report: {
+      scan_id: "test", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,
+      agents: [{ agent_id: "antigravity", display_name: "Antigravity", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" }],
+    } });
+
+    render(<Settings />);
+
+    expect(screen.getByText("~/.gemini/config/skills")).toBeVisible();
+    expect(screen.getByText("配置目录会用于分发；内置目录仅扫描，不会写入 Skills。")).toBeVisible();
+  });
+
   it("reorders cards through pointer dragging", () => {
     useScanStore.setState({ report: {
       scan_id: "test", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,

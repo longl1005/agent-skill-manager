@@ -1,5 +1,6 @@
 //! Antigravity (反重力) Adapter 真实实现。
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -132,21 +133,23 @@ impl AgentAdapter for AntigravityAdapter {
             || std::fs::symlink_metadata(&config_dir).is_ok();
 
         let candidate_roots = [
+            (config_dir.join("skills"), "config-skills", RootScope::User),
             (antigravity_dir.join("skills"), "user-skills", RootScope::User),
             (antigravity_dir.join("builtin").join("skills"), "builtin-skills", RootScope::User),
-            (config_dir.join("skills"), "config-skills", RootScope::User),
             (antigravity_dir.join("global").join("skills"), "global-skills", RootScope::User),
         ];
 
         let mut roots = Vec::new();
+        let mut seen_paths = HashSet::new();
         for (path, root_id, scope) in &candidate_roots {
             let present =
                 std::fs::metadata(path).is_ok() || std::fs::symlink_metadata(path).is_ok();
-            if present {
+            let canonical_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
+            if present && seen_paths.insert(canonical_path.clone()) {
                 roots.push(SkillRoot {
                     root_id: (*root_id).to_string(),
                     display_path: path.clone(),
-                    canonical_path: path.clone(),
+                    canonical_path,
                     scope: *scope,
                 });
             }
@@ -473,6 +476,32 @@ mod tests {
         assert_eq!(r.status, DetectionStatus::Detected);
         assert_eq!(r.roots.len(), 1);
         assert_eq!(r.roots[0].root_id, "builtin-skills");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn antigravity_deduplicates_a_skills_symlink_to_the_config_root() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempdir();
+        let home = tmp.join("home");
+        let config_skills = home.join(".gemini/config/skills");
+        fs::create_dir_all(&config_skills).unwrap();
+        let user_parent = home.join(".gemini/antigravity");
+        fs::create_dir_all(&user_parent).unwrap();
+        symlink(&config_skills, user_parent.join("skills")).unwrap();
+        let cwd = tmp.join("cwd");
+        fs::create_dir_all(&cwd).unwrap();
+        let ctx = DetectContext {
+            platform: Box::leak(Box::new(fake_platform(&home, &cwd))),
+            custom_path: None,
+        };
+
+        let r = AntigravityAdapter.detect(&ctx);
+
+        assert_eq!(r.roots.len(), 1);
+        assert_eq!(r.roots[0].root_id, "config-skills");
+        assert_eq!(r.roots[0].canonical_path, fs::canonicalize(config_skills).unwrap());
     }
 
     #[test]
