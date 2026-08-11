@@ -2,9 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, UNIX_EPOCH};
 
 use crate::modules::platform::user_home_dir;
+use crate::modules::performance::{
+    DiagnosticErrorCategory, DiagnosticOutcome, DiagnosticPhase, EventCounters, OperationRecorder,
+};
 use crate::modules::util::parse_frontmatter;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -271,18 +274,38 @@ pub fn is_valid_symlink_to(target_symlink: &Path, master_path: &Path) -> bool {
     false
 }
 
-pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<MasterSkillReport> {
+pub fn scan_master_repo(
+    custom_paths: Option<&HashMap<String, String>>,
+    recorder: &mut OperationRecorder,
+) -> Vec<MasterSkillReport> {
+    let enumeration_started = Instant::now();
     let master_dir = get_master_dir(custom_paths);
     if !master_dir.exists() {
+        recorder.record_counted_phase(
+            DiagnosticPhase::MasterEnumeration,
+            None,
+            EventCounters::default(),
+            enumeration_started,
+            DiagnosticOutcome::Success,
+        );
         return Vec::new();
     }
 
     let entries = match fs::read_dir(&master_dir) {
         Ok(e) => e,
-        Err(_) => return Vec::new(),
+        Err(_) => {
+            recorder.record_counted_phase(
+                DiagnosticPhase::MasterEnumeration,
+                None,
+                EventCounters::default(),
+                enumeration_started,
+                DiagnosticOutcome::Error(DiagnosticErrorCategory::Io),
+            );
+            return Vec::new();
+        }
     };
 
-    let mut reports = Vec::new();
+    let mut discovered = Vec::new();
     let known_agents = [
         "claude-code",
         "cline",
@@ -336,8 +359,27 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
         let name = parsed_name.unwrap_or_else(|| file_name.clone());
         let description = parsed_desc.unwrap_or_default();
 
+        discovered.push((path, file_name, name, description));
+    }
+
+    recorder.record_counted_phase(
+        DiagnosticPhase::MasterEnumeration,
+        None,
+        EventCounters {
+            master_skills: discovered.len() as u64,
+            ..EventCounters::default()
+        },
+        enumeration_started,
+        DiagnosticOutcome::Success,
+    );
+
+    let reconciliation_started = Instant::now();
+    let mut reports = Vec::new();
+    let mut agent_link_checks = 0u64;
+    for (path, file_name, name, description) in discovered {
         let mut linked_agents = HashMap::new();
         for &agent_id in &known_agents {
+            agent_link_checks += 1;
             let is_linked = if let Some(agent_dir) = get_agent_skills_dir(agent_id, custom_paths) {
                 let target_symlink = agent_dir.join(&file_name);
                 if is_valid_symlink_to(&target_symlink, &path) {
@@ -349,15 +391,6 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
                 false
             };
             linked_agents.insert(agent_id.to_string(), is_linked);
-        }
-
-        // Sync to SQLite database
-        if let Ok(conn) = crate::modules::db::open_db(None) {
-            let _ = crate::modules::db::upsert_master_skill(&conn, &name, &description, "", "", 1);
-            for (agent_id, &is_linked) in &linked_agents {
-                let status = if is_linked { "linked" } else { "unlinked" };
-                let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, &name, status);
-            }
         }
 
         reports.push(MasterSkillReport {
@@ -373,6 +406,61 @@ pub fn scan_master_repo(custom_paths: Option<&HashMap<String, String>>) -> Vec<M
             linked_agents,
         });
     }
+
+    recorder.record_counted_phase(
+        DiagnosticPhase::LinkReconciliation,
+        None,
+        EventCounters {
+            master_skills: reports.len() as u64,
+            agent_link_checks,
+            ..EventCounters::default()
+        },
+        reconciliation_started,
+        DiagnosticOutcome::Success,
+    );
+
+    let sqlite_started = Instant::now();
+    let mut database_writes = 0u64;
+    let mut sqlite_outcome = DiagnosticOutcome::Success;
+    match crate::modules::db::open_db(None) {
+        Ok(conn) => {
+            for report in &reports {
+                if crate::modules::db::upsert_master_skill(
+                    &conn,
+                    &report.name,
+                    &report.description,
+                    "",
+                    "",
+                    1,
+                )
+                .is_ok()
+                {
+                    database_writes += 1;
+                }
+                for (agent_id, &is_linked) in &report.linked_agents {
+                    let status = if is_linked { "linked" } else { "unlinked" };
+                    if crate::modules::db::upsert_agent_symlink(&conn, agent_id, &report.name, status)
+                        .is_ok()
+                    {
+                        database_writes += 1;
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            sqlite_outcome = DiagnosticOutcome::Error(DiagnosticErrorCategory::Io);
+        }
+    }
+    recorder.record_counted_phase(
+        DiagnosticPhase::SqliteSync,
+        None,
+        EventCounters {
+            database_writes,
+            ..EventCounters::default()
+        },
+        sqlite_started,
+        sqlite_outcome,
+    );
 
     // The master library is an installation workspace, not a dictionary.
     // Show the newest folder first so a just-installed skill is immediately
@@ -1220,6 +1308,52 @@ mod tests {
         p
     }
 
+    fn master_fixture() -> PathBuf {
+        let root = temp_dir();
+        let master_skill = root.join("master").join("diagnostic-skill");
+        fs::create_dir_all(&master_skill).unwrap();
+        fs::write(
+            master_skill.join("SKILL.md"),
+            "---\nname: diagnostic-skill\ndescription: Fixture\n---\n",
+        )
+        .unwrap();
+        root
+    }
+
+    fn run_master_scan_with_diagnostics(root: PathBuf) -> Vec<serde_json::Value> {
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), root.join("master").to_string_lossy().into_owned());
+        for agent_id in [
+            "claude-code", "cline", "codebuddy", "github-copilot", "droid", "qoder",
+            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "augment",
+            "roo-code", "windsurf", "codex", "antigravity", "pi-agent", "oh-my-pi",
+            "grok", "kiro", "trae", "trae-cn", "opencode", "cursor",
+        ] {
+            let agent_dir = root.join(agent_id);
+            fs::create_dir_all(&agent_dir).unwrap();
+            custom_paths.insert(agent_id.to_string(), agent_dir.to_string_lossy().into_owned());
+        }
+
+        let mut recorder = OperationRecorder::enabled_at(
+            &root,
+            crate::modules::performance::DiagnosticOperation::GetMasterSkills,
+            None,
+        );
+        let _ = scan_master_repo(Some(&custom_paths), &mut recorder);
+        recorder
+            .finish(crate::modules::performance::DiagnosticOutcome::Success)
+            .unwrap();
+
+        let events = fs::read_dir(root.join("diagnostics"))
+            .unwrap()
+            .flatten()
+            .flat_map(|entry| fs::read_to_string(entry.path()).unwrap().lines().map(str::to_owned).collect::<Vec<_>>())
+            .map(|line| serde_json::from_str(&line).unwrap())
+            .collect();
+        let _ = fs::remove_dir_all(root);
+        events
+    }
+
     #[test]
     fn git_skill_discovery_finds_nested_skill_metadata() {
         let repo = temp_dir();
@@ -1308,7 +1442,8 @@ mod tests {
         );
         custom_paths.insert("pi-agent".to_string(), pi_dir.to_string_lossy().to_string());
 
-        let reports = scan_master_repo(Some(&custom_paths));
+        let mut recorder = OperationRecorder::disabled();
+        let reports = scan_master_repo(Some(&custom_paths), &mut recorder);
         assert_eq!(reports.len(), 1);
         assert_eq!(reports[0].name, "skill-a");
         assert_eq!(reports[0].description, "Skill A desc");
@@ -1316,7 +1451,7 @@ mod tests {
 
         toggle_skill_symlink("claude-code", "skill-a", true, Some(&custom_paths)).unwrap();
 
-        let reports_after = scan_master_repo(Some(&custom_paths));
+        let reports_after = scan_master_repo(Some(&custom_paths), &mut recorder);
         assert_eq!(
             reports_after[0].linked_agents.get("claude-code"),
             Some(&true)
@@ -1324,13 +1459,23 @@ mod tests {
         assert_eq!(reports_after[0].linked_agents.get("codex"), Some(&false));
 
         toggle_skill_symlink("claude-code", "skill-a", false, Some(&custom_paths)).unwrap();
-        let reports_after_untoggle = scan_master_repo(Some(&custom_paths));
+        let reports_after_untoggle = scan_master_repo(Some(&custom_paths), &mut recorder);
         assert_eq!(
             reports_after_untoggle[0].linked_agents.get("claude-code"),
             Some(&false)
         );
 
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn master_scan_records_link_and_sqlite_aggregates() {
+        let events = run_master_scan_with_diagnostics(master_fixture());
+
+        assert!(events
+            .iter()
+            .any(|event| event["phase"] == "link_reconciliation"));
+        assert!(events.iter().any(|event| event["phase"] == "sqlite_sync"));
     }
 
     #[test]

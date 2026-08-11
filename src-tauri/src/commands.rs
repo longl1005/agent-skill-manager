@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
@@ -13,12 +13,17 @@ use crate::modules::adapter::{
     Platform, PlatformContext, QoderAdapter, QwenCodeAdapter, RooCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult, TraeAdapter,
     TraeCnAdapter, WindsurfAdapter, WorkBuddyAdapter,
 };
+use crate::modules::performance::{
+    DiagnosticContext, DiagnosticErrorCategory, DiagnosticOperation, DiagnosticOutcome,
+    DiagnosticPhase, EventCounters, OperationRecorder,
+};
 
 /// 整个 app 共享的 state。
 #[derive(Default)]
 pub struct AppState {
     pub last_report: Mutex<Option<ScanReport>>,
     pub last_inventory: Mutex<Option<crate::modules::inventory::Inventory>>,
+    pub performance_diagnostics_enabled: AtomicBool,
 }
 
 // ============================================================
@@ -86,6 +91,93 @@ pub fn open_skill_directory(location: String) -> Result<(), String> {
         .map_err(|error| format!("Unable to open skill directory: {error}"))
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PerformanceDiagnosticsSummary {
+    pub enabled: bool,
+    pub report_count: usize,
+    pub newest_event_at_ms: Option<u128>,
+    pub report_directory_label: &'static str,
+}
+
+#[tauri::command]
+pub fn get_performance_diagnostics_enabled(
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, String> {
+    let conn = crate::modules::db::open_db(None).map_err(|error| error.to_string())?;
+    get_diagnostics_enabled(&conn, &state)
+}
+
+#[tauri::command]
+pub fn set_performance_diagnostics_enabled(
+    state: tauri::State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let conn = crate::modules::db::open_db(None).map_err(|error| error.to_string())?;
+    set_diagnostics_enabled(&conn, &state, enabled)
+}
+
+fn get_diagnostics_enabled(
+    conn: &rusqlite::Connection,
+    state: &AppState,
+) -> Result<bool, String> {
+    let enabled = crate::modules::db::get_performance_diagnostics_enabled(conn)
+        .map_err(|error| error.to_string())?;
+    state
+        .performance_diagnostics_enabled
+        .store(enabled, Ordering::Release);
+    Ok(enabled)
+}
+
+fn set_diagnostics_enabled(
+    conn: &rusqlite::Connection,
+    state: &AppState,
+    enabled: bool,
+) -> Result<(), String> {
+    crate::modules::db::set_performance_diagnostics_enabled(conn, enabled)
+        .map_err(|error| error.to_string())?;
+    state
+        .performance_diagnostics_enabled
+        .store(enabled, Ordering::Release);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_performance_diagnostics_summary() -> Result<PerformanceDiagnosticsSummary, String> {
+    let conn = crate::modules::db::open_db(None).map_err(|error| error.to_string())?;
+    let enabled = crate::modules::db::get_performance_diagnostics_enabled(&conn)
+        .map_err(|error| error.to_string())?;
+    let summary = crate::modules::performance::summarize_reports().map_err(|error| error.to_string())?;
+
+    Ok(diagnostics_summary_response(enabled, summary))
+}
+
+fn diagnostics_summary_response(
+    enabled: bool,
+    summary: crate::modules::performance::PerformanceDiagnosticsSummary,
+) -> PerformanceDiagnosticsSummary {
+    PerformanceDiagnosticsSummary {
+        enabled,
+        report_count: summary.report_count,
+        newest_event_at_ms: summary.newest_event_at_ms,
+        report_directory_label: "~/.asm/diagnostics",
+    }
+}
+
+#[tauri::command]
+pub fn export_performance_diagnostics(destination: String) -> Result<(), String> {
+    crate::modules::performance::export_reports(&PathBuf::from(destination))
+        .map(|_| ())
+        .map_err(|_| "Unable to export performance diagnostics".to_string())
+}
+
+#[tauri::command]
+pub fn clear_performance_diagnostics() -> Result<(), String> {
+    crate::modules::performance::clear_reports()
+        .map(|_| ())
+        .map_err(|_| "Unable to clear performance diagnostics".to_string())
+}
+
 // ============================================================
 // scan_agents 命令（M0 新增）
 // ============================================================
@@ -145,7 +237,30 @@ pub struct IssueReport {
 pub fn scan_agents(
     state: tauri::State<'_, AppState>,
     custom_paths: Option<std::collections::HashMap<String, String>>,
+    diagnostic_context: Option<DiagnosticContext>,
 ) -> Result<ScanReport, String> {
+    let recorder = operation_recorder(&state, DiagnosticOperation::ScanAgents, diagnostic_context);
+    scan_agents_with_recorder(&state, custom_paths, recorder)
+}
+
+fn operation_recorder(
+    state: &AppState,
+    operation: DiagnosticOperation,
+    diagnostic_context: Option<DiagnosticContext>,
+) -> OperationRecorder {
+    if state.performance_diagnostics_enabled.load(Ordering::Acquire) {
+        OperationRecorder::enabled(operation, diagnostic_context)
+    } else {
+        OperationRecorder::disabled()
+    }
+}
+
+fn scan_agents_with_recorder(
+    state: &AppState,
+    custom_paths: Option<std::collections::HashMap<String, String>>,
+    mut recorder: OperationRecorder,
+) -> Result<ScanReport, String> {
+    let result: Result<ScanReport, String> = (|| {
     let started_at = SystemTime::now();
 
     // 构造 platform context
@@ -194,25 +309,28 @@ pub fn scan_agents(
         let custom_pathbuf =
             custom_path_str.map(|path| crate::modules::master_repo::expand_config_path(path));
 
-        let custom_det = adapter.detect(&DetectContext {
-            platform: &platform_ctx,
-            custom_path: custom_pathbuf.as_deref(),
-        });
-        // A custom Skills directory augments detection, but a missing/invalid path
-        // must not make an installed Agent disappear from the UI.
-        let det = if custom_pathbuf.is_some() && custom_det.roots.is_empty() {
-            let mut fallback = adapter.detect(&DetectContext {
+        let det = {
+            let _detect_phase = recorder.start_phase(DiagnosticPhase::AdapterDetect, None);
+            let custom_det = adapter.detect(&DetectContext {
                 platform: &platform_ctx,
-                custom_path: None,
+                custom_path: custom_pathbuf.as_deref(),
             });
-            if !fallback.roots.is_empty() {
-                fallback.issues.extend(custom_det.issues);
-                fallback
+            // A custom Skills directory augments detection, but a missing/invalid path
+            // must not make an installed Agent disappear from the UI.
+            if custom_pathbuf.is_some() && custom_det.roots.is_empty() {
+                let mut fallback = adapter.detect(&DetectContext {
+                    platform: &platform_ctx,
+                    custom_path: None,
+                });
+                if !fallback.roots.is_empty() {
+                    fallback.issues.extend(custom_det.issues);
+                    fallback
+                } else {
+                    custom_det
+                }
             } else {
                 custom_det
             }
-        } else {
-            custom_det
         };
         let roots = adapter.skill_roots(&det);
         let descriptor = adapter.descriptor();
@@ -228,41 +346,45 @@ pub fn scan_agents(
             .collect();
 
         let scan_id = ScanId::new();
-        let scan_result: ScanResult = if roots.is_empty() {
-            // 跳过 scan, 但报告里仍带 issues (detect 的)
-            ScanResult {
-                scan_id,
-                agent_id: adapter.id(),
-                outcome: match det.status {
-                    crate::modules::adapter::DetectionStatus::Failed => {
-                        crate::modules::adapter::ScanOutcome::Failed
-                    }
-                    crate::modules::adapter::DetectionStatus::Unavailable => {
-                        crate::modules::adapter::ScanOutcome::Completed
-                    }
-                    _ => crate::modules::adapter::ScanOutcome::Completed,
-                },
-                completeness: crate::modules::adapter::ScanCompleteness::Complete,
-                installations: vec![],
-                issues: det.issues.clone(),
-                started_at,
-                completed_at: SystemTime::now(),
+        let scan_result: ScanResult = {
+            let _scan_phase = recorder.start_phase(DiagnosticPhase::AdapterScan, None);
+            if roots.is_empty() {
+                // 跳过 scan, 但报告里仍带 issues (detect 的)
+                ScanResult {
+                    scan_id,
+                    agent_id: adapter.id(),
+                    outcome: match det.status {
+                        crate::modules::adapter::DetectionStatus::Failed => {
+                            crate::modules::adapter::ScanOutcome::Failed
+                        }
+                        crate::modules::adapter::DetectionStatus::Unavailable => {
+                            crate::modules::adapter::ScanOutcome::Completed
+                        }
+                        _ => crate::modules::adapter::ScanOutcome::Completed,
+                    },
+                    completeness: crate::modules::adapter::ScanCompleteness::Complete,
+                    installations: vec![],
+                    issues: det.issues.clone(),
+                    started_at,
+                    completed_at: SystemTime::now(),
+                }
+            } else {
+                let scan_ctx = ScanContext {
+                    scan_id,
+                    agent: adapter.id(),
+                    roots: &roots,
+                    platform: &platform_ctx,
+                    started_at,
+                };
+                adapter.scan(&scan_ctx)
             }
-        } else {
-            let scan_ctx = ScanContext {
-                scan_id,
-                agent: adapter.id(),
-                roots: &roots,
-                platform: &platform_ctx,
-                started_at,
-            };
-            adapter.scan(&scan_ctx)
         };
 
         // 收集 detect + scan 的 issues
         let mut all_issues: Vec<&ScanIssue> = det.issues.iter().collect();
         all_issues.extend(scan_result.issues.iter());
 
+        let serialization_started = Instant::now();
         let skill_reports: Vec<SkillReport> = scan_result
             .installations
             .iter()
@@ -296,6 +418,20 @@ pub fn scan_agents(
                 issues: inst.diagnostics.iter().map(issue_to_report).collect(),
             })
             .collect();
+        let fingerprinted_files = skill_reports
+            .iter()
+            .map(|skill| skill.file_count as u64)
+            .sum();
+        recorder.record_counted_phase(
+            DiagnosticPhase::ReportSerialization,
+            None,
+            EventCounters {
+                fingerprinted_files,
+                ..EventCounters::default()
+            },
+            serialization_started,
+            DiagnosticOutcome::Success,
+        );
 
         total_skills += skill_reports.len();
         total_issues += all_issues.len();
@@ -335,6 +471,15 @@ pub fn scan_agents(
     }
 
     Ok(report)
+    })();
+
+    let outcome = if result.is_ok() {
+        DiagnosticOutcome::Success
+    } else {
+        DiagnosticOutcome::Error(DiagnosticErrorCategory::Io)
+    };
+    let _ = recorder.finish(outcome);
+    result
 }
 
 fn issue_to_report(i: &ScanIssue) -> IssueReport {
@@ -412,11 +557,14 @@ impl UuidWrapper {
 
 #[tauri::command]
 pub fn get_master_skills(
+    state: tauri::State<'_, AppState>,
     custom_paths: Option<std::collections::HashMap<String, String>>,
+    diagnostic_context: Option<DiagnosticContext>,
 ) -> Result<Vec<crate::modules::master_repo::MasterSkillReport>, String> {
-    Ok(crate::modules::master_repo::scan_master_repo(
-        custom_paths.as_ref(),
-    ))
+    let mut recorder = operation_recorder(&state, DiagnosticOperation::GetMasterSkills, diagnostic_context);
+    let reports = crate::modules::master_repo::scan_master_repo(custom_paths.as_ref(), &mut recorder);
+    let _ = recorder.finish(DiagnosticOutcome::Success);
+    Ok(reports)
 }
 
 #[tauri::command]
@@ -624,4 +772,117 @@ pub fn get_activity_logs(
 ) -> Result<Vec<crate::modules::db::DbActivityLog>, String> {
     let conn = crate::modules::db::open_db(None).map_err(|e| e.to_string())?;
     crate::modules::db::get_activity_logs(&conn, limit.unwrap_or(20)).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    static NEXT_FIXTURE_ID: AtomicUsize = AtomicUsize::new(1);
+
+    struct ScanFixture {
+        root: PathBuf,
+        custom_paths: HashMap<String, String>,
+    }
+
+    impl ScanFixture {
+        fn report_dir(&self) -> &Path {
+            &self.root
+        }
+    }
+
+    impl Drop for ScanFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn fixture_home() -> ScanFixture {
+        let fixture_id = NEXT_FIXTURE_ID.fetch_add(1, AtomicOrdering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "asm-command-diagnostics-{}-{fixture_id}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let mut custom_paths = HashMap::new();
+        for adapter_id in [
+            "claude-code", "cline", "codebuddy", "github-copilot", "droid", "qoder",
+            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "augment",
+            "roo-code", "windsurf", "codex", "antigravity", "pi-agent", "oh-my-pi",
+            "grok", "kiro", "trae", "trae-cn", "opencode", "cursor",
+        ] {
+            let path = root.join(adapter_id);
+            fs::create_dir_all(&path).unwrap();
+            custom_paths.insert(adapter_id.to_string(), path.to_string_lossy().into_owned());
+        }
+        ScanFixture { root, custom_paths }
+    }
+
+    fn run_scan_with_diagnostics(fixture: &ScanFixture) {
+        let state = AppState::default();
+        let recorder = OperationRecorder::enabled_at(
+            fixture.report_dir(),
+            DiagnosticOperation::ScanAgents,
+            None,
+        );
+        scan_agents_with_recorder(&state, Some(fixture.custom_paths.clone()), recorder).unwrap();
+    }
+
+    fn read_report_events(report_dir: &Path) -> Vec<serde_json::Value> {
+        fs::read_dir(report_dir.join("diagnostics"))
+            .unwrap()
+            .flatten()
+            .flat_map(|entry| fs::read_to_string(entry.path()).unwrap().lines().map(str::to_owned).collect::<Vec<_>>())
+            .map(|line| serde_json::from_str(&line).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn scan_records_a_parent_event_and_one_detect_event_per_adapter() {
+        let fixture = fixture_home();
+        run_scan_with_diagnostics(&fixture);
+        let events = read_report_events(fixture.report_dir());
+
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event["phase"] == "adapter_detect")
+                .count(),
+            24
+        );
+        assert!(events
+            .iter()
+            .any(|event| event["operation"] == "scan_agents" && event["eventType"] == "operation"));
+    }
+
+    #[test]
+    fn diagnostics_toggle_persists_the_enabled_value_and_updates_the_cache() {
+        let state = AppState::default();
+        let conn = crate::modules::db::open_db(Some(Path::new(":memory:"))).unwrap();
+
+        set_diagnostics_enabled(&conn, &state, true).unwrap();
+
+        assert!(crate::modules::db::get_performance_diagnostics_enabled(&conn).unwrap());
+        assert!(state.performance_diagnostics_enabled.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn diagnostics_summary_exposes_only_the_safe_directory_label() {
+        let summary = diagnostics_summary_response(
+            true,
+            crate::modules::performance::PerformanceDiagnosticsSummary {
+                report_count: 2,
+                event_count: 7,
+                newest_event_at_ms: Some(42),
+            },
+        );
+
+        let serialized = serde_json::to_string(&summary).unwrap();
+        assert!(serialized.contains("~/.asm/diagnostics"));
+        assert!(!serialized.contains("/Users/"));
+    }
 }

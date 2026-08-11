@@ -36,6 +36,11 @@ pub fn run() {
             commands::ping,
             commands::open_external_url,
             commands::open_skill_directory,
+            commands::get_performance_diagnostics_enabled,
+            commands::set_performance_diagnostics_enabled,
+            commands::get_performance_diagnostics_summary,
+            commands::export_performance_diagnostics,
+            commands::clear_performance_diagnostics,
             commands::scan_agents,
             commands::read_skill_content,
             #[cfg(any(target_os = "macos", target_os = "windows"))]

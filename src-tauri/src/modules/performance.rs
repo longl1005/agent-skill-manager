@@ -30,12 +30,18 @@ pub struct DiagnosticContext {
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticOperation {
     ScanAgents,
+    GetMasterSkills,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticPhase {
+    AdapterDetect,
     AdapterScan,
+    ReportSerialization,
+    MasterEnumeration,
+    LinkReconciliation,
+    SqliteSync,
     ReadSkill,
 }
 
@@ -69,6 +75,10 @@ pub struct EventCounters {
     pub items_examined: u64,
     pub items_matched: u64,
     pub issues_found: u64,
+    pub fingerprinted_files: u64,
+    pub master_skills: u64,
+    pub agent_link_checks: u64,
+    pub database_writes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +116,7 @@ impl PerformanceEvent {
                 items_examined,
                 items_matched: 0,
                 issues_found,
+                ..EventCounters::default()
             },
         }
     }
@@ -158,6 +169,7 @@ impl PerformanceEvent {
 pub struct PerformanceDiagnosticsSummary {
     pub report_count: usize,
     pub event_count: usize,
+    pub newest_event_at_ms: Option<u128>,
 }
 
 pub struct OperationRecorder {
@@ -187,7 +199,7 @@ impl OperationRecorder {
     }
 
     #[cfg(test)]
-    fn disabled_at(report_root: &Path) -> Self {
+    pub(crate) fn disabled_at(report_root: &Path) -> Self {
         Self::new(
             false,
             report_root.to_path_buf(),
@@ -197,7 +209,7 @@ impl OperationRecorder {
     }
 
     #[cfg(test)]
-    fn enabled_at(
+    pub(crate) fn enabled_at(
         report_root: &Path,
         operation: DiagnosticOperation,
         context: Option<DiagnosticContext>,
@@ -396,13 +408,19 @@ fn summarize_reports_from(report_root: &Path) -> std::io::Result<PerformanceDiag
     let mut summary = PerformanceDiagnosticsSummary {
         report_count: report_paths.len(),
         event_count: 0,
+        newest_event_at_ms: None,
     };
 
     for report_path in report_paths {
         let report = File::open(report_path)?;
         for line in BufReader::new(report).lines().map_while(Result::ok) {
-            if serde_json::from_str::<PerformanceEvent>(&line).is_ok() {
+            if let Ok(event) = serde_json::from_str::<PerformanceEvent>(&line) {
                 summary.event_count += 1;
+                summary.newest_event_at_ms = Some(
+                    summary
+                        .newest_event_at_ms
+                        .map_or(event.timestamp_ms, |newest| newest.max(event.timestamp_ms)),
+                );
             }
         }
     }
@@ -514,9 +532,11 @@ fn regular_files_in_dir(diagnostics_dir: &Path) -> std::io::Result<Vec<PathBuf>>
 mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
-    use std::sync::{Arc, Barrier};
+    use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Barrier};
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static NEXT_TEMP_ID: AtomicUsize = AtomicUsize::new(1);
 
     struct TempDir(PathBuf);
 
@@ -526,7 +546,8 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let path = std::env::temp_dir().join(format!("asm-performance-test-{unique}"));
+            let sequence = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!("asm-performance-test-{unique}-{sequence}"));
             std::fs::create_dir_all(&path).unwrap();
             Self(path)
         }
