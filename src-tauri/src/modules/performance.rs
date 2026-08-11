@@ -1,8 +1,10 @@
 //! Local, opt-in performance diagnostics.
 //!
-//! Reports contain only fixed operation names, phase names, durations, outcomes, and counters.
-//! Callers may provide a subject while timing a phase, but it is deliberately never persisted.
+//! Reports contain only fixed operation names, phase names, durations, outcomes, timestamps, and
+//! aggregate counters. Callers may provide a subject while timing a phase, but it is deliberately
+//! never persisted.
 
+use crate::modules::db;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -13,6 +15,8 @@ use uuid::Uuid;
 
 const DIAGNOSTICS_DIRECTORY: &str = "diagnostics";
 const MAX_REPORT_FILES: usize = 5;
+const MAX_REPORT_BYTES: usize = 2 * 1024 * 1024;
+const REPORT_PREFIX: &str = "performance-";
 static REPORT_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Clone, Deserialize)]
@@ -20,6 +24,43 @@ static REPORT_WRITE_LOCK: Mutex<()> = Mutex::new(());
 pub struct DiagnosticContext {
     pub operation_id: String,
     pub in_flight_same_operation: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticOperation {
+    ScanAgents,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticPhase {
+    AdapterScan,
+    ReadSkill,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticErrorCategory {
+    Io,
+    Parse,
+    Permission,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticOutcome {
+    Success,
+    Cancelled,
+    Error(DiagnosticErrorCategory),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PerformanceEventType {
+    AdapterScan,
+    Phase,
+    Operation,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,12 +74,13 @@ pub struct EventCounters {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PerformanceEvent {
-    pub event_type: String,
+    pub event_type: PerformanceEventType,
+    pub timestamp_ms: u128,
     pub operation_id: String,
-    pub operation: String,
-    pub phase: Option<String>,
+    pub operation: DiagnosticOperation,
+    pub phase: Option<DiagnosticPhase>,
     pub duration_ms: u128,
-    pub outcome: String,
+    pub outcome: DiagnosticOutcome,
     pub in_flight_same_operation: u32,
     pub counters: EventCounters,
 }
@@ -52,12 +94,13 @@ impl PerformanceEvent {
         issues_found: u64,
     ) -> Self {
         Self {
-            event_type: "adapter_scan".into(),
+            event_type: PerformanceEventType::AdapterScan,
+            timestamp_ms: timestamp_ms(),
             operation_id: String::new(),
-            operation: "adapter_scan".into(),
-            phase: Some("adapter_scan".into()),
+            operation: DiagnosticOperation::ScanAgents,
+            phase: Some(DiagnosticPhase::AdapterScan),
             duration_ms,
-            outcome: "success".into(),
+            outcome: DiagnosticOutcome::Success,
             in_flight_same_operation: 0,
             counters: EventCounters {
                 items_examined,
@@ -69,20 +112,21 @@ impl PerformanceEvent {
 
     fn phase(
         operation_id: String,
-        operation: &'static str,
-        phase: &'static str,
+        operation: DiagnosticOperation,
+        phase: DiagnosticPhase,
         duration_ms: u128,
         in_flight_same_operation: u32,
         counters: EventCounters,
-        outcome: &'static str,
+        outcome: DiagnosticOutcome,
     ) -> Self {
         Self {
-            event_type: "phase".into(),
+            event_type: PerformanceEventType::Phase,
+            timestamp_ms: timestamp_ms(),
             operation_id,
-            operation: operation.into(),
-            phase: Some(phase.into()),
+            operation,
+            phase: Some(phase),
             duration_ms,
-            outcome: outcome.into(),
+            outcome,
             in_flight_same_operation,
             counters,
         }
@@ -90,18 +134,19 @@ impl PerformanceEvent {
 
     fn operation(
         operation_id: String,
-        operation: &'static str,
+        operation: DiagnosticOperation,
         duration_ms: u128,
         in_flight_same_operation: u32,
-        outcome: &'static str,
+        outcome: DiagnosticOutcome,
     ) -> Self {
         Self {
-            event_type: "operation".into(),
+            event_type: PerformanceEventType::Operation,
+            timestamp_ms: timestamp_ms(),
             operation_id,
-            operation: operation.into(),
+            operation,
             phase: None,
             duration_ms,
-            outcome: outcome.into(),
+            outcome,
             in_flight_same_operation,
             counters: EventCounters::default(),
         }
@@ -118,29 +163,52 @@ pub struct PerformanceDiagnosticsSummary {
 pub struct OperationRecorder {
     enabled: bool,
     operation_id: String,
-    operation: &'static str,
+    operation: DiagnosticOperation,
     started_at: Instant,
     events: Vec<PerformanceEvent>,
-    report_dir: PathBuf,
+    report_root: PathBuf,
     in_flight_same_operation: u32,
 }
 
 impl OperationRecorder {
-    pub fn disabled(report_dir: &Path) -> Self {
-        Self {
-            enabled: false,
-            operation_id: Uuid::new_v4().to_string(),
-            operation: "disabled",
-            started_at: Instant::now(),
-            events: Vec::new(),
-            report_dir: report_dir.to_path_buf(),
-            in_flight_same_operation: 0,
-        }
+    /// Creates a disabled recorder whose production report root is derived from the database path.
+    pub fn disabled() -> Self {
+        Self::new(
+            false,
+            production_report_root(),
+            DiagnosticOperation::ScanAgents,
+            None,
+        )
     }
 
-    pub fn enabled(
-        report_dir: &Path,
-        operation: &'static str,
+    /// Creates an enabled recorder whose production report root is derived from the database path.
+    pub fn enabled(operation: DiagnosticOperation, context: Option<DiagnosticContext>) -> Self {
+        Self::new(true, production_report_root(), operation, context)
+    }
+
+    #[cfg(test)]
+    fn disabled_at(report_root: &Path) -> Self {
+        Self::new(
+            false,
+            report_root.to_path_buf(),
+            DiagnosticOperation::ScanAgents,
+            None,
+        )
+    }
+
+    #[cfg(test)]
+    fn enabled_at(
+        report_root: &Path,
+        operation: DiagnosticOperation,
+        context: Option<DiagnosticContext>,
+    ) -> Self {
+        Self::new(true, report_root.to_path_buf(), operation, context)
+    }
+
+    fn new(
+        enabled: bool,
+        report_root: PathBuf,
+        operation: DiagnosticOperation,
         context: Option<DiagnosticContext>,
     ) -> Self {
         let (operation_id, in_flight_same_operation) = context
@@ -153,32 +221,36 @@ impl OperationRecorder {
             .unwrap_or_else(|| (Uuid::new_v4().to_string(), 0));
 
         Self {
-            enabled: true,
+            enabled,
             operation_id,
             operation,
             started_at: Instant::now(),
             events: Vec::new(),
-            report_dir: report_dir.to_path_buf(),
+            report_root,
             in_flight_same_operation,
         }
     }
 
-    pub fn start_phase(&mut self, phase: &'static str, _subject: Option<&str>) -> PhaseGuard<'_> {
+    pub fn start_phase(
+        &mut self,
+        phase: DiagnosticPhase,
+        _subject: Option<&str>,
+    ) -> PhaseGuard<'_> {
         PhaseGuard {
             recorder: self,
             phase,
             started_at: Instant::now(),
-            outcome: "success",
+            outcome: DiagnosticOutcome::Success,
         }
     }
 
     pub fn record_counted_phase(
         &mut self,
-        phase: &'static str,
+        phase: DiagnosticPhase,
         _subject: Option<&str>,
         counters: EventCounters,
         started_at: Instant,
-        outcome: &'static str,
+        outcome: DiagnosticOutcome,
     ) {
         if !self.enabled {
             return;
@@ -196,7 +268,7 @@ impl OperationRecorder {
     }
 
     /// Completes an operation. Diagnostic persistence failures are intentionally non-fatal.
-    pub fn finish(mut self, outcome: &'static str) -> Result<(), ()> {
+    pub fn finish(mut self, outcome: DiagnosticOutcome) -> Result<(), ()> {
         if !self.enabled {
             return Ok(());
         }
@@ -209,7 +281,7 @@ impl OperationRecorder {
             outcome,
         ));
 
-        let diagnostics_dir = diagnostics_dir(&self.report_dir);
+        let diagnostics_dir = diagnostics_dir(&self.report_root);
         if fs::create_dir_all(&diagnostics_dir).is_err() {
             return Ok(());
         }
@@ -218,40 +290,26 @@ impl OperationRecorder {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        rotate_reports(&diagnostics_dir, MAX_REPORT_FILES.saturating_sub(1));
-
-        let report_path = diagnostics_dir.join(report_filename());
-        let mut report = match OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(report_path)
-        {
-            Ok(report) => report,
-            Err(_) => return Ok(()),
-        };
-
-        let mut batch = Vec::new();
-        for event in &self.events {
-            if serde_json::to_writer(&mut batch, event).is_err() || batch.write_all(b"\n").is_err()
-            {
+        for chunk in event_chunks(&self.events) {
+            rotate_reports(&diagnostics_dir, MAX_REPORT_FILES.saturating_sub(1));
+            if write_report_chunk(&diagnostics_dir, &chunk).is_err() {
                 return Ok(());
             }
         }
 
-        let _ = report.write_all(&batch);
         Ok(())
     }
 }
 
 pub struct PhaseGuard<'a> {
     recorder: &'a mut OperationRecorder,
-    phase: &'static str,
+    phase: DiagnosticPhase,
     started_at: Instant,
-    outcome: &'static str,
+    outcome: DiagnosticOutcome,
 }
 
 impl PhaseGuard<'_> {
-    pub fn finish(mut self, outcome: &'static str) {
+    pub fn finish(mut self, outcome: DiagnosticOutcome) {
         self.outcome = outcome;
     }
 }
@@ -268,15 +326,27 @@ impl Drop for PhaseGuard<'_> {
     }
 }
 
-/// Exports validated JSONL event lines and returns their aggregate counts.
-pub fn export_reports(
-    report_dir: &Path,
+/// Exports validated JSONL event lines from the database-derived diagnostics directory.
+pub fn export_reports(destination: &Path) -> Result<PerformanceDiagnosticsSummary, ()> {
+    export_reports_from(&production_report_root(), destination)
+}
+
+#[cfg(test)]
+fn export_reports_at(
+    report_root: &Path,
+    destination: &Path,
+) -> Result<PerformanceDiagnosticsSummary, ()> {
+    export_reports_from(report_root, destination)
+}
+
+fn export_reports_from(
+    report_root: &Path,
     destination: &Path,
 ) -> Result<PerformanceDiagnosticsSummary, ()> {
     let mut destination = File::create(destination).map_err(|_| ())?;
     let mut summary = PerformanceDiagnosticsSummary::default();
 
-    for report_path in report_files(report_dir).map_err(|_| ())? {
+    for report_path in report_files(report_root).map_err(|_| ())? {
         summary.report_count += 1;
         let report = File::open(report_path).map_err(|_| ())?;
         for line in BufReader::new(report).lines() {
@@ -292,21 +362,19 @@ pub fn export_reports(
     Ok(summary)
 }
 
-/// Removes only regular files from this application's diagnostics directory.
-/// Callers must pass the directory derived from `db::get_db_path().parent()`.
-pub fn clear_reports(report_dir: &Path) -> Result<PerformanceDiagnosticsSummary, ()> {
-    let db_path = crate::modules::db::get_db_path();
-    let expected_report_dir = db_path.parent().ok_or(())?;
-    if report_dir != expected_report_dir {
-        return Err(());
-    }
-
-    clear_reports_in_dir(report_dir)
+/// Clears only this application's `performance-*.jsonl` reports from the database-derived root.
+pub fn clear_reports() -> Result<PerformanceDiagnosticsSummary, ()> {
+    clear_reports_from(&production_report_root())
 }
 
-fn clear_reports_in_dir(report_dir: &Path) -> Result<PerformanceDiagnosticsSummary, ()> {
-    let mut summary = summarize_reports(report_dir).map_err(|_| ())?;
-    for report_path in regular_files(report_dir).map_err(|_| ())? {
+#[cfg(test)]
+fn clear_reports_at(report_root: &Path) -> Result<PerformanceDiagnosticsSummary, ()> {
+    clear_reports_from(report_root)
+}
+
+fn clear_reports_from(report_root: &Path) -> Result<PerformanceDiagnosticsSummary, ()> {
+    let mut summary = summarize_reports_from(report_root).map_err(|_| ())?;
+    for report_path in report_files(report_root).map_err(|_| ())? {
         fs::remove_file(report_path).map_err(|_| ())?;
     }
     summary.report_count = 0;
@@ -314,8 +382,17 @@ fn clear_reports_in_dir(report_dir: &Path) -> Result<PerformanceDiagnosticsSumma
     Ok(summary)
 }
 
-pub fn summarize_reports(report_dir: &Path) -> std::io::Result<PerformanceDiagnosticsSummary> {
-    let report_paths = report_files(report_dir)?;
+pub fn summarize_reports() -> std::io::Result<PerformanceDiagnosticsSummary> {
+    summarize_reports_from(&production_report_root())
+}
+
+#[cfg(test)]
+fn summarize_reports_at(report_root: &Path) -> std::io::Result<PerformanceDiagnosticsSummary> {
+    summarize_reports_from(report_root)
+}
+
+fn summarize_reports_from(report_root: &Path) -> std::io::Result<PerformanceDiagnosticsSummary> {
+    let report_paths = report_files(report_root)?;
     let mut summary = PerformanceDiagnosticsSummary {
         report_count: report_paths.len(),
         event_count: 0,
@@ -333,16 +410,62 @@ pub fn summarize_reports(report_dir: &Path) -> std::io::Result<PerformanceDiagno
     Ok(summary)
 }
 
-fn diagnostics_dir(report_dir: &Path) -> PathBuf {
-    report_dir.join(DIAGNOSTICS_DIRECTORY)
+fn production_report_root() -> PathBuf {
+    db::get_db_path()
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf()
+}
+
+fn diagnostics_dir(report_root: &Path) -> PathBuf {
+    report_root.join(DIAGNOSTICS_DIRECTORY)
+}
+
+fn timestamp_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
 }
 
 fn report_filename() -> String {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    format!("report-{timestamp:020}-{}.jsonl", Uuid::new_v4())
+    format!(
+        "{REPORT_PREFIX}{:020}-{}.jsonl",
+        timestamp_ms(),
+        Uuid::new_v4()
+    )
+}
+
+fn event_chunks(events: &[PerformanceEvent]) -> Vec<Vec<u8>> {
+    let mut chunks = Vec::new();
+    let mut chunk = Vec::new();
+
+    for event in events {
+        let Ok(mut line) = serde_json::to_vec(event) else {
+            continue;
+        };
+        line.push(b'\n');
+        if line.len() > MAX_REPORT_BYTES {
+            continue;
+        }
+        if !chunk.is_empty() && chunk.len() + line.len() > MAX_REPORT_BYTES {
+            chunks.push(std::mem::take(&mut chunk));
+        }
+        chunk.extend(line);
+    }
+
+    if !chunk.is_empty() {
+        chunks.push(chunk);
+    }
+    chunks
+}
+
+fn write_report_chunk(diagnostics_dir: &Path, chunk: &[u8]) -> std::io::Result<()> {
+    let mut report = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(diagnostics_dir.join(report_filename()))?;
+    report.write_all(chunk)
 }
 
 fn rotate_reports(diagnostics_dir: &Path, retain: usize) {
@@ -356,8 +479,8 @@ fn rotate_reports(diagnostics_dir: &Path, retain: usize) {
     }
 }
 
-fn report_files(report_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
-    report_files_in_dir(&diagnostics_dir(report_dir))
+fn report_files(report_root: &Path) -> std::io::Result<Vec<PathBuf>> {
+    report_files_in_dir(&diagnostics_dir(report_root))
 }
 
 fn report_files_in_dir(diagnostics_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -365,15 +488,12 @@ fn report_files_in_dir(diagnostics_dir: &Path) -> std::io::Result<Vec<PathBuf>> 
         files
             .into_iter()
             .filter(|path| {
-                path.extension()
-                    .is_some_and(|extension| extension == "jsonl")
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(REPORT_PREFIX) && name.ends_with(".jsonl"))
             })
             .collect()
     })
-}
-
-fn regular_files(report_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
-    regular_files_in_dir(&diagnostics_dir(report_dir))
 }
 
 fn regular_files_in_dir(diagnostics_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -425,9 +545,10 @@ mod tests {
     #[test]
     fn disabled_recorder_creates_no_diagnostic_directory() {
         let temp = TempDir::new();
-        let recorder = OperationRecorder::disabled(temp.path());
-        recorder.finish("success").unwrap();
-        assert!(!temp.path().join("diagnostics").exists());
+        OperationRecorder::disabled_at(temp.path())
+            .finish(DiagnosticOutcome::Success)
+            .unwrap();
+        assert!(!temp.path().join(DIAGNOSTICS_DIRECTORY).exists());
     }
 
     #[test]
@@ -439,26 +560,65 @@ mod tests {
     }
 
     #[test]
+    fn serialized_events_include_their_own_timestamp() {
+        let event = PerformanceEvent::adapter_scan("adapter", 15, 2, 9);
+        assert!(event.timestamp_ms > 0);
+        assert!(serde_json::to_string(&event)
+            .unwrap()
+            .contains("timestampMs"));
+    }
+
+    #[test]
+    fn persisted_phase_and_operation_events_include_timestamps() {
+        let temp = TempDir::new();
+        let mut recorder =
+            OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None);
+        {
+            let _phase = recorder.start_phase(DiagnosticPhase::ReadSkill, None);
+        }
+        recorder.finish(DiagnosticOutcome::Success).unwrap();
+
+        let events: Vec<PerformanceEvent> =
+            std::fs::read_to_string(report_files(temp.path()).unwrap().remove(0))
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+        assert_eq!(events.len(), 2);
+        assert!(events.iter().all(|event| event.timestamp_ms > 0));
+        assert!(events
+            .iter()
+            .any(|event| event.event_type == PerformanceEventType::Phase));
+        assert!(events
+            .iter()
+            .any(|event| event.event_type == PerformanceEventType::Operation));
+    }
+
+    #[test]
     fn rotation_retains_at_most_five_files() {
         let temp = TempDir::new();
         write_completed_operations(temp.path(), 6);
-        assert!(report_files(temp.path()).unwrap().len() <= 5);
+        assert!(report_files(temp.path()).unwrap().len() <= MAX_REPORT_FILES);
     }
 
     #[test]
     fn concurrent_completion_retains_at_most_five_files() {
         let temp = TempDir::new();
-        let report_dir = Arc::new(temp.path().to_path_buf());
+        let report_root = Arc::new(temp.path().to_path_buf());
         let barrier = Arc::new(Barrier::new(6));
         let workers: Vec<_> = (0..6)
             .map(|_| {
-                let report_dir = Arc::clone(&report_dir);
+                let report_root = Arc::clone(&report_root);
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
                     barrier.wait();
-                    OperationRecorder::enabled(&report_dir, "scan_agents", None)
-                        .finish("success")
-                        .unwrap();
+                    OperationRecorder::enabled_at(
+                        &report_root,
+                        DiagnosticOperation::ScanAgents,
+                        None,
+                    )
+                    .finish(DiagnosticOutcome::Success)
+                    .unwrap();
                 })
             })
             .collect();
@@ -467,7 +627,7 @@ mod tests {
             worker.join().unwrap();
         }
 
-        assert!(report_files(temp.path()).unwrap().len() <= 5);
+        assert!(report_files(temp.path()).unwrap().len() <= MAX_REPORT_FILES);
     }
 
     #[test]
@@ -475,22 +635,24 @@ mod tests {
         let temp = TempDir::new();
         let blocked = temp.path().join("blocked");
         std::fs::write(&blocked, "not a directory").unwrap();
-        let recorder = OperationRecorder::enabled(&blocked, "scan_agents", None);
-        assert!(recorder.finish("success").is_ok());
+        let recorder =
+            OperationRecorder::enabled_at(&blocked, DiagnosticOperation::ScanAgents, None);
+        assert!(recorder.finish(DiagnosticOutcome::Success).is_ok());
     }
 
     #[test]
     fn invalid_context_operation_id_is_replaced_with_a_uuid() {
         let temp = TempDir::new();
-        let recorder = OperationRecorder::enabled(
+        OperationRecorder::enabled_at(
             temp.path(),
-            "scan_agents",
+            DiagnosticOperation::ScanAgents,
             Some(DiagnosticContext {
                 operation_id: "not-a-uuid".into(),
                 in_flight_same_operation: 3,
             }),
-        );
-        recorder.finish("success").unwrap();
+        )
+        .finish(DiagnosticOutcome::Success)
+        .unwrap();
 
         let report = std::fs::read_to_string(report_files(temp.path()).unwrap().remove(0)).unwrap();
         let event: PerformanceEvent = serde_json::from_str(report.lines().next().unwrap()).unwrap();
@@ -500,11 +662,15 @@ mod tests {
     #[test]
     fn phased_operation_never_persists_its_subject() {
         let temp = TempDir::new();
-        let mut recorder = OperationRecorder::enabled(temp.path(), "scan_agents", None);
+        let mut recorder =
+            OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None);
         {
-            let _phase = recorder.start_phase("read_skill", Some("private-skill/C:\\\\Users\\\\A"));
+            let _phase = recorder.start_phase(
+                DiagnosticPhase::ReadSkill,
+                Some("private-skill/C:\\\\Users\\\\A"),
+            );
         }
-        recorder.finish("success").unwrap();
+        recorder.finish(DiagnosticOutcome::Success).unwrap();
 
         let serialized =
             std::fs::read_to_string(report_files(temp.path()).unwrap().remove(0)).unwrap();
@@ -513,33 +679,62 @@ mod tests {
     }
 
     #[test]
+    fn large_completed_operation_never_creates_a_report_larger_than_two_mib() {
+        let temp = TempDir::new();
+        let mut recorder =
+            OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None);
+        for _ in 0..20_000 {
+            recorder.record_counted_phase(
+                DiagnosticPhase::ReadSkill,
+                None,
+                EventCounters::default(),
+                Instant::now(),
+                DiagnosticOutcome::Success,
+            );
+        }
+        recorder.finish(DiagnosticOutcome::Success).unwrap();
+
+        let reports = report_files(temp.path()).unwrap();
+        assert!(reports.len() > 1);
+        for report in reports {
+            assert!(std::fs::metadata(report).unwrap().len() <= MAX_REPORT_BYTES as u64);
+        }
+    }
+
+    #[test]
     fn export_skips_malformed_lines_and_clear_preserves_directories() {
         let temp = TempDir::new();
-        OperationRecorder::enabled(temp.path(), "scan_agents", None)
-            .finish("success")
+        OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None)
+            .finish(DiagnosticOutcome::Success)
             .unwrap();
         let reports = report_files(temp.path()).unwrap();
         std::fs::write(&reports[0], "not json\n").unwrap();
-        let nested_dir = temp.path().join("diagnostics").join("keep-directory");
+        let nested_dir = temp
+            .path()
+            .join(DIAGNOSTICS_DIRECTORY)
+            .join("keep-directory");
         std::fs::create_dir(&nested_dir).unwrap();
         let exported = temp.path().join("export.jsonl");
 
-        let summary = export_reports(temp.path(), &exported).unwrap();
+        let summary = export_reports_at(temp.path(), &exported).unwrap();
         assert_eq!(summary.event_count, 0);
         assert!(std::fs::read_to_string(&exported).unwrap().is_empty());
 
-        clear_reports_in_dir(temp.path()).unwrap();
+        clear_reports_at(temp.path()).unwrap();
         assert!(nested_dir.exists());
         assert!(report_files(temp.path()).unwrap().is_empty());
     }
 
     #[test]
-    fn export_uses_only_jsonl_reports() {
+    fn export_uses_only_performance_jsonl_reports() {
         let temp = TempDir::new();
-        OperationRecorder::enabled(temp.path(), "scan_agents", None)
-            .finish("success")
+        OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None)
+            .finish(DiagnosticOutcome::Success)
             .unwrap();
-        let non_report = temp.path().join("diagnostics").join("unrelated.json");
+        let non_report = temp
+            .path()
+            .join(DIAGNOSTICS_DIRECTORY)
+            .join("unrelated.json");
         std::fs::write(
             non_report,
             format!(
@@ -550,22 +745,61 @@ mod tests {
         .unwrap();
         let exported = temp.path().join("export.jsonl");
 
-        let summary = export_reports(temp.path(), &exported).unwrap();
+        let summary = export_reports_at(temp.path(), &exported).unwrap();
 
         assert_eq!(summary.report_count, 1);
         assert_eq!(summary.event_count, 1);
     }
 
     #[test]
-    fn clear_reports_rejects_a_directory_other_than_the_db_parent() {
+    fn export_rejects_events_with_unknown_fixed_values() {
         let temp = TempDir::new();
-        assert!(clear_reports(temp.path()).is_err());
+        OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None)
+            .finish(DiagnosticOutcome::Success)
+            .unwrap();
+        let report = report_files(temp.path()).unwrap().remove(0);
+        let contents = std::fs::read_to_string(&report).unwrap().replace(
+            "\"operation\":\"scan_agents\"",
+            "\"operation\":\"arbitrary_operation\"",
+        );
+        std::fs::write(report, contents).unwrap();
+        let exported = temp.path().join("export.jsonl");
+
+        assert_eq!(
+            export_reports_at(temp.path(), &exported)
+                .unwrap()
+                .event_count,
+            0
+        );
     }
 
-    fn write_completed_operations(report_dir: &Path, count: usize) {
+    #[test]
+    fn clear_keeps_non_performance_files() {
+        let temp = TempDir::new();
+        let diagnostics_dir = temp.path().join(DIAGNOSTICS_DIRECTORY);
+        std::fs::create_dir_all(&diagnostics_dir).unwrap();
+        OperationRecorder::enabled_at(temp.path(), DiagnosticOperation::ScanAgents, None)
+            .finish(DiagnosticOutcome::Success)
+            .unwrap();
+        let keep = diagnostics_dir.join("keep.txt");
+        std::fs::write(&keep, "keep").unwrap();
+
+        clear_reports_at(temp.path()).unwrap();
+
+        assert!(keep.exists());
+        assert!(report_files(temp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn production_report_root_is_derived_from_the_database_parent() {
+        let expected = db::get_db_path().parent().unwrap().to_path_buf();
+        assert_eq!(production_report_root(), expected);
+    }
+
+    fn write_completed_operations(report_root: &Path, count: usize) {
         for _ in 0..count {
-            OperationRecorder::enabled(report_dir, "scan_agents", None)
-                .finish("success")
+            OperationRecorder::enabled_at(report_root, DiagnosticOperation::ScanAgents, None)
+                .finish(DiagnosticOutcome::Success)
                 .unwrap();
         }
     }
