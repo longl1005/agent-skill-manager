@@ -137,15 +137,40 @@ describe("SkillLibrary Route", () => {
     expect(localStorage.getItem("asm_skill_library_view")).toBe("list");
     expect(screen.getByTestId("skill-card-web-search-pro")).toHaveClass("master-skill-card--list");
     expect(screen.getByText("1 linked Agent")).toBeVisible();
-    expect(screen.getByTestId("skill-card-web-search-pro").querySelector(".agent-distribution-section"))
-      .toHaveClass("agent-distribution-section--compact");
-    expect(screen.getByTestId("skill-card-web-search-pro").querySelector(".agent-matrix-badges"))
-      .toHaveClass("agent-matrix-badges--wrap");
+    expect(screen.getByTestId("skill-list-coverage-web-search-pro")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show Agent matrix for web-search-pro" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Card view" }));
 
     expect(skillsContainer).not.toHaveClass("master-skill-grid--list");
     expect(screen.getByTestId("skill-card-web-search-pro")).not.toHaveClass("master-skill-card--list");
+  });
+
+  it("keeps the list matrix collapsed until the user asks to view it", () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+
+    expect(screen.getByTestId("skill-list-coverage-web-search-pro")).toHaveTextContent("1 / 2 Agents linked");
+    expect(screen.getByTestId("list-linked-agent-web-search-pro-claude-code")).toBeVisible();
+    expect(screen.queryByTestId("agent-badge-web-search-pro-claude-code")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show Agent matrix for web-search-pro" }));
+
+    expect(screen.getByTestId("agent-badge-web-search-pro-claude-code")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hide Agent matrix for web-search-pro" })).toBeVisible();
+  });
+
+  it("moves secondary list actions into an explicit more-actions menu", () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    fireEvent.click(screen.getByRole("button", { name: "More actions for web-search-pro" }));
+
+    const menu = screen.getByTestId("skill-list-actions-web-search-pro");
+    expect(within(menu).getByRole("button", { name: "Open Folder" })).toBeVisible();
+    expect(within(menu).getByRole("button", { name: "Export skill" })).toBeVisible();
+    expect(within(menu).getByRole("button", { name: "Delete skill web-search-pro" })).toBeVisible();
   });
 
   it("restores the last selected skill view when the page mounts", () => {

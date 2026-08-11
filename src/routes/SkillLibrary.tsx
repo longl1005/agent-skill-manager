@@ -58,6 +58,8 @@ export default function SkillLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [skillSort, setSkillSort] = useState<SkillSort>("recent");
   const [skillView, setSkillView] = useState<SkillView>(getStoredSkillView);
+  const [expandedMatrixSkills, setExpandedMatrixSkills] = useState<Record<string, boolean>>({});
+  const [openActionMenuSkill, setOpenActionMenuSkill] = useState<string | null>(null);
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
   const [batchTogglingSkill, setBatchTogglingSkill] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ skillName: string; linkedCount: number } | null>(null);
@@ -249,6 +251,8 @@ export default function SkillLibrary() {
         <div className={`master-skill-grid ${skillView === "list" ? "master-skill-grid--list" : ""}`}>
           {filteredSkills.map((skill) => {
             const linkedCount = supportedAgents.filter((agent) => skill.linked_agents?.[agent.id]).length;
+            const linkedAgents = supportedAgents.filter((agent) => skill.linked_agents?.[agent.id]);
+            const isMatrixExpanded = Boolean(expandedMatrixSkills[skill.name]);
             return (
               <div
                 className={`master-skill-card master-skill-card--interactive ${skillView === "list" ? "master-skill-card--list" : ""}`}
@@ -330,6 +334,35 @@ export default function SkillLibrary() {
                         </svg>
                       </button>
                     </Tooltip>
+                    {skillView === "list" && (
+                      <div className="skill-list-more-actions">
+                        <button
+                          aria-expanded={openActionMenuSkill === skill.name}
+                          aria-label={`${t("skillLibrary.moreActions", lang)} for ${skill.name}`}
+                          className="skill-list-more-actions__trigger"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenActionMenuSkill((current) => current === skill.name ? null : skill.name);
+                          }}
+                          type="button"
+                        >
+                          <svg aria-hidden="true" fill="currentColor" height="16" viewBox="0 0 24 24" width="16"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+                        </button>
+                        {openActionMenuSkill === skill.name && (
+                          <div className="skill-list-more-actions__menu" data-testid={`skill-list-actions-${skill.name}`}>
+                            <button aria-label={t("skillLibrary.openDirectory", lang)} onClick={(event) => { event.stopPropagation(); handleOpenDirectory(skill.path); }} type="button">
+                              {t("skillLibrary.openDirectory", lang)}
+                            </button>
+                            <button aria-label={t("skillLibrary.exportSkill", lang)} onClick={(event) => { event.stopPropagation(); void handleShare(skill.name); }} type="button">
+                              {t("skillLibrary.exportSkill", lang)}
+                            </button>
+                            <button aria-label={`Delete skill ${skill.name}`} className="is-danger" onClick={(event) => { event.stopPropagation(); setOpenActionMenuSkill(null); handleDeleteClick(skill.name); }} type="button">
+                              {t("skillLibrary.deleteSkill", lang)}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -341,7 +374,47 @@ export default function SkillLibrary() {
                   {t("skillLibrary.linkedAgentCount", lang).replace("{count}", String(linkedCount))}
                 </span>
 
-                <div className={`agent-distribution-section ${skillView === "list" ? "agent-distribution-section--compact" : ""}`}>
+                {skillView === "list" && (
+                  <div className="skill-list-coverage" data-testid={`skill-list-coverage-${skill.name}`}>
+                    <div className="skill-list-coverage__summary">
+                      <span className="skill-list-coverage__count">
+                        {t("skillLibrary.linkedAgentCoverage", lang)
+                          .replace("{linked}", String(linkedCount))
+                          .replace("{total}", String(supportedAgents.length))}
+                      </span>
+                      <div className="skill-list-linked-agents" aria-label={t("skillLibrary.linkedAgents", lang)}>
+                        {linkedAgents.slice(0, 4).map((agent) => (
+                          <span
+                            className="skill-list-linked-agent"
+                            data-testid={`list-linked-agent-${skill.name}-${agent.id}`}
+                            key={agent.id}
+                            title={agent.name}
+                          >
+                            <AgentIdentityMark agentId={agent.id} size={22} />
+                          </span>
+                        ))}
+                        {linkedAgents.length > 4 && <span className="skill-list-linked-agent-overflow">+{linkedAgents.length - 4}</span>}
+                      </div>
+                    </div>
+                    <button
+                      aria-expanded={isMatrixExpanded}
+                      aria-label={`${t(isMatrixExpanded ? "skillLibrary.hideMatrix" : "skillLibrary.showMatrix", lang)} for ${skill.name}`}
+                      className="skill-list-matrix-toggle"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setExpandedMatrixSkills((previous) => ({ ...previous, [skill.name]: !previous[skill.name] }));
+                      }}
+                      type="button"
+                    >
+                      {t(isMatrixExpanded ? "skillLibrary.hideMatrix" : "skillLibrary.showMatrix", lang)}
+                      <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                        <path d={isMatrixExpanded ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6"} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+
+                {(skillView === "card" || isMatrixExpanded) && <div className={`agent-distribution-section ${skillView === "list" ? "agent-distribution-section--compact" : ""}`}>
                   <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>
                   <div className={`agent-matrix-badges ${skillView === "list" ? "agent-matrix-badges--wrap" : ""}`}>
                 {supportedAgents.map((agent) => {
@@ -377,7 +450,7 @@ export default function SkillLibrary() {
                       );
                     })}
                   </div>
-                </div>
+                </div>}
               </div>
             );
           })}
