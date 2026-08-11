@@ -55,6 +55,7 @@ describe("SkillLibrary Route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem("asm_skill_library_view");
     useI18nStore.setState({ lang: "en" });
     useAgentConfigStore.setState({ disabledAgentIds: [] });
     useScanStore.setState({
@@ -133,6 +134,7 @@ describe("SkillLibrary Route", () => {
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
 
     expect(skillsContainer).toHaveClass("master-skill-grid--list");
+    expect(localStorage.getItem("asm_skill_library_view")).toBe("list");
     expect(screen.getByTestId("skill-card-web-search-pro")).toHaveClass("master-skill-card--list");
     expect(screen.getByText("1 linked Agent")).toBeVisible();
 
@@ -140,6 +142,15 @@ describe("SkillLibrary Route", () => {
 
     expect(skillsContainer).not.toHaveClass("master-skill-grid--list");
     expect(screen.getByTestId("skill-card-web-search-pro")).not.toHaveClass("master-skill-card--list");
+  });
+
+  it("restores the last selected skill view when the page mounts", () => {
+    localStorage.setItem("asm_skill_library_view", "list");
+
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    expect(document.querySelector(".master-skill-grid")).toHaveClass("master-skill-grid--list");
+    expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("renders agent link distribution matrix badges with correct states", () => {

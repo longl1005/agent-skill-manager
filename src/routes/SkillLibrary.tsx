@@ -40,6 +40,11 @@ export const SUPPORTED_AGENTS = [
 
 type SkillSort = "recent" | "name";
 type SkillView = "card" | "list";
+const SKILL_VIEW_STORAGE_KEY = "asm_skill_library_view";
+
+function getStoredSkillView(): SkillView {
+  return localStorage.getItem(SKILL_VIEW_STORAGE_KEY) === "list" ? "list" : "card";
+}
 
 export default function SkillLibrary() {
   const navigate = useNavigate();
@@ -52,7 +57,7 @@ export default function SkillLibrary() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [skillSort, setSkillSort] = useState<SkillSort>("recent");
-  const [skillView, setSkillView] = useState<SkillView>("card");
+  const [skillView, setSkillView] = useState<SkillView>(getStoredSkillView);
   const [togglingMap, setTogglingMap] = useState<Record<string, boolean>>({});
   const [batchTogglingSkill, setBatchTogglingSkill] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ skillName: string; linkedCount: number } | null>(null);
@@ -64,6 +69,10 @@ export default function SkillLibrary() {
   }, [fetchMasterSkills]);
 
   const handleOpenDirectory = (path: string) => void openSkillDirectory(path);
+  const handleSkillViewChange = (view: SkillView) => {
+    localStorage.setItem(SKILL_VIEW_STORAGE_KEY, view);
+    setSkillView(view);
+  };
   const handleShare = async (skillName: string) => {
     const destination = await save({ defaultPath: `${skillName}.zip`, filters: [{ name: "ZIP", extensions: ["zip"] }] });
     if (destination) await exportMasterSkillZip(skillName, destination, useAgentConfigStore.getState().customPaths);
@@ -200,7 +209,7 @@ export default function SkillLibrary() {
               aria-label={t("skillLibrary.cardView", lang)}
               aria-pressed={skillView === "card"}
               className={`skill-view-toggle ${skillView === "card" ? "is-active" : ""}`}
-              onClick={() => setSkillView("card")}
+              onClick={() => handleSkillViewChange("card")}
               title={t("skillLibrary.cardView", lang)}
               type="button"
             >
@@ -215,7 +224,7 @@ export default function SkillLibrary() {
               aria-label={t("skillLibrary.listView", lang)}
               aria-pressed={skillView === "list"}
               className={`skill-view-toggle ${skillView === "list" ? "is-active" : ""}`}
-              onClick={() => setSkillView("list")}
+              onClick={() => handleSkillViewChange("list")}
               title={t("skillLibrary.listView", lang)}
               type="button"
             >
