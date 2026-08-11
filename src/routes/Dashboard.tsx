@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useScanStore } from "../stores/scanStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
@@ -16,14 +15,10 @@ function formatTime(unixMillis: number): string {
 
 export default function Dashboard() {
   const { report, scanning, error } = useScanStore();
-  const { skills: masterSkills, fetchMasterSkills } = useMasterRepoStore();
+  const { skills: masterSkills } = useMasterRepoStore();
   const lang = useI18nStore((s) => s.lang);
   const disabledAgentIds = useAgentConfigStore((state) => state.disabledAgentIds);
   const agentOrder = useAgentConfigStore((state) => state.agentOrder);
-
-  useEffect(() => {
-    fetchMasterSkills();
-  }, [fetchMasterSkills]);
 
   const detectedAgents = orderAgents(report?.agents.filter((agent) => isDiscoveredAgent(agent) && !disabledAgentIds.includes(agent.agent_id)) ?? [], agentOrder);
 

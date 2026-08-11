@@ -5,6 +5,8 @@ import type { ImportMode, ImportResult, MasterSkillReport } from "../ipc/types";
 import { useAgentConfigStore } from "./agentConfigStore";
 import { useScanStore } from "./scanStore";
 
+let inFlightMasterSkillsFetch: Promise<void> | null = null;
+
 export interface MasterRepoState {
   skills: MasterSkillReport[];
   loading: boolean;
@@ -25,17 +27,25 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
   loading: false,
   error: null,
 
-  fetchMasterSkills: async () => {
+  fetchMasterSkills: () => {
+    if (inFlightMasterSkillsFetch) return inFlightMasterSkillsFetch;
+
     set({ loading: true, error: null });
-    try {
-      const customPaths = useAgentConfigStore.getState().customPaths;
-      const skills = await traceDiagnosticRequest("get_master_skills", (diagnosticContext) => getMasterSkills(customPaths, diagnosticContext));
-      set({ skills });
-    } catch (err) {
-      set({ error: String(err) });
-    } finally {
-      set({ loading: false });
-    }
+    inFlightMasterSkillsFetch = (async () => {
+      try {
+        const customPaths = useAgentConfigStore.getState().customPaths;
+        const skills = await traceDiagnosticRequest("get_master_skills", (diagnosticContext) => getMasterSkills(customPaths, diagnosticContext));
+        set({ skills });
+      } catch (err) {
+        set({ error: String(err) });
+      } finally {
+        set({ loading: false });
+      }
+    })().finally(() => {
+      inFlightMasterSkillsFetch = null;
+    });
+
+    return inFlightMasterSkillsFetch;
   },
 
   toggleAgentSkill: async (agentId: string, skillName: string, enable: boolean) => {

@@ -57,6 +57,21 @@ describe("masterRepoStore", () => {
     expect(state.error).toBeNull();
   });
 
+  it("shares an in-flight master skills request to avoid duplicate native synchronization", async () => {
+    let resolveSkills: ((skills: any[]) => void) | undefined;
+    vi.mocked(commands.getMasterSkills).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveSkills = resolve; }),
+    );
+
+    const firstRequest = useMasterRepoStore.getState().fetchMasterSkills();
+    const secondRequest = useMasterRepoStore.getState().fetchMasterSkills();
+
+    expect(commands.getMasterSkills).toHaveBeenCalledTimes(1);
+
+    resolveSkills?.([]);
+    await Promise.all([firstRequest, secondRequest]);
+  });
+
   it("handles fetchMasterSkills failure", async () => {
     vi.mocked(commands.getMasterSkills).mockRejectedValueOnce(new Error("Failed to fetch"));
 

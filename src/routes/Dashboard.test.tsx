@@ -68,6 +68,16 @@ describe("Dashboard Route Redesign", () => {
     expect(screen.getByText("Auto-Sync Active")).toBeInTheDocument();
   });
 
+  it("uses the application bootstrap data without triggering another master skills refresh", () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    expect(vi.mocked(useMasterRepoStore).mock.results[0]?.value.fetchMasterSkills).not.toHaveBeenCalled();
+  });
+
   it("renders metric card counts correctly", () => {
     render(
       <MemoryRouter>
