@@ -122,9 +122,40 @@ pub fn init_db_tables(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )?;
+
     // Cleanup legacy translation table if it exists
     let _ = conn.execute("DROP TABLE IF EXISTS skill_translations", []);
 
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn get_performance_diagnostics_enabled(conn: &Connection) -> Result<bool> {
+    conn.query_row(
+        "SELECT value = 'true' FROM app_settings WHERE key = 'performance_diagnostics_enabled'",
+        [],
+        |row| row.get(0),
+    )
+    .or_else(|err| match err {
+        rusqlite::Error::QueryReturnedNoRows => Ok(false),
+        other => Err(other),
+    })
+}
+
+#[allow(dead_code)]
+pub fn set_performance_diagnostics_enabled(conn: &Connection, enabled: bool) -> Result<()> {
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES ('performance_diagnostics_enabled', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [if enabled { "true" } else { "false" }],
+    )?;
     Ok(())
 }
 
@@ -294,6 +325,23 @@ pub fn get_db_summary(conn: &Connection, custom_path: Option<&Path>) -> Result<D
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn application_setting_defaults_to_disabled() {
+        let conn = open_db(Some(Path::new(":memory:"))).unwrap();
+        assert!(!get_performance_diagnostics_enabled(&conn).unwrap());
+    }
+
+    #[test]
+    fn application_setting_can_be_enabled_and_disabled() {
+        let conn = open_db(Some(Path::new(":memory:"))).unwrap();
+
+        set_performance_diagnostics_enabled(&conn, true).unwrap();
+        assert!(get_performance_diagnostics_enabled(&conn).unwrap());
+
+        set_performance_diagnostics_enabled(&conn, false).unwrap();
+        assert!(!get_performance_diagnostics_enabled(&conn).unwrap());
+    }
 
     #[test]
     fn test_sqlite_db_init_and_operations() {

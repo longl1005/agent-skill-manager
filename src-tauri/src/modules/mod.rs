@@ -8,5 +8,7 @@ pub mod errors;
 pub mod inventory;
 pub mod master_repo;
 pub mod platform;
+#[allow(dead_code)]
+pub mod performance;
 pub mod scanner;
 pub mod util;
