@@ -1,74 +1,56 @@
-# Performance Diagnostics Design
+# 性能诊断设计
 
-## Goal
+## 目标
 
-Make Windows performance regressions measurable in an installed build without
-collecting or transmitting user content. An opt-in diagnostic mode must show
-whether elapsed time comes from full Agent scans, content fingerprinting,
-master-library link reconciliation, SQLite writes, or duplicated frontend
-requests.
+在不采集或传输用户内容的前提下，让已安装的 Windows 版本可以量化性能回归。启用诊断后，应能分辨耗时主要来自全量 Agent 扫描、内容指纹计算、主技能库链接状态同步、SQLite 写入，还是重复的前端请求。
 
-## Scope
+## 范围
 
-- Add a Settings-controlled, persisted performance-diagnostics switch.
-- Record compact, local timing events only while the switch is enabled.
-- Record backend work for `scan_agents` and `get_master_skills`, plus the
-  frontend request lifecycle that invokes them.
-- Provide Settings actions to export the current report and clear reports.
-- Use the report to make later performance fixes evidence-based.
+- 增加由设置页控制且可持久化的性能诊断开关。
+- 仅在开关启用时记录精简的本地耗时事件。
+- 记录 `scan_agents`、`get_master_skills` 的后端工作，以及调用它们的前端请求生命周期。
+- 在设置页提供导出当前报告和清除报告的操作。
+- 让后续性能优化以实际证据为依据。
 
-## Non-goals
+## 非目标
 
-- No remote telemetry, analytics service, account identifier, or automatic
-  upload.
-- No skill content, skill names, descriptions, file paths, machine user name,
-  environment variables, or command output in diagnostics.
-- No live profiler view or continuous process-level CPU and memory monitor.
-- No caching, incremental scanning, or database redesign in this change.
+- 不增加远程遥测、分析服务、账户标识符或自动上传。
+- 不在诊断数据中记录技能内容、技能名称、描述、文件路径、机器用户名、环境变量或命令输出。
+- 不实现实时性能面板，也不持续监控进程级 CPU 与内存。
+- 本次不实现缓存、增量扫描或数据库重构。
 
-## User Experience
+## 用户体验
 
-The Settings page gains a `Performance diagnostics` section.
+设置页增加“性能诊断”区域。
 
-- Diagnostics are off by default.
-- When enabled, explanatory copy states that only timings and counts are kept
-  locally, never uploaded, and may be exported for troubleshooting.
-- `Export diagnostic report` opens the normal save dialog and writes a JSONL
-  copy of the retained entries.
-- `Clear diagnostic reports` removes retained diagnostic data after a
-  confirmation dialog.
-- The section displays the local report directory and the time of the newest
-  event. It must not show individual paths or skill names.
+- 诊断默认关闭。
+- 开启时明确说明：仅保留本地的耗时和计数数据，不会上传，可按需导出以协助排查。
+- “导出诊断报告”使用现有保存对话框，写出当前保留的 JSONL 报告副本。
+- “清除诊断报告”经确认后删除保留的诊断数据。
+- 该区域显示本地报告目录与最新事件时间，但绝不显示单个路径或技能名称。
 
-The switch is intended for a user reproducing a lag on an installed Windows
-build. It remains enabled across restarts until the user turns it off, so a
-slow startup can be captured.
+该开关面向已安装 Windows 包的复现场景。用户开启后，状态会跨重启保留，以便捕获缓慢的启动过程；用户可随时关闭。
 
-## Architecture
+## 架构
 
 ```text
-Settings toggle
-  -> persisted diagnostic configuration
-  -> frontend PerformanceTrace request events
-  -> Tauri commands
-       -> backend PerformanceRecorder spans
-       -> in-memory bounded event queue
-       -> rotated local JSONL session file
-  -> Settings export / clear actions
+设置页开关
+  -> 持久化的诊断配置
+  -> 前端 PerformanceTrace 请求事件
+  -> Tauri 命令
+       -> 后端 PerformanceRecorder 时间跨度
+       -> 有界内存事件队列
+       -> 轮转的本地 JSONL 会话文件
+  -> 设置页导出 / 清除操作
 ```
 
-### Configuration
+### 配置
 
-Store a single Boolean `performance_diagnostics_enabled` with the existing
-local application configuration. Reading this setting must occur once when the
-app initializes. When disabled, the recorder uses a no-op path that performs
-only the Boolean check; it does not allocate event data, open report files, or
-inspect the filesystem.
+使用现有的本地应用配置保存一个布尔值 `performance_diagnostics_enabled`。应用初始化时读取一次此配置。关闭时，记录器只进行极轻量的布尔判断；不会分配事件数据、打开报告文件或访问文件系统。
 
-### Event model
+### 事件模型
 
-Every operation receives a UUID `operation_id`. A backend event has this
-shape:
+每个操作都有 UUID 格式的 `operation_id`。后端事件结构如下：
 
 ```json
 {
@@ -91,13 +73,9 @@ shape:
 }
 ```
 
-`subject` is restricted to fixed operation and Agent identifiers already
-shipped by the application. It is never a filesystem-derived value. Counters
-are omitted when irrelevant. Failure events contain a fixed error category
-(for example `io_error` or `database_error`), not the error message, because
-messages may contain paths.
+`subject` 仅允许使用应用内置的操作名和 Agent ID，绝不能来自文件系统。无关的计数可以省略。失败事件仅记录固定错误类别（例如 `io_error`、`database_error`），不记录错误消息，因为错误消息可能包含路径。
 
-The frontend records matching lifecycle events for each IPC request:
+前端为每个 IPC 请求记录对应的生命周期事件：
 
 ```json
 {
@@ -112,121 +90,85 @@ The frontend records matching lifecycle events for each IPC request:
 }
 ```
 
-This identifies duplicated or overlapping requests without recording UI input
-or application state beyond a count.
+这能识别重复或重叠的请求，同时不记录 UI 输入或除计数外的应用状态。
 
-### Backend instrumentation
+### 后端埋点
 
-Use `std::time::Instant` for durations; wall-clock time is used only to order
-events.
+耗时使用 `std::time::Instant` 计算；墙上时钟仅用于排列事件顺序。
 
-`scan_agents` records:
+`scan_agents` 记录：
 
-1. one overall `scan_agents` event;
-2. one `adapter_detect` event per registered adapter;
-3. one `adapter_scan` event for each adapter with roots;
-4. one `skill_fingerprint` aggregate per adapter, including the number of
-   skills and comparable files fingerprinted;
-5. one `report_serialization` event for the final DTO conversion.
+1. 一个整体 `scan_agents` 事件；
+2. 每个已注册 Adapter 一个 `adapter_detect` 事件；
+3. 每个有技能目录的 Adapter 一个 `adapter_scan` 事件；
+4. 每个 Adapter 一个聚合的 `skill_fingerprint` 事件，包含技能数和参与指纹计算的可比文件数；
+5. 最终 DTO 转换的一个 `report_serialization` 事件。
 
-`scan_master_repo` records:
+`scan_master_repo` 记录：
 
-1. one overall `get_master_skills` event;
-2. one `master_enumeration` event;
-3. one aggregate `link_reconciliation` event with master-skill count and
-   Agent link-check count;
-4. one `sqlite_sync` event with master-skill upserts and Agent-symlink upserts.
+1. 一个整体 `get_master_skills` 事件；
+2. 一个 `master_enumeration` 事件；
+3. 一个聚合的 `link_reconciliation` 事件，记录主技能数与 Agent 链接检查数；
+4. 一个 `sqlite_sync` 事件，记录主技能 upsert 与 Agent 软链接 upsert 数量。
 
-Instrumentation must be aggregate-first: it must not write one event per
-individual Skill or file. The exception is a per-Adapter scan event, because
-that is necessary to identify an expensive adapter and is bounded by the
-supported Adapter list.
+埋点必须以聚合为优先：不得为每个 Skill 或文件写入一条事件。唯一例外是每个 Adapter 的扫描事件，因为定位高耗时 Adapter 必需该维度，并且其数量受支持的 Adapter 列表限制。
 
-### Storage and retention
+### 存储与保留
 
-Store diagnostics under the application data directory, in a dedicated
-`diagnostics` child directory. Do not use a temporary directory or browser
-storage, because Windows startup diagnostics must survive an application
-restart.
+诊断数据存放在应用数据目录的专用 `diagnostics` 子目录。不得使用临时目录或浏览器存储，因为 Windows 启动诊断必须跨应用重启保留。
 
-The recorder appends newline-delimited JSON records to a session file. Before
-an append, it rotates files so that each file is at most 2 MiB and at most five
-files are retained. Rotation and retention failures are swallowed and counted
-in an in-memory `diagnostic_write_failure` metric; diagnostics must never make
-a normal Agent operation fail.
+记录器以换行分隔 JSON 的形式追加到会话文件。每次追加前进行轮转：单个文件最多 2 MiB，最多保留 5 份。轮转或清理失败应被吞掉，并在内存中计为 `diagnostic_write_failure`；诊断功能绝不能使正常 Agent 操作失败。
 
-All writes occur after the measured operation completes. The implementation
-must not flush a file after every span. A bounded queue of at most 256 events
-is drained as one append operation at the end of the parent operation, keeping
-diagnostics from materially changing the observed latency.
+所有文件写入都发生在被测操作结束后。实现不得在每个时间跨度结束后强制刷新文件；最多 256 条事件的有界队列在父操作结束时作为一次追加写入，以避免诊断本身明显改变被测延迟。
 
-### Request correlation and concurrency
+### 请求关联与并发
 
-Frontend calls create and pass an optional `operation_id` to the matching
-Tauri command. Existing callers that do not pass one get a backend-generated
-UUID. The frontend maintains an in-memory count by command name while
-diagnostics are enabled, records the count at request start, and decrements it
-in `finally`.
+前端调用创建并传递可选的 `operation_id` 给对应 Tauri 命令。现有调用方若未传递，则由后端生成 UUID。诊断启用时，前端按命令名维护内存中的进行中请求计数，在请求开始时记录该计数，并在 `finally` 中递减。
 
-The diagnostic mode observes overlapping scans; it does not prevent them.
-Request coalescing is a later optimization that needs data from this mode.
+诊断模式只观察重叠扫描，不阻止它们。请求合并属于后续优化，需要先由本模式提供数据。
 
-## Error Handling
+## 错误处理
 
-- If configuration cannot be read, diagnostics default to disabled.
-- A malformed historical JSONL line is skipped during export, not surfaced in
-  the UI.
-- An unavailable report directory disables only report persistence for the
-  current session; the associated business operation still completes.
-- Export writes a new filtered copy. It never moves or deletes retained logs.
-- Clear removes only files inside the resolved diagnostics directory, after
-  verifying that it is the application-owned path.
+- 无法读取配置时，诊断默认关闭。
+- 导出时遇到历史 JSONL 中格式错误的行，跳过该行，不在 UI 中报错。
+- 报告目录不可用时，只禁用当前会话的报告持久化；关联的业务操作仍正常完成。
+- 导出写入的是新的过滤副本，绝不移动或删除原有日志。
+- 清除操作只删除已解析并验证属于本应用的诊断目录内的文件。
 
-## Testing
+## 测试
 
-### Rust unit tests
+### Rust 单元测试
 
-- Disabled recorder emits no events and never creates a directory.
-- A recorded `scan_agents` operation has one parent event and only allowed
-  fields; serialized text contains no supplied file path or skill name.
-- Rotation keeps no more than five files and no file above 2 MiB after a
-  completed append.
-- A report-write error does not change the result of a simulated scan.
-- Master-library counters match a fixture with known master skills and known
-  supported Agents.
+- 关闭记录器不会产生事件，也不会创建目录。
+- 一个已记录的 `scan_agents` 操作包含一个父事件，且只含允许字段；序列化文本不得包含测试提供的文件路径或技能名称。
+- 轮转后最多保留 5 个文件，且一次追加完成后没有文件超过 2 MiB。
+- 模拟报告写入失败不会改变模拟扫描的返回结果。
+- 主技能库计数应与包含已知主技能和已知支持 Agent 的夹具相符。
 
-### Frontend tests
+### 前端测试
 
-- Settings renders diagnostics disabled by default.
-- Enabling diagnostics persists the configuration and enables request timing.
-- A traced IPC call records its duration and concurrent-request count, and the
-  count returns to zero if the call rejects.
-- Export is disabled when no report exists; clear requires confirmation.
+- 设置页默认显示诊断关闭。
+- 开启诊断会持久化配置并启用请求计时。
+- 被追踪的 IPC 调用会记录耗时和并发请求数；即使调用 reject，计数也会归零。
+- 没有报告时导出按钮禁用；清除操作需要确认。
 
-### Manual Windows verification
+### Windows 手动验证
 
-1. Install a release build with at least ten detected Agents and a populated
-   master library.
-2. Enable diagnostics, restart the app, and wait for startup to finish.
-3. Run one link/unlink operation and one explicit refresh.
-4. Export the report and verify it contains timings and counts only.
-5. Confirm each operation has an overall duration, per-Adapter scan durations,
-   master-library reconciliation duration, SQLite duration, and frontend
-   in-flight counts.
-6. Confirm disabling diagnostics stops new report files and does not change
-   normal operation results.
+1. 安装一个至少检测到 10 个 Agent、且主技能库已有内容的发布构建。
+2. 开启诊断，重启应用，等待启动完成。
+3. 执行一次链接或取消链接操作，以及一次显式刷新。
+4. 导出报告，确认其中只有耗时和计数。
+5. 确认每个操作都包含总耗时、每个 Adapter 的扫描耗时、主技能库同步耗时、SQLite 耗时与前端进行中请求数。
+6. 关闭诊断，确认不再创建新报告文件，且正常操作结果不变。
 
-## Success Criteria
+## 验收标准
 
-The exported report lets us answer all of the following from one Windows
-reproduction:
+从一次 Windows 复现导出的报告中，必须能回答：
 
-1. Which top-level command has the highest elapsed time?
-2. Which Agent, if any, dominates `scan_agents`?
-3. How much time is spent fingerprinting compared with discovery?
-4. How much time is spent reconciling master Skill links and synchronizing
-   SQLite?
-5. Did startup or a user action issue duplicate or overlapping scans?
+1. 哪个顶层命令的总耗时最高？
+2. 是否存在主导 `scan_agents` 耗时的 Agent？
+3. 指纹计算相对于发现过程占多少时间？
+4. 主技能链接状态同步与 SQLite 写入分别占多少时间？
+5. 启动或一次用户操作是否发出了重复或重叠扫描？
 
-Once these are answered, the next change can target the dominant cost with a
-measurable before/after comparison.
+回答这些问题后，下一次改动就可以针对占比最高的成本做优化，并进行可量化的前后对比。
