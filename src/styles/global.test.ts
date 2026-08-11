@@ -27,3 +27,10 @@ describe("Git URL input focus styling", () => {
     expect(styles).toContain("input.install-url-input:focus-visible {\n  outline: none;\n  outline-offset: 0;\n}");
   });
 });
+
+describe("skill library list coverage", () => {
+  it("keeps linked Agent icons visually separated instead of overlapping", () => {
+    expect(styles).toContain(".skill-list-linked-agents {\n  align-items: center;\n  display: flex;\n  gap: 6px;");
+    expect(styles).not.toContain(".skill-list-linked-agent {\n  align-items: center;\n  background: var(--surface);\n  border: 2px solid var(--surface);\n  border-radius: 8px;\n  display: inline-flex;\n  height: 26px;\n  justify-content: center;\n  margin-left: -4px;");
+  });
+});

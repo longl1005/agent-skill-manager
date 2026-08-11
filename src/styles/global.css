@@ -3242,9 +3242,9 @@ input.settings-agent-path-input:focus-visible {
 .skill-list-linked-agents {
   align-items: center;
   display: flex;
-  height: 24px;
+  gap: 6px;
+  height: 26px;
   margin-top: 5px;
-  padding-left: 2px;
 }
 
 .skill-list-linked-agent {
@@ -3255,13 +3255,8 @@ input.settings-agent-path-input:focus-visible {
   display: inline-flex;
   height: 26px;
   justify-content: center;
-  margin-left: -4px;
   overflow: hidden;
   width: 26px;
-}
-
-.skill-list-linked-agent:first-child {
-  margin-left: 0;
 }
 
 .skill-list-linked-agent-overflow {
@@ -3276,7 +3271,6 @@ input.settings-agent-path-input:focus-visible {
   font-weight: 700;
   height: 26px;
   justify-content: center;
-  margin-left: -4px;
   min-width: 26px;
   padding: 0 4px;
 }
