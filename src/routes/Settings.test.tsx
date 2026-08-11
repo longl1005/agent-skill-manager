@@ -30,9 +30,9 @@ vi.mock("../ipc/commands", () => ({
 
 const reportSummaryFixture = {
   enabled: true,
-  report_count: 2,
-  newest_event_at_ms: 1_725_000_000_000,
-  report_directory_label: "~/.asm/diagnostics",
+  reportCount: 2,
+  newestEventAtMs: 1_725_000_000_000,
+  reportDirectoryLabel: "~/.asm/diagnostics",
 };
 
 const defaultRefreshDiagnosticsSummary = usePerformanceDiagnosticsStore.getState().refreshSummary;
@@ -160,6 +160,12 @@ describe("Settings route & i18n / Theme Switcher", () => {
     fireEvent.click(toggle);
 
     await waitFor(() => expect(setPerformanceDiagnosticsEnabled).toHaveBeenCalledWith(true));
+  });
+
+  it("renders the camel-case report summary returned by the Tauri command", () => {
+    render(<Settings />);
+
+    expect(screen.getByText("诊断报告：2 份")).toBeInTheDocument();
   });
 
   it("refreshes the persisted diagnostics summary when the settings page opens", async () => {

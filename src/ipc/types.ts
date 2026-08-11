@@ -9,9 +9,9 @@ export interface DiagnosticContext {
 
 export interface PerformanceDiagnosticsSummary {
   enabled: boolean;
-  report_count: number;
-  newest_event_at_ms: number | null;
-  report_directory_label: string;
+  reportCount: number;
+  newestEventAtMs: number | null;
+  reportDirectoryLabel: string;
 }
 
 // ===== scan_agents 响应 =====

@@ -396,11 +396,11 @@ export default function Settings() {
           </button>
         </div>
         <p className="settings-section__desc">{t("settings.performanceDiagnostics.privacy", lang)}</p>
-        <p className="settings-section__desc">{diagnosticsSummary?.report_directory_label ?? "~/.asm/diagnostics"}</p>
-        <p className="settings-section__desc">{t("settings.performanceDiagnostics.reportCount", lang).replace("{count}", String(diagnosticsSummary?.report_count ?? 0))}</p>
+        <p className="settings-section__desc">{diagnosticsSummary?.reportDirectoryLabel ?? "~/.asm/diagnostics"}</p>
+        <p className="settings-section__desc">{t("settings.performanceDiagnostics.reportCount", lang).replace("{count}", String(diagnosticsSummary?.reportCount ?? 0))}</p>
         <p className="settings-section__desc">
-          {t("settings.performanceDiagnostics.latestEvent", lang)}: {diagnosticsSummary?.newest_event_at_ms != null
-            ? new Date(diagnosticsSummary.newest_event_at_ms).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")
+          {t("settings.performanceDiagnostics.latestEvent", lang)}: {diagnosticsSummary?.newestEventAtMs != null
+            ? new Date(diagnosticsSummary.newestEventAtMs).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")
             : t("settings.performanceDiagnostics.noEvents", lang)}
         </p>
         {diagnosticsEnabled && (
@@ -409,7 +409,7 @@ export default function Settings() {
               type="button"
               className="settings-reset-all-btn"
               onClick={() => void handleExportDiagnostics()}
-              disabled={!diagnosticsSummary?.report_count || diagnosticsAction !== null}
+              disabled={!diagnosticsSummary?.reportCount || diagnosticsAction !== null}
             >
               {diagnosticsAction === "export" ? t("settings.performanceDiagnostics.exporting", lang) : t("settings.performanceDiagnostics.export", lang)}
             </button>
@@ -417,7 +417,7 @@ export default function Settings() {
               type="button"
               className="settings-reset-all-btn"
               onClick={() => setIsClearDiagnosticsDialogOpen(true)}
-              disabled={!diagnosticsSummary?.report_count || diagnosticsAction !== null}
+              disabled={!diagnosticsSummary?.reportCount || diagnosticsAction !== null}
             >
               {t("settings.performanceDiagnostics.clear", lang)}
             </button>

@@ -13,16 +13,16 @@ import { usePerformanceDiagnosticsStore } from "./performanceDiagnosticsStore";
 
 const disabledSummary = {
   enabled: false,
-  report_count: 0,
-  newest_event_at_ms: null,
-  report_directory_label: "~/.asm/diagnostics",
+  reportCount: 0,
+  newestEventAtMs: null,
+  reportDirectoryLabel: "~/.asm/diagnostics",
 };
 
 const enabledSummary = {
   enabled: true,
-  report_count: 2,
-  newest_event_at_ms: 42,
-  report_directory_label: "~/.asm/diagnostics",
+  reportCount: 2,
+  newestEventAtMs: 42,
+  reportDirectoryLabel: "~/.asm/diagnostics",
 };
 
 describe("performanceDiagnosticsStore", () => {
