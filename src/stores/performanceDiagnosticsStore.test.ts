@@ -52,6 +52,22 @@ describe("performanceDiagnosticsStore", () => {
     expect(usePerformanceDiagnosticsStore.getState()).toMatchObject({ enabled: true, summary: enabledSummary });
   });
 
+  it("enables tracing before waiting for the refreshed summary", async () => {
+    let resolveSummary: ((summary: typeof enabledSummary) => void) | undefined;
+    vi.mocked(commands.setPerformanceDiagnosticsEnabled).mockResolvedValueOnce(undefined);
+    vi.mocked(commands.getPerformanceDiagnosticsSummary).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveSummary = resolve; }),
+    );
+
+    const updating = usePerformanceDiagnosticsStore.getState().setEnabled(true);
+
+    await expect.poll(() => usePerformanceDiagnosticsStore.getState().enabled).toBe(true);
+    resolveSummary?.(enabledSummary);
+    await updating;
+
+    expect(usePerformanceDiagnosticsStore.getState().summary).toEqual(enabledSummary);
+  });
+
   it("refreshes the summary after exporting a report", async () => {
     vi.mocked(commands.exportPerformanceDiagnostics).mockResolvedValueOnce(undefined);
     vi.mocked(commands.getPerformanceDiagnosticsSummary).mockResolvedValueOnce(disabledSummary);

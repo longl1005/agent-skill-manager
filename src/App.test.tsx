@@ -2,9 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { useUiStore } from "./stores/uiStore";
+import { useAgentConfigStore } from "./stores/agentConfigStore";
 
 const scanMock = vi.fn();
 const fetchMasterSkillsMock = vi.fn();
+const hydrateAgentConfigMock = vi.fn().mockResolvedValue(undefined);
 const hydratePerformanceDiagnosticsMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -37,10 +39,13 @@ vi.mock("./stores/performanceDiagnosticsStore", () => ({
   },
 }));
 
+vi.mock("./routes/Dashboard", () => ({ default: () => null }));
+
 describe("App Launch Auto-Scan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useUiStore.setState({ sidebarCollapsed: false });
+    useAgentConfigStore.setState({ hydrate: hydrateAgentConfigMock });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: (query: string) => ({
@@ -62,6 +67,30 @@ describe("App Launch Auto-Scan", () => {
     await waitFor(() => expect(hydratePerformanceDiagnosticsMock).toHaveBeenCalled());
     await waitFor(() => expect(scanMock).toHaveBeenCalled());
     expect(fetchMasterSkillsMock).toHaveBeenCalled();
+  });
+
+  it("waits for both hydration attempts to settle before the first scan", async () => {
+    let resolveAgentConfig: (() => void) | undefined;
+    let rejectDiagnostics: ((reason: Error) => void) | undefined;
+    const pendingAgentConfig = new Promise<void>((resolve) => { resolveAgentConfig = resolve; });
+    const failedDiagnostics = new Promise<void>((_resolve, reject) => { rejectDiagnostics = reject; });
+    hydrateAgentConfigMock.mockImplementationOnce(() => pendingAgentConfig);
+    hydratePerformanceDiagnosticsMock.mockImplementationOnce(() => failedDiagnostics);
+
+    render(<App />);
+
+    await waitFor(() => expect(hydrateAgentConfigMock).toHaveBeenCalled());
+    await waitFor(() => expect(hydratePerformanceDiagnosticsMock).toHaveBeenCalled());
+    rejectDiagnostics?.(new Error("diagnostics unavailable"));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(scanMock).not.toHaveBeenCalled();
+    expect(fetchMasterSkillsMock).not.toHaveBeenCalled();
+
+    resolveAgentConfig?.();
+
+    await waitFor(() => expect(scanMock).toHaveBeenCalledOnce());
+    expect(fetchMasterSkillsMock).toHaveBeenCalledOnce();
   });
 
   it("moves the sidebar toggle into the title bar", () => {

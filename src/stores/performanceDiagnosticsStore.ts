@@ -27,8 +27,9 @@ export const usePerformanceDiagnosticsStore = create<PerformanceDiagnosticsState
   },
   setEnabled: async (enabled) => {
     await setPerformanceDiagnosticsEnabled(enabled);
+    set({ enabled });
     const summary = await getPerformanceDiagnosticsSummary();
-    set({ enabled, summary });
+    set({ summary });
   },
   exportReport: async (destination) => {
     await exportPerformanceDiagnostics(destination);

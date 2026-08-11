@@ -43,8 +43,7 @@ export default function App() {
 
   useEffect(() => {
     initTheme();
-    void Promise.all([hydrateAgentConfig(), hydratePerformanceDiagnostics()])
-      .catch(() => undefined)
+    void Promise.allSettled([hydrateAgentConfig(), hydratePerformanceDiagnostics()])
       .finally(() => {
         void scan();
         void fetchMasterSkills();

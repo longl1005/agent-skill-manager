@@ -45,7 +45,6 @@ export default function SkillLibrary() {
   const { skills, loading, error, fetchMasterSkills, toggleAgentSkill, toggleAgentSkillsBatch, deleteMasterSkill } = useMasterRepoStore();
   const lang = useI18nStore((s) => s.lang);
   const scanReport = useScanStore((state) => state.report);
-  const scanAgents = useScanStore((state) => state.scan);
   const disabledAgentIds = useAgentConfigStore((state) => state.disabledAgentIds);
   const agentOrder = useAgentConfigStore((state) => state.agentOrder);
   const supportedAgents = orderAgents(SUPPORTED_AGENTS.filter((agent) => !disabledAgentIds.includes(agent.id) && scanReport?.agents.some((report) => report.agent_id === agent.id && isDiscoveredAgent(report))), agentOrder);
@@ -74,7 +73,7 @@ export default function SkillLibrary() {
     try {
       // Agent discovery affects both the matrix targets and link status. Refresh it
       // before re-reading the master repository so this page is always consistent.
-      await scanAgents();
+      await useScanStore.getState().scan();
       await fetchMasterSkills();
     } finally {
       setRefreshing(false);

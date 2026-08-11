@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import SkillLibrary from "./SkillLibrary";
@@ -51,6 +51,7 @@ describe("SkillLibrary Route", () => {
   let fetchMasterSkillsMock: ReturnType<typeof vi.fn>;
   let toggleAgentSkillMock: ReturnType<typeof vi.fn>;
   let toggleAgentSkillsBatchMock: ReturnType<typeof vi.fn>;
+  let scanMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,6 +70,8 @@ describe("SkillLibrary Route", () => {
     fetchMasterSkillsMock = vi.fn();
     toggleAgentSkillMock = vi.fn().mockResolvedValue(true);
     toggleAgentSkillsBatchMock = vi.fn().mockResolvedValue(1);
+    scanMock = vi.fn().mockResolvedValue(undefined);
+    useScanStore.setState({ scan: scanMock });
 
     vi.mocked(useMasterRepoStore).mockReturnValue({
       skills: mockMasterSkills,
@@ -100,6 +103,15 @@ describe("SkillLibrary Route", () => {
     expect(screen.getByText("code-analyzer")).toBeInTheDocument();
     expect(screen.getByText("~/.asm/skills/web-search-pro")).toBeInTheDocument();
     expect(screen.getByText("Advanced web searching skill")).toBeInTheDocument();
+  });
+
+  it("uses the scan store for a manual refresh before refreshing master skills", async () => {
+    render(<MemoryRouter><SkillLibrary /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(scanMock).toHaveBeenCalledOnce());
+    expect(fetchMasterSkillsMock).toHaveBeenCalledTimes(2);
   });
 
   it("shows the total number of master skills beside the library title", () => {
