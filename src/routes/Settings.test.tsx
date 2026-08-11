@@ -1,13 +1,43 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import Settings from "./Settings";
 import { useThemeStore } from "../stores/themeStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
 import { useScanStore } from "../stores/scanStore";
+import { usePerformanceDiagnosticsStore } from "../stores/performanceDiagnosticsStore";
+import {
+  clearPerformanceDiagnostics,
+  exportPerformanceDiagnostics,
+  getPerformanceDiagnosticsSummary,
+  setPerformanceDiagnosticsEnabled,
+} from "../ipc/commands";
+
+const { saveMock } = vi.hoisted(() => ({ saveMock: vi.fn() }));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({ save: saveMock }));
+
+vi.mock("../ipc/commands", () => ({
+  migrateAgentSkillsDir: vi.fn(),
+  resetAgentSkillsDir: vi.fn(),
+  setAgentSortOrder: vi.fn().mockResolvedValue(undefined),
+  getPerformanceDiagnosticsEnabled: vi.fn(),
+  setPerformanceDiagnosticsEnabled: vi.fn(),
+  getPerformanceDiagnosticsSummary: vi.fn(),
+  exportPerformanceDiagnostics: vi.fn(),
+  clearPerformanceDiagnostics: vi.fn(),
+}));
+
+const reportSummaryFixture = {
+  enabled: true,
+  report_count: 2,
+  newest_event_at_ms: 1_725_000_000_000,
+  report_directory_label: "~/.asm/diagnostics",
+};
 
 describe("Settings route & i18n / Theme Switcher", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: (query: string) => ({
@@ -26,6 +56,9 @@ describe("Settings route & i18n / Theme Switcher", () => {
     useThemeStore.getState().setThemeMode("system");
     useAgentConfigStore.setState({ customPaths: {}, disabledAgentIds: [], agentOrder: [] });
     useScanStore.setState({ report: null, scanning: false, error: null });
+    usePerformanceDiagnosticsStore.setState({ enabled: false, summary: reportSummaryFixture });
+    vi.mocked(getPerformanceDiagnosticsSummary).mockResolvedValue(reportSummaryFixture);
+    saveMock.mockResolvedValue(null);
   });
 
   it("renders theme options and allows changing theme mode", () => {
@@ -111,5 +144,57 @@ describe("Settings route & i18n / Theme Switcher", () => {
     fireEvent.pointerUp(handles[0], { pointerId: 1 });
 
     expect(useAgentConfigStore.getState().agentOrder.slice(0, 2)).toEqual(["droid", "claude-code"]);
+  });
+
+  it("shows diagnostics as disabled by default and enables it", async () => {
+    render(<Settings />);
+
+    const toggle = screen.getByRole("switch", { name: "性能诊断" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(setPerformanceDiagnosticsEnabled).toHaveBeenCalledWith(true));
+  });
+
+  it("requires confirmation before clearing diagnostic reports", () => {
+    usePerformanceDiagnosticsStore.setState({ enabled: true });
+    render(<Settings />);
+
+    fireEvent.click(screen.getByRole("button", { name: "清除诊断报告" }));
+
+    expect(screen.getByRole("dialog", { name: "清除诊断报告" })).toBeInTheDocument();
+    expect(clearPerformanceDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("does not export when the save dialog is cancelled", async () => {
+    usePerformanceDiagnosticsStore.setState({ enabled: true });
+    render(<Settings />);
+
+    fireEvent.click(screen.getByRole("button", { name: "导出诊断报告" }));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(exportPerformanceDiagnostics).not.toHaveBeenCalled();
+    expect(usePerformanceDiagnosticsStore.getState().summary).toEqual(reportSummaryFixture);
+  });
+
+  it("shows the generic error when exporting diagnostics fails", async () => {
+    usePerformanceDiagnosticsStore.setState({ enabled: true });
+    saveMock.mockResolvedValueOnce("/tmp/diagnostics.jsonl");
+    vi.mocked(exportPerformanceDiagnostics).mockRejectedValueOnce(new Error("backend detail"));
+    render(<Settings />);
+
+    fireEvent.click(screen.getByRole("button", { name: "导出诊断报告" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("无法完成性能诊断操作，请重试。");
+    expect(screen.queryByText("backend detail")).not.toBeInTheDocument();
+  });
+
+  it("hides report actions after diagnostics is disabled", async () => {
+    usePerformanceDiagnosticsStore.setState({ enabled: true, summary: reportSummaryFixture });
+    render(<Settings />);
+
+    fireEvent.click(screen.getByRole("switch", { name: "性能诊断" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "导出诊断报告" })).not.toBeInTheDocument());
   });
 });

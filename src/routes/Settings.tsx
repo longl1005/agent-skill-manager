@@ -8,7 +8,9 @@ import { useThemeStore, type ThemeMode } from "../stores/themeStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useUpdateStore } from "../stores/updateStore";
 import { migrateAgentSkillsDir, resetAgentSkillsDir } from "../ipc/commands";
+import { usePerformanceDiagnosticsStore } from "../stores/performanceDiagnosticsStore";
 import { t, type Language, type TranslationKey } from "../locales/dict";
+import { save } from "@tauri-apps/plugin-dialog";
 
 interface ThemeOption {
   id: ThemeMode;
@@ -95,6 +97,11 @@ export default function Settings() {
   const report = useScanStore((state) => state.report);
   const checkForUpdates = useUpdateStore((state) => state.checkForUpdates);
   const updateStatus = useUpdateStore((state) => state.status);
+  const diagnosticsEnabled = usePerformanceDiagnosticsStore((state) => state.enabled);
+  const diagnosticsSummary = usePerformanceDiagnosticsStore((state) => state.summary);
+  const setDiagnosticsEnabled = usePerformanceDiagnosticsStore((state) => state.setEnabled);
+  const exportDiagnosticsReport = usePerformanceDiagnosticsStore((state) => state.exportReport);
+  const clearDiagnosticsReports = usePerformanceDiagnosticsStore((state) => state.clearReports);
 
   // Local state for path inputs
   const [inputPaths, setInputPaths] = useState<Record<string, string>>(() => ({
@@ -110,6 +117,9 @@ export default function Settings() {
   const [draggedAgentId, setDraggedAgentId] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [diagnosticsAction, setDiagnosticsAction] = useState<"export" | "clear" | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState(false);
+  const [isClearDiagnosticsDialogOpen, setIsClearDiagnosticsDialogOpen] = useState(false);
   const draggedAgentIdRef = useRef<string | null>(null);
 
   const handleInputChange = (agentId: string, val: string) => {
@@ -153,6 +163,44 @@ export default function Settings() {
     resetAll();
     setInputPaths({});
     await scan();
+  };
+
+  const handleDiagnosticsToggle = async () => {
+    setDiagnosticsError(false);
+    try {
+      await setDiagnosticsEnabled(!diagnosticsEnabled);
+    } catch {
+      setDiagnosticsError(true);
+    }
+  };
+
+  const handleExportDiagnostics = async () => {
+    setDiagnosticsError(false);
+    setDiagnosticsAction("export");
+    try {
+      const destination = await save({
+        defaultPath: "asm-performance-diagnostics.jsonl",
+        filters: [{ name: "JSONL", extensions: ["jsonl"] }],
+      });
+      if (destination) await exportDiagnosticsReport(destination);
+    } catch {
+      setDiagnosticsError(true);
+    } finally {
+      setDiagnosticsAction(null);
+    }
+  };
+
+  const confirmClearDiagnostics = async () => {
+    setDiagnosticsError(false);
+    setDiagnosticsAction("clear");
+    try {
+      await clearDiagnosticsReports();
+      setIsClearDiagnosticsDialogOpen(false);
+    } catch {
+      setDiagnosticsError(true);
+    } finally {
+      setDiagnosticsAction(null);
+    }
   };
 
   const handleAgentToggle = async (agentId: string, enabled: boolean) => {
@@ -328,6 +376,54 @@ export default function Settings() {
       <div className="settings-section" style={{ marginTop: 32 }}>
         <div className="settings-section__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
+            <h2 className="settings-section__title">{t("settings.performanceDiagnostics.title", lang)}</h2>
+            <p className="settings-section__desc">{t("settings.performanceDiagnostics.description", lang)}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={diagnosticsEnabled}
+            aria-label={t("settings.performanceDiagnostics.title", lang)}
+            className="settings-reset-all-btn"
+            onClick={() => void handleDiagnosticsToggle()}
+          >
+            {diagnosticsEnabled ? t("settings.performanceDiagnostics.enabled", lang) : t("settings.performanceDiagnostics.disabled", lang)}
+          </button>
+        </div>
+        <p className="settings-section__desc">{t("settings.performanceDiagnostics.privacy", lang)}</p>
+        <p className="settings-section__desc">{diagnosticsSummary?.report_directory_label ?? "~/.asm/diagnostics"}</p>
+        <p className="settings-section__desc">{t("settings.performanceDiagnostics.reportCount", lang).replace("{count}", String(diagnosticsSummary?.report_count ?? 0))}</p>
+        <p className="settings-section__desc">
+          {t("settings.performanceDiagnostics.latestEvent", lang)}: {diagnosticsSummary?.newest_event_at_ms != null
+            ? new Date(diagnosticsSummary.newest_event_at_ms).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")
+            : t("settings.performanceDiagnostics.noEvents", lang)}
+        </p>
+        {diagnosticsEnabled && (
+          <div className="settings-section__header" style={{ display: "flex", gap: 12, marginTop: 16 }}>
+            <button
+              type="button"
+              className="settings-reset-all-btn"
+              onClick={() => void handleExportDiagnostics()}
+              disabled={!diagnosticsSummary?.report_count || diagnosticsAction !== null}
+            >
+              {diagnosticsAction === "export" ? t("settings.performanceDiagnostics.exporting", lang) : t("settings.performanceDiagnostics.export", lang)}
+            </button>
+            <button
+              type="button"
+              className="settings-reset-all-btn"
+              onClick={() => setIsClearDiagnosticsDialogOpen(true)}
+              disabled={!diagnosticsSummary?.report_count || diagnosticsAction !== null}
+            >
+              {t("settings.performanceDiagnostics.clear", lang)}
+            </button>
+          </div>
+        )}
+        {diagnosticsError && <p className="settings-agent-toggle-error" role="alert">{t("settings.performanceDiagnostics.operationFailed", lang)}</p>}
+      </div>
+
+      <div className="settings-section" style={{ marginTop: 32 }}>
+        <div className="settings-section__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
             <h2 className="settings-section__title">{t("settings.paths.title", lang)}</h2>
             <p className="settings-section__desc">{t("settings.paths.desc", lang)}</p>
           </div>
@@ -358,6 +454,18 @@ export default function Settings() {
             <div className="delete-confirm-header"><div><h3 id="disable-agent-title">{lang === "zh" ? "关闭 Agent" : "Disable Agent"}</h3><p>{knownAgents.find((agent) => agent.id === pendingDisableAgentId)?.name}</p></div></div>
             <div className="delete-confirm-body"><p>{lang === "zh" ? "关闭后将删除此 Agent 下所有由 ASM 管理的 Skills 软链接。" : "All ASM-managed skill symlinks for this Agent will be removed."}</p><p className="delete-confirm-warning">{lang === "zh" ? "重新开启不会自动恢复这些链接。" : "Re-enabling will not restore these links."}</p></div>
             <div className="delete-confirm-footer"><button type="button" className="btn secondary" onClick={() => setPendingDisableAgentId(null)}>{lang === "zh" ? "取消" : "Cancel"}</button><button type="button" className="btn danger" onClick={() => void confirmDisableAgent()}>{lang === "zh" ? "确认关闭" : "Disable"}</button></div>
+          </div>
+        </div>
+      )}
+      {isClearDiagnosticsDialogOpen && (
+        <div className="modal-overlay" role="presentation">
+          <div className="delete-confirm-card settings-disable-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-diagnostics-title">
+            <div className="delete-confirm-header"><div><h3 id="clear-diagnostics-title">{t("settings.performanceDiagnostics.clear", lang)}</h3></div></div>
+            <div className="delete-confirm-body"><p>{t("settings.performanceDiagnostics.clearConfirmation", lang)}</p></div>
+            <div className="delete-confirm-footer">
+              <button type="button" className="btn secondary" onClick={() => setIsClearDiagnosticsDialogOpen(false)} disabled={diagnosticsAction === "clear"}>{t("settings.performanceDiagnostics.cancel", lang)}</button>
+              <button type="button" className="btn danger" onClick={() => void confirmClearDiagnostics()} disabled={diagnosticsAction === "clear"}>{diagnosticsAction === "clear" ? t("settings.performanceDiagnostics.clearing", lang) : t("settings.performanceDiagnostics.clear", lang)}</button>
+            </div>
           </div>
         </div>
       )}
