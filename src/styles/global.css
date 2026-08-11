@@ -3115,7 +3115,7 @@ input.settings-agent-path-input:focus-visible {
   align-items: center;
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(190px, 0.85fr) minmax(200px, 1.4fr) max-content minmax(180px, 0.8fr) auto;
+  grid-template-columns: minmax(190px, 0.85fr) minmax(200px, 1.4fr) max-content minmax(260px, 1fr) auto;
   padding: 12px 16px;
 }
 
@@ -3166,11 +3166,11 @@ input.settings-agent-path-input:focus-visible {
   display: none;
 }
 
-.agent-distribution-section--compact .agent-matrix-badges {
+.agent-distribution-section--compact .agent-matrix-badges--wrap {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 4px;
-  overflow-x: auto;
+  overflow: visible;
   padding: 1px;
 }
 

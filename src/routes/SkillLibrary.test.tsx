@@ -139,6 +139,8 @@ describe("SkillLibrary Route", () => {
     expect(screen.getByText("1 linked Agent")).toBeVisible();
     expect(screen.getByTestId("skill-card-web-search-pro").querySelector(".agent-distribution-section"))
       .toHaveClass("agent-distribution-section--compact");
+    expect(screen.getByTestId("skill-card-web-search-pro").querySelector(".agent-matrix-badges"))
+      .toHaveClass("agent-matrix-badges--wrap");
 
     fireEvent.click(screen.getByRole("button", { name: "Card view" }));
 

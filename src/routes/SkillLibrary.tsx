@@ -343,7 +343,7 @@ export default function SkillLibrary() {
 
                 <div className={`agent-distribution-section ${skillView === "list" ? "agent-distribution-section--compact" : ""}`}>
                   <h4 className="matrix-title">{t("skillLibrary.agentMatrixTitle", lang)}</h4>
-                  <div className="agent-matrix-badges">
+                  <div className={`agent-matrix-badges ${skillView === "list" ? "agent-matrix-badges--wrap" : ""}`}>
                 {supportedAgents.map((agent) => {
                       const isLinked = Boolean(skill.linked_agents?.[agent.id]);
                       const key = `${agent.id}:${skill.name}`;
