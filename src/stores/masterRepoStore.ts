@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getMasterSkills, toggleAgentSkill, toggleAgentSkillsBatch, unlinkAllAgentSkills, importToMaster, installSkillToMaster, deleteMasterSkill, replaceAgentLocalSkillWithSymlink, deleteAgentSkill } from "../ipc/commands";
+import { traceDiagnosticRequest } from "../ipc/performanceTrace";
 import type { ImportMode, ImportResult, MasterSkillReport } from "../ipc/types";
 import { useAgentConfigStore } from "./agentConfigStore";
 import { useScanStore } from "./scanStore";
@@ -28,7 +29,7 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const customPaths = useAgentConfigStore.getState().customPaths;
-      const skills = await getMasterSkills(customPaths);
+      const skills = await traceDiagnosticRequest("get_master_skills", (diagnosticContext) => getMasterSkills(customPaths, diagnosticContext));
       set({ skills });
     } catch (err) {
       set({ error: String(err) });

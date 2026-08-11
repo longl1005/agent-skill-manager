@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ImportMode, ImportResult, MasterSkillReport, PingResponse, ScanReport } from "./types";
+import type { DiagnosticContext, ImportMode, ImportResult, MasterSkillReport, PerformanceDiagnosticsSummary, PingResponse, ScanReport } from "./types";
 
 /**
  * 与 Rust 端 `commands::ping` 对应。
@@ -23,8 +23,14 @@ export async function openSkillDirectory(location: string): Promise<void> {
  * 与 Rust 端 `commands::scan_agents` 对应。
  * 同步阻塞: 76 个 Skill ~50ms。
  */
-export async function scanAgents(customPaths?: Record<string, string>): Promise<ScanReport> {
-  return invoke<ScanReport>("scan_agents", { customPaths: customPaths ?? null });
+export async function scanAgents(
+  customPaths?: Record<string, string>,
+  diagnosticContext?: DiagnosticContext,
+): Promise<ScanReport> {
+  return invoke<ScanReport>("scan_agents", {
+    customPaths: customPaths ?? null,
+    diagnosticContext: diagnosticContext ?? null,
+  });
 }
 
 /**
@@ -49,8 +55,34 @@ export async function setTrayStatistics(language: "zh" | "en", masterSkills: num
  * 与 Rust 端 `commands::get_master_skills` 对应。
  * 获取主仓库 (`~/.asm/skills`) 中所有的 Master Skill 及与各 Agent 的关联 link 状态。
  */
-export async function getMasterSkills(customPaths?: Record<string, string>): Promise<MasterSkillReport[]> {
-  return invoke<MasterSkillReport[]>("get_master_skills", { customPaths: customPaths ?? null });
+export async function getMasterSkills(
+  customPaths?: Record<string, string>,
+  diagnosticContext?: DiagnosticContext,
+): Promise<MasterSkillReport[]> {
+  return invoke<MasterSkillReport[]>("get_master_skills", {
+    customPaths: customPaths ?? null,
+    diagnosticContext: diagnosticContext ?? null,
+  });
+}
+
+export async function getPerformanceDiagnosticsEnabled(): Promise<boolean> {
+  return invoke<boolean>("get_performance_diagnostics_enabled");
+}
+
+export async function setPerformanceDiagnosticsEnabled(enabled: boolean): Promise<void> {
+  return invoke<void>("set_performance_diagnostics_enabled", { enabled });
+}
+
+export async function getPerformanceDiagnosticsSummary(): Promise<PerformanceDiagnosticsSummary> {
+  return invoke<PerformanceDiagnosticsSummary>("get_performance_diagnostics_summary");
+}
+
+export async function exportPerformanceDiagnostics(destination: string): Promise<void> {
+  return invoke<void>("export_performance_diagnostics", { destination });
+}
+
+export async function clearPerformanceDiagnostics(): Promise<void> {
+  return invoke<void>("clear_performance_diagnostics");
 }
 
 /**

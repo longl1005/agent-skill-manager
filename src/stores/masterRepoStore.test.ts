@@ -50,7 +50,7 @@ describe("masterRepoStore", () => {
 
     await useMasterRepoStore.getState().fetchMasterSkills();
 
-    expect(commands.getMasterSkills).toHaveBeenCalledWith({ claude_code: "/custom/path" });
+    expect(commands.getMasterSkills).toHaveBeenCalledWith({ claude_code: "/custom/path" }, undefined);
     const state = useMasterRepoStore.getState();
     expect(state.skills).toEqual(mockSkills);
     expect(state.loading).toBe(false);

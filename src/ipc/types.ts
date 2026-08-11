@@ -2,6 +2,18 @@ export interface PingResponse {
   message: string;
 }
 
+export interface DiagnosticContext {
+  operationId: string;
+  inFlightSameOperation: number;
+}
+
+export interface PerformanceDiagnosticsSummary {
+  enabled: boolean;
+  report_count: number;
+  newest_event_at_ms: number | null;
+  report_directory_label: string;
+}
+
 // ===== scan_agents 响应 =====
 
 export interface ScanReport {

@@ -22,12 +22,14 @@ import { t } from "./locales/dict";
 import { TrayEventBridge } from "./hooks/useTrayEvents";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { useUpdateStore } from "./stores/updateStore";
+import { usePerformanceDiagnosticsStore } from "./stores/performanceDiagnosticsStore";
 
 export default function App() {
   const initTheme = useThemeStore((s) => s.initTheme);
   const scan = useScanStore((s) => s.scan);
   const fetchMasterSkills = useMasterRepoStore((s) => s.fetchMasterSkills);
   const hydrateAgentConfig = useAgentConfigStore((s) => s.hydrate);
+  const hydratePerformanceDiagnostics = usePerformanceDiagnosticsStore((s) => s.hydrate);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const lang = useI18nStore((s) => s.lang);
@@ -41,9 +43,14 @@ export default function App() {
 
   useEffect(() => {
     initTheme();
-    void hydrateAgentConfig().catch(() => undefined).finally(() => { scan(); fetchMasterSkills(); });
+    void Promise.all([hydrateAgentConfig(), hydratePerformanceDiagnostics()])
+      .catch(() => undefined)
+      .finally(() => {
+        void scan();
+        void fetchMasterSkills();
+      });
     void checkForUpdates(true);
-  }, [initTheme, scan, fetchMasterSkills, hydrateAgentConfig, checkForUpdates]);
+  }, [initTheme, scan, fetchMasterSkills, hydrateAgentConfig, hydratePerformanceDiagnostics, checkForUpdates]);
 
   return (
     <HashRouter>

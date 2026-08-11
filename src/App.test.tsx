@@ -5,6 +5,7 @@ import { useUiStore } from "./stores/uiStore";
 
 const scanMock = vi.fn();
 const fetchMasterSkillsMock = vi.fn();
+const hydratePerformanceDiagnosticsMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(vi.fn()),
@@ -29,6 +30,13 @@ vi.mock("./stores/masterRepoStore", () => ({
   },
 }));
 
+vi.mock("./stores/performanceDiagnosticsStore", () => ({
+  usePerformanceDiagnosticsStore: (selector?: (s: any) => any) => {
+    const store = { hydrate: hydratePerformanceDiagnosticsMock };
+    return selector ? selector(store) : store;
+  },
+}));
+
 describe("App Launch Auto-Scan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,9 +56,10 @@ describe("App Launch Auto-Scan", () => {
     });
   });
 
-  it("triggers scan and fetchMasterSkills on mount", async () => {
+  it("hydrates performance diagnostics before triggering the launch scan", async () => {
     render(<App />);
 
+    await waitFor(() => expect(hydratePerformanceDiagnosticsMock).toHaveBeenCalled());
     await waitFor(() => expect(scanMock).toHaveBeenCalled());
     expect(fetchMasterSkillsMock).toHaveBeenCalled();
   });
