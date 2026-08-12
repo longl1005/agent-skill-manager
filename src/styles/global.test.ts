@@ -12,7 +12,16 @@ describe("sidebar scrolling", () => {
 
 describe("settings layout", () => {
   it("uses the full available content width", () => {
-    expect(styles).toContain(".settings-page {\n  width: 100%;\n}");
+    expect(styles).toMatch(/\.settings-page\s*\{[^}]*width:\s*100%;/s);
+  });
+
+  it("stacks preference rows and expands selects by 760px", () => {
+    const responsiveSettingsRule = styles.match(
+      /@media \(max-width:\s*(\d+)px\)\s*\{\s*\.settings-content-panel\s*\{[^}]*padding:\s*20px;[^}]*\}\s*\.settings-row,[\s\S]*?flex-direction:\s*column;[\s\S]*?\.settings-select\s*\{[^}]*width:\s*100%;/,
+    );
+
+    expect(responsiveSettingsRule).not.toBeNull();
+    expect(Number(responsiveSettingsRule?.[1])).toBeGreaterThanOrEqual(760);
   });
 });
 

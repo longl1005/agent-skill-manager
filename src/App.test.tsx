@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { useUiStore } from "./stores/uiStore";
 import { useAgentConfigStore } from "./stores/agentConfigStore";
 
 const scanMock = vi.fn();
@@ -44,7 +43,6 @@ vi.mock("./routes/Dashboard", () => ({ default: () => null }));
 describe("App Launch Auto-Scan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useUiStore.setState({ sidebarCollapsed: false });
     useAgentConfigStore.setState({ hydrate: hydrateAgentConfigMock });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -93,12 +91,12 @@ describe("App Launch Auto-Scan", () => {
     expect(fetchMasterSkillsMock).toHaveBeenCalledOnce();
   });
 
-  it("moves the sidebar toggle into the title bar", () => {
+  it("renders a static shell without a custom title bar or sidebar toggle", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /收起菜单|Collapse menu/ }));
-
-    expect(document.querySelector(".app-shell")).toHaveClass("sidebar-collapsed");
-    expect(screen.getByRole("button", { name: /展开菜单|Expand menu/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /收起菜单|Collapse menu|展开菜单|Expand menu/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".app-titlebar")).not.toBeInTheDocument();
+    expect(document.querySelector(".app-frame")).not.toBeInTheDocument();
+    expect(document.querySelector(".app-shell")).not.toHaveClass("sidebar-collapsed");
   });
 });

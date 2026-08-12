@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import Settings from "./Settings";
 import { useThemeStore } from "../stores/themeStore";
@@ -37,6 +37,10 @@ const reportSummaryFixture = {
 
 const defaultRefreshDiagnosticsSummary = usePerformanceDiagnosticsStore.getState().refreshSummary;
 
+const openSection = (name: string) => {
+  fireEvent.click(screen.getByRole("button", { name }));
+};
+
 describe("Settings route & i18n / Theme Switcher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,6 +60,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
 
     useI18nStore.getState().setLanguage("zh");
     useThemeStore.getState().setThemeMode("system");
+    useThemeStore.getState().setThemeStyle("graphite");
     useAgentConfigStore.setState({ customPaths: {}, disabledAgentIds: [], agentOrder: [] });
     useScanStore.setState({ report: null, scanning: false, error: null });
     usePerformanceDiagnosticsStore.setState({
@@ -67,52 +72,89 @@ describe("Settings route & i18n / Theme Switcher", () => {
     saveMock.mockResolvedValue(null);
   });
 
-  it("renders theme options and allows changing theme mode", () => {
+  it("changes color scheme and theme style independently from dropdowns", () => {
     render(<Settings />);
 
-    expect(screen.getByText("浅色模式")).toBeInTheDocument();
-    expect(screen.getByText("深色模式")).toBeInTheDocument();
-    expect(screen.getByText("跟随系统")).toBeInTheDocument();
+    const schemeSelect = screen.getByRole("combobox", { name: "配色方案" });
+    const styleSelect = screen.getByRole("combobox", { name: "主题" });
 
-    const lightBtn = screen.getByText("浅色模式").closest("button");
-    expect(lightBtn).not.toBeNull();
-    fireEvent.click(lightBtn!);
+    expect(within(schemeSelect).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["跟随系统", "浅色模式", "深色模式"]);
+    expect(within(styleSelect).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Graphite", "Aura", "Jade"]);
 
-    expect(useThemeStore.getState().themeMode).toBe("light");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    fireEvent.change(schemeSelect, { target: { value: "dark" } });
+    fireEvent.change(styleSelect, { target: { value: "aura" } });
+
+    expect(useThemeStore.getState().themeMode).toBe("dark");
+    expect(useThemeStore.getState().themeStyle).toBe("aura");
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+    expect(document.documentElement).toHaveAttribute("data-theme-style", "aura");
   });
 
-  it("switches language from Chinese to English and updates active badge and section labels", () => {
+  it("uses category navigation and displays one settings panel at a time", () => {
+    render(<Settings />);
+
+    expect(screen.getByRole("navigation", { name: "设置分类" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "通用设置" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("配色方案")).toBeVisible();
+    expect(screen.queryByText("Agent 技能目录配置")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agent 管理" }));
+
+    expect(screen.getByRole("button", { name: "Agent 管理" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Agent 技能目录配置")).toBeVisible();
+    expect(screen.queryByText("配色方案")).not.toBeInTheDocument();
+  });
+
+  it("keeps an Agent path editor collapsed until requested", () => {
+    useScanStore.setState({ report: {
+      scan_id: "test", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,
+      agents: [{ agent_id: "codex", display_name: "Codex", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" }],
+    } });
+    render(<Settings />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Agent 管理" }));
+    expect(screen.queryByLabelText("Codex Skills 目录")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "修改 Codex 目录" }));
+
+    expect(screen.getByLabelText("Codex Skills 目录")).toBeVisible();
+  });
+
+  it("offers only Chinese and English in a language dropdown and switches immediately", () => {
     render(<Settings />);
 
     // Defaults to Chinese
     expect(screen.getByRole("heading", { level: 1, name: "设置" })).toBeInTheDocument();
     expect(screen.getByText("语言 / Language")).toBeInTheDocument();
-    expect(screen.getByText("外观主题")).toBeInTheDocument();
-    expect(screen.getByText("Agent 技能目录配置")).toBeInTheDocument();
+    expect(screen.getByText("配色方案")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent 管理" })).toBeInTheDocument();
 
-    // Find and click the English language card button
-    const enOption = screen.getByText("English").closest("button");
-    expect(enOption).not.toBeNull();
-    fireEvent.click(enOption!);
+    const languageSelect = screen.getByRole("combobox", { name: "语言 / Language" });
+    expect(within(languageSelect).getAllByRole("option").map((option) => option.textContent)).toEqual(["简体中文", "English"]);
+    fireEvent.change(languageSelect, { target: { value: "en" } });
 
     // Verify Zustand state updated
     expect(useI18nStore.getState().lang).toBe("en");
 
     // Verify UI re-rendered in English
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Appearance")).toBeInTheDocument();
+    expect(screen.getByText("Color scheme")).toBeInTheDocument();
     expect(screen.getByText("Light Mode")).toBeInTheDocument();
+    openSection("Agent management");
     expect(screen.getByText("Agent Skills Directory Configurations")).toBeInTheDocument();
   });
 
   it("renders a manual update-check control", () => {
     render(<Settings />);
+    openSection("更新与关于");
     expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
   });
 
   it("keeps undetected Agents collapsed and read-only until they are detected", () => {
     render(<Settings />);
+    openSection("Agent 管理");
 
     expect(screen.queryByText("TRAE")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /更多 Agent/ }));
@@ -125,6 +167,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
   it("does not show a disabled state for an undetected Agent", () => {
     useAgentConfigStore.setState({ disabledAgentIds: ["trae", "trae-cn"] });
     render(<Settings />);
+    openSection("Agent 管理");
 
     fireEvent.click(screen.getByRole("button", { name: /更多 Agent/ }));
 
@@ -139,6 +182,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
     } });
 
     render(<Settings />);
+    openSection("Agent 管理");
 
     expect(screen.getByText("~/.gemini/config/skills")).toBeVisible();
     expect(screen.getByText("配置目录会用于分发；内置目录仅扫描，不会写入 Skills。")).toBeVisible();
@@ -152,20 +196,58 @@ describe("Settings route & i18n / Theme Switcher", () => {
         { agent_id: "droid", display_name: "Droid", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" },
       ],
     } });
-    render(<Settings />);
+    const { container } = render(<Settings />);
+    openSection("Agent 管理");
     const handles = screen.getAllByTitle("拖动排序");
     const droidCard = screen.getByRole("heading", { name: "Droid" }).closest("article")!;
     Object.defineProperty(document, "elementFromPoint", { configurable: true, value: vi.fn(() => droidCard) });
 
     fireEvent.pointerDown(handles[0], { pointerId: 1 });
+    expect(container.querySelector<HTMLElement>(".settings-agent-drag-preview")?.style.left).toBe("14px");
     fireEvent.pointerMove(handles[0], { pointerId: 1, clientX: 100, clientY: 100 });
     fireEvent.pointerUp(handles[0], { pointerId: 1 });
 
     expect(useAgentConfigStore.getState().agentOrder.slice(0, 2)).toEqual(["droid", "claude-code"]);
   });
 
+  it("renders every detected Agent without search or aggregate summary", () => {
+    useScanStore.setState({ report: {
+      scan_id: "test", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,
+      agents: [
+        { agent_id: "claude-code", display_name: "Claude Code", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" },
+        { agent_id: "droid", display_name: "Droid", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" },
+      ],
+    } });
+    render(<Settings />);
+    openSection("Agent 管理");
+
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByText("2 个已启用 · 2 个已检测")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Claude Code" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Droid" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "已检测到的 Agent" })).toBeVisible();
+    expect(screen.getByText("2", { selector: ".settings-agent-group-header > span" })).toBeVisible();
+  });
+
+  it("supports keyboard reordering from the drag handle", () => {
+    useScanStore.setState({ report: {
+      scan_id: "test", started_at: 0, completed_at: 0, total_skills: 0, total_issues: 0,
+      agents: [
+        { agent_id: "claude-code", display_name: "Claude Code", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" },
+        { agent_id: "droid", display_name: "Droid", detection_status: "Detected", roots: [], skills: [], issues: [], outcome: "success" },
+      ],
+    } });
+    render(<Settings />);
+    openSection("Agent 管理");
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "拖动 Claude Code 排序" }), { key: "ArrowDown" });
+
+    expect(useAgentConfigStore.getState().agentOrder.slice(0, 2)).toEqual(["droid", "claude-code"]);
+  });
+
   it("shows diagnostics as disabled by default and enables it", async () => {
     render(<Settings />);
+    openSection("性能诊断");
 
     const toggle = screen.getByRole("switch", { name: "性能诊断" });
     expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -176,6 +258,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
 
   it("renders the camel-case report summary returned by the Tauri command", () => {
     render(<Settings />);
+    openSection("性能诊断");
 
     expect(screen.getByText("诊断报告：2 份")).toBeInTheDocument();
   });
@@ -192,6 +275,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
   it("requires confirmation before clearing diagnostic reports", () => {
     usePerformanceDiagnosticsStore.setState({ enabled: true });
     render(<Settings />);
+    openSection("性能诊断");
 
     fireEvent.click(screen.getByRole("button", { name: "清除诊断报告" }));
 
@@ -202,6 +286,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
   it("does not export when the save dialog is cancelled", async () => {
     usePerformanceDiagnosticsStore.setState({ enabled: true });
     render(<Settings />);
+    openSection("性能诊断");
 
     fireEvent.click(screen.getByRole("button", { name: "导出诊断报告" }));
 
@@ -215,6 +300,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
     saveMock.mockResolvedValueOnce("/tmp/diagnostics.jsonl");
     vi.mocked(exportPerformanceDiagnostics).mockRejectedValueOnce(new Error("backend detail"));
     render(<Settings />);
+    openSection("性能诊断");
 
     fireEvent.click(screen.getByRole("button", { name: "导出诊断报告" }));
 
@@ -225,6 +311,7 @@ describe("Settings route & i18n / Theme Switcher", () => {
   it("hides report actions after diagnostics is disabled", async () => {
     usePerformanceDiagnosticsStore.setState({ enabled: true, summary: reportSummaryFixture });
     render(<Settings />);
+    openSection("性能诊断");
 
     fireEvent.click(screen.getByRole("switch", { name: "性能诊断" }));
 

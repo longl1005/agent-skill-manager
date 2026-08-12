@@ -8,6 +8,7 @@ vi.mock("../ipc/commands", () => ({
   getMasterSkills: vi.fn(),
   toggleAgentSkill: vi.fn(),
   toggleAgentSkillsBatch: vi.fn(),
+  unlinkAllAgentSkills: vi.fn(),
   importToMaster: vi.fn(),
 }));
 
@@ -117,6 +118,18 @@ describe("masterRepoStore", () => {
     );
     expect(commands.getMasterSkills).toHaveBeenCalledTimes(1);
     expect(useScanStore.getState().scan).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlinks an Agent without starting a full Agent scan", async () => {
+    vi.mocked(commands.unlinkAllAgentSkills).mockResolvedValueOnce(3);
+    vi.mocked(commands.getMasterSkills).mockResolvedValueOnce([]);
+
+    const result = await useMasterRepoStore.getState().unlinkAllAgentSkills("codex");
+
+    expect(result).toBe(3);
+    expect(commands.unlinkAllAgentSkills).toHaveBeenCalledWith("codex", {});
+    expect(commands.getMasterSkills).toHaveBeenCalledTimes(1);
+    expect(useScanStore.getState().scan).not.toHaveBeenCalled();
   });
 
   it("imports skill to master and triggers refresh and scan", async () => {

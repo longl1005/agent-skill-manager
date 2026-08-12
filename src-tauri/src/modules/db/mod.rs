@@ -249,6 +249,19 @@ pub fn log_activity(
     Ok(())
 }
 
+pub fn record_agent_unlinks(
+    conn: &Connection,
+    agent_id: &str,
+    skill_names: &[String],
+) -> Result<()> {
+    let transaction = conn.unchecked_transaction()?;
+    for skill_name in skill_names {
+        upsert_agent_symlink(&transaction, agent_id, skill_name, "unlinked")?;
+        log_activity(&transaction, "UNLINK_SKILL", skill_name, agent_id)?;
+    }
+    transaction.commit()
+}
+
 #[allow(dead_code)]
 pub fn get_all_master_skills(conn: &Connection) -> Result<Vec<DbMasterSkill>> {
     let mut stmt = conn.prepare(
@@ -385,5 +398,31 @@ mod tests {
         let configs = get_agent_configs(&conn).unwrap();
         assert_eq!(configs.iter().map(|config| config.agent_id.as_str()).collect::<Vec<_>>(), vec!["windsurf", "claude-code", "codex"]);
         assert_eq!(configs.iter().map(|config| config.sort_order).collect::<Vec<_>>(), vec![Some(0), Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn records_agent_unlinks_as_one_batch() {
+        let conn = open_db(Some(Path::new(":memory:"))).unwrap();
+        let skill_names = vec!["skill-a".to_string(), "skill-b".to_string()];
+
+        record_agent_unlinks(&conn, "codex", &skill_names).unwrap();
+
+        let unlinked: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM agent_symlinks WHERE agent_id = 'codex' AND status = 'unlinked'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let activities: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM activity_logs WHERE action = 'UNLINK_SKILL' AND target_agent = 'codex'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(unlinked, 2);
+        assert_eq!(activities, 2);
     }
 }

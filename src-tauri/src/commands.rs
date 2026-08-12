@@ -676,12 +676,16 @@ pub fn delete_agent_skill(
 }
 
 #[tauri::command]
-pub fn unlink_all_agent_skills(
+pub async fn unlink_all_agent_skills(
     agent_id: String,
     custom_paths: Option<std::collections::HashMap<String, String>>,
 ) -> Result<usize, String> {
-    crate::modules::master_repo::unlink_all_agent_skills(&agent_id, custom_paths.as_ref())
-        .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::modules::master_repo::unlink_all_agent_skills(&agent_id, custom_paths.as_ref())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 #[tauri::command]
 pub fn migrate_agent_skills_dir(

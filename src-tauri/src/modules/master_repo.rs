@@ -229,12 +229,55 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 pub fn remove_skill_symlink(target_symlink: &Path) -> std::io::Result<()> {
-    if target_symlink.exists() || fs::symlink_metadata(target_symlink).is_ok() {
-        if fs::remove_file(target_symlink).is_err() {
-            let _ = fs::remove_dir_all(target_symlink);
+    let metadata = match fs::symlink_metadata(target_symlink) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Refusing to remove non-link path: {}", target_symlink.display()),
+            ));
         }
+        return if metadata.is_dir() {
+            fs::remove_dir(target_symlink)
+        } else {
+            fs::remove_file(target_symlink)
+        };
     }
-    Ok(())
+
+    #[cfg(not(windows))]
+    {
+        if !metadata.file_type().is_symlink() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Refusing to remove non-link path: {}", target_symlink.display()),
+            ));
+        }
+        fs::remove_file(target_symlink)
+    }
+}
+
+fn remove_agent_skill_entry(path: &Path) -> std::io::Result<()> {
+    match remove_skill_symlink(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
+            let metadata = fs::symlink_metadata(path)?;
+            if metadata.is_dir() {
+                fs::remove_dir_all(path)
+            } else {
+                fs::remove_file(path)
+            }
+        }
+        Err(error) => Err(error),
+    }
 }
 
 pub fn is_valid_symlink_to(target_symlink: &Path, master_path: &Path) -> bool {
@@ -586,7 +629,7 @@ pub fn unlink_all_agent_skills(
             format!("Unknown agent: {}", agent_id),
         )
     })?;
-    let mut removed = 0;
+    let mut removed_skills = Vec::new();
     if !master_dir.exists() || !agent_dir.exists() {
         return Ok(0);
     }
@@ -599,21 +642,15 @@ pub fn unlink_all_agent_skills(
         let target = agent_dir.join(entry.file_name());
         if is_valid_symlink_to(&target, &master_skill) {
             remove_skill_symlink(&target)?;
-            removed += 1;
-            if let Ok(conn) = crate::modules::db::open_db(None) {
-                let skill_name = entry.file_name().to_string_lossy().to_string();
-                let _ = crate::modules::db::upsert_agent_symlink(
-                    &conn,
-                    agent_id,
-                    &skill_name,
-                    "unlinked",
-                );
-                let _ =
-                    crate::modules::db::log_activity(&conn, "UNLINK_SKILL", &skill_name, agent_id);
-            }
+            removed_skills.push(entry.file_name().to_string_lossy().to_string());
         }
     }
-    Ok(removed)
+    if !removed_skills.is_empty() {
+        if let Ok(conn) = crate::modules::db::open_db(None) {
+            let _ = crate::modules::db::record_agent_unlinks(&conn, agent_id, &removed_skills);
+        }
+    }
+    Ok(removed_skills.len())
 }
 
 /// Atomically move ASM-managed links from the previous effective directory to a new Skills directory.
@@ -1169,7 +1206,7 @@ pub fn import_skill_to_master_with_mode(
                     .unwrap_or_default();
 
                 if !src_fp.is_empty() && src_fp == mst_fp {
-                    remove_skill_symlink(&source_path)?;
+                    remove_agent_skill_entry(&source_path)?;
                     create_skill_symlink(&master_skill_path, &source_path)?;
                     Ok(ImportResult::Success)
                 } else {
@@ -1188,7 +1225,7 @@ pub fn import_skill_to_master_with_mode(
                     }
                     fs::copy(&source_path, &master_skill_path)?;
                 }
-                remove_skill_symlink(&source_path)?;
+                remove_agent_skill_entry(&source_path)?;
                 create_skill_symlink(&master_skill_path, &source_path)?;
                 Ok(ImportResult::Success)
             }
@@ -1200,8 +1237,7 @@ pub fn import_skill_to_master_with_mode(
                     format!("Master skill '{}' does not exist", target_name),
                 ));
             }
-            remove_skill_symlink(&source_path)?;
-            let _ = fs::remove_dir_all(&source_path);
+            remove_agent_skill_entry(&source_path)?;
             create_skill_symlink(&master_skill_path, &source_path)?;
             Ok(ImportResult::Success)
         }
@@ -1218,7 +1254,7 @@ pub fn import_skill_to_master_with_mode(
                 }
                 fs::copy(&source_path, &master_skill_path)?;
             }
-            remove_skill_symlink(&source_path)?;
+            remove_agent_skill_entry(&source_path)?;
             create_skill_symlink(&master_skill_path, &source_path)?;
             Ok(ImportResult::Success)
         }
@@ -1242,7 +1278,7 @@ pub fn import_skill_to_master_with_mode(
                 }
                 fs::copy(&source_path, &master_skill_path)?;
             }
-            remove_skill_symlink(&source_path)?;
+            remove_agent_skill_entry(&source_path)?;
             create_skill_symlink(&master_skill_path, &source_path)?;
             Ok(ImportResult::Success)
         }
@@ -1482,6 +1518,20 @@ mod tests {
         );
         assert!(!agent.join("managed").exists());
         assert!(agent.join("personal").exists());
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn remove_skill_symlink_refuses_to_delete_a_real_directory() {
+        let tmp = temp_dir();
+        let real_skill = tmp.join("real-skill");
+        fs::create_dir_all(&real_skill).unwrap();
+        fs::write(real_skill.join("SKILL.md"), "# Keep me").unwrap();
+
+        let error = remove_skill_symlink(&real_skill).unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(real_skill.join("SKILL.md").exists());
         let _ = fs::remove_dir_all(tmp);
     }
 

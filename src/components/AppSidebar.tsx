@@ -5,7 +5,6 @@ import type { AgentReport } from "../ipc/types";
 import { useScanStore } from "../stores/scanStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
-import { useUiStore } from "../stores/uiStore";
 import { t, type TranslationKey } from "../locales/dict";
 import { AgentSidebarIcon } from "./AgentVisual";
 
@@ -93,10 +92,9 @@ export default function AppSidebar() {
   const agentOrder = useAgentConfigStore((state) => state.agentOrder);
   const detectedAgents = orderAgents(report?.agents.filter((agent) => isDiscoveredAgent(agent) && !disabledAgentIds.includes(agent.agent_id)) ?? [], agentOrder);
   const lang = useI18nStore((state) => state.lang);
-  const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
 
   return (
-    <aside className={`sidebar${sidebarCollapsed ? " is-collapsed" : ""}`}>
+    <aside className="sidebar">
       <div className="brand" aria-label="Agent Skill Manager">
         <svg className="brand-mark" aria-hidden="true" viewBox="0 0 32 32">
           <rect width="32" height="32" rx="8" fill="currentColor" />
@@ -109,25 +107,21 @@ export default function AppSidebar() {
           <strong>Agent Skill Manager</strong>
         </span>
       </div>
-      {!sidebarCollapsed && (
-        <>
-          <nav aria-label="Primary navigation">
-            {primaryDestinations.map((destination) => (
-              <SidebarLink
-                key={destination.to}
-                to={destination.to}
-                label={t(destination.labelKey, lang)}
-                icon={destination.icon}
-                end={destination.to === "/"}
-              />
-            ))}
-          </nav>
-          <AgentNavigation agents={detectedAgents} label={t("nav.allAgents", lang)} />
-          <nav aria-label={t("nav.settings", lang)} className="sidebar-settings-navigation">
-            <SidebarLink icon="settings" label={t("nav.settings", lang)} to="/settings" />
-          </nav>
-        </>
-      )}
+      <nav aria-label="Primary navigation">
+        {primaryDestinations.map((destination) => (
+          <SidebarLink
+            key={destination.to}
+            to={destination.to}
+            label={t(destination.labelKey, lang)}
+            icon={destination.icon}
+            end={destination.to === "/"}
+          />
+        ))}
+      </nav>
+      <AgentNavigation agents={detectedAgents} label={t("nav.allAgents", lang)} />
+      <nav aria-label={t("nav.settings", lang)} className="sidebar-settings-navigation">
+        <SidebarLink icon="settings" label={t("nav.settings", lang)} to="/settings" />
+      </nav>
     </aside>
   );
 }

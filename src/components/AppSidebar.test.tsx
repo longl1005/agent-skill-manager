@@ -5,7 +5,6 @@ import { MemoryRouter } from "react-router-dom";
 import { useScanStore } from "../stores/scanStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
-import { useUiStore } from "../stores/uiStore";
 import AppSidebar from "./AppSidebar";
 
 const reportFixture = {
@@ -23,7 +22,6 @@ beforeEach(() => {
   useScanStore.setState({ report: reportFixture, scanning: false, error: null });
   useI18nStore.getState().setLanguage("zh");
   useAgentConfigStore.setState({ disabledAgentIds: [] });
-  useUiStore.setState({ sidebarCollapsed: false });
 });
 
 describe("AppSidebar", () => {
@@ -102,14 +100,5 @@ describe("AppSidebar", () => {
     expect(screen.getByRole("link", { name: "All Agents" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByText("Discovered Agents")).not.toBeInTheDocument();
-  });
-
-  it("hides the full navigation when the sidebar is collapsed", () => {
-    useUiStore.setState({ sidebarCollapsed: true });
-    render(<MemoryRouter initialEntries={["/"]}><AppSidebar /></MemoryRouter>);
-
-    const sidebar = screen.getByRole("complementary");
-    expect(sidebar).toHaveClass("is-collapsed");
-    expect(screen.queryByRole("link", { name: "仪表盘" })).not.toBeInTheDocument();
   });
 });

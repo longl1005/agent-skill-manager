@@ -106,7 +106,7 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     set({ error: null });
     try {
       const result = await unlinkAllAgentSkills(agentId, useAgentConfigStore.getState().customPaths);
-      await Promise.all([get().fetchMasterSkills(), useScanStore.getState().scan()]);
+      await get().fetchMasterSkills();
       return result;
     } catch (err) { set({ error: String(err) }); return null; }
   },
