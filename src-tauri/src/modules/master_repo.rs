@@ -419,51 +419,6 @@ pub fn scan_master_repo(
         DiagnosticOutcome::Success,
     );
 
-    let sqlite_started = Instant::now();
-    // Count intended synchronization writes even when SQLite is unavailable; the phase outcome
-    // still records that the writes could not be attempted.
-    let database_writes = reports
-        .iter()
-        .map(|report| 1 + report.linked_agents.len() as u64)
-        .sum();
-    let mut sqlite_outcome = DiagnosticOutcome::Success;
-    match crate::modules::db::open_db(None) {
-        Ok(conn) => {
-            for report in &reports {
-                let _ = crate::modules::db::upsert_master_skill(
-                    &conn,
-                    &report.name,
-                    &report.description,
-                    "",
-                    "",
-                    1,
-                );
-                for (agent_id, &is_linked) in &report.linked_agents {
-                    let status = if is_linked { "linked" } else { "unlinked" };
-                    let _ = crate::modules::db::upsert_agent_symlink(
-                        &conn,
-                        agent_id,
-                        &report.name,
-                        status,
-                    );
-                }
-            }
-        }
-        Err(_) => {
-            sqlite_outcome = DiagnosticOutcome::Error(DiagnosticErrorCategory::Io);
-        }
-    }
-    recorder.record_counted_phase(
-        DiagnosticPhase::SqliteSync,
-        None,
-        EventCounters {
-            database_writes,
-            ..EventCounters::default()
-        },
-        sqlite_started,
-        sqlite_outcome,
-    );
-
     // The master library is an installation workspace, not a dictionary.
     // Show the newest folder first so a just-installed skill is immediately
     // visible; names are only the stable tie-breaker.
@@ -1471,7 +1426,7 @@ mod tests {
     }
 
     #[test]
-    fn master_scan_records_link_and_sqlite_aggregates() {
+    fn master_scan_does_not_write_sqlite_snapshot() {
         let events = run_master_scan_with_diagnostics(master_fixture());
 
         let link_event = events
@@ -1480,11 +1435,7 @@ mod tests {
             .unwrap();
         assert_eq!(link_event["counters"]["masterSkills"], 1);
         assert_eq!(link_event["counters"]["agentLinkChecks"], 24);
-        let sqlite_event = events
-            .iter()
-            .find(|event| event["phase"] == "sqlite_sync")
-            .unwrap();
-        assert_eq!(sqlite_event["counters"]["databaseWrites"], 25);
+        assert!(events.iter().all(|event| event["phase"] != "sqlite_sync"));
     }
 
     #[test]
