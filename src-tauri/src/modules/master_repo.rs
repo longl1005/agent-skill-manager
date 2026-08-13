@@ -246,10 +246,16 @@ pub fn remove_skill_symlink(target_symlink: &Path) -> std::io::Result<()> {
                 format!("Refusing to remove non-link path: {}", target_symlink.display()),
             ));
         }
-        return if metadata.is_dir() {
-            fs::remove_dir(target_symlink)
-        } else {
-            fs::remove_file(target_symlink)
+
+        // A junction is a directory reparse point, but `symlink_metadata`
+        // does not consistently report it as a directory. Removing it as a
+        // file returns ERROR_ACCESS_DENIED (os error 5). Try the directory
+        // operation first so junctions and directory symlinks are removed
+        // without following them; a file symlink then falls back to file
+        // removal.
+        return match fs::remove_dir(target_symlink) {
+            Ok(()) => Ok(()),
+            Err(directory_error) => fs::remove_file(target_symlink).or(Err(directory_error)),
         };
     }
 
