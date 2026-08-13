@@ -798,6 +798,28 @@ fn parse_git_url(source: &str) -> String {
     }
 }
 
+fn github_archive_url(source: &str) -> Option<String> {
+    let source = source.trim().trim_end_matches('/');
+    let repository = if let Some(repository) = source
+        .strip_prefix("https://github.com/")
+        .or_else(|| source.strip_prefix("http://github.com/"))
+    {
+        repository.trim_end_matches(".git")
+    } else if !source.contains("://") && source.split('/').count() == 2 {
+        source.trim_matches('/')
+    } else {
+        return None;
+    };
+
+    let mut parts = repository.split('/');
+    let owner = parts.next()?;
+    let name = parts.next()?;
+    if owner.is_empty() || name.is_empty() || parts.next().is_some() {
+        return None;
+    }
+    Some(format!("https://codeload.github.com/{owner}/{name}/zip/HEAD"))
+}
+
 fn uuid_simple() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let start = SystemTime::now();
@@ -858,6 +880,41 @@ fn extract_skill_zip(source: &Path) -> std::io::Result<(PathBuf, PathBuf)> {
     match result {
         Ok(skill_dir) => Ok((temp_root, skill_dir)),
         Err(error) => { let _ = fs::remove_dir_all(&temp_root); Err(error) }
+    }
+}
+
+fn extract_github_archive(source: &Path, destination: &Path) -> std::io::Result<PathBuf> {
+    fs::create_dir_all(destination)?;
+    let file = fs::File::open(source)?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?;
+
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?;
+        let enclosed = entry.enclosed_name().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "ZIP contains an unsafe path")
+        })?;
+        let output = destination.join(enclosed);
+        if entry.is_dir() {
+            fs::create_dir_all(&output)?;
+        } else {
+            if let Some(parent) = output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let mut file = fs::File::create(output)?;
+            std::io::copy(&mut entry, &mut file)?;
+        }
+    }
+
+    let mut entries = fs::read_dir(destination)?
+        .flatten()
+        .filter_map(|entry| entry.file_type().ok().filter(|type_| type_.is_dir()).map(|_| entry.path()));
+    let first_directory = entries.next();
+    if first_directory.is_some() && entries.next().is_none() {
+        Ok(first_directory.unwrap())
+    } else {
+        Ok(destination.to_path_buf())
     }
 }
 
@@ -955,6 +1012,43 @@ pub fn selected_skill_dir(root: &Path, relative_path: &str) -> std::io::Result<P
 }
 
 fn clone_git_source(source: &str) -> std::io::Result<PathBuf> {
+    clone_git_source_with_fallback(source, clone_git_repository, download_github_archive)
+}
+
+fn clone_git_source_with_fallback<Clone, Download>(
+    source: &str,
+    clone: Clone,
+    download_archive: Download,
+) -> std::io::Result<PathBuf>
+where
+    Clone: FnOnce(&str) -> std::io::Result<PathBuf>,
+    Download: FnOnce(&str) -> std::io::Result<PathBuf>,
+{
+    match clone(source) {
+        Ok(path) => Ok(path),
+        Err(git_error) if git_error.kind() == std::io::ErrorKind::NotFound => {
+            let archive_url = github_archive_url(source).ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!(
+                        "Git is not available and this source cannot be downloaded without Git: {source}"
+                    ),
+                )
+            })?;
+            download_archive(&archive_url).map_err(|download_error| {
+                std::io::Error::new(
+                    download_error.kind(),
+                    format!(
+                        "Git is not available ({git_error}); GitHub archive download failed: {download_error}"
+                    ),
+                )
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn clone_git_repository(source: &str) -> std::io::Result<PathBuf> {
     let temp_dir = std::env::temp_dir().join(format!("asm-clone-{}", uuid_simple()));
     let _ = fs::remove_dir_all(&temp_dir);
     let status = std::process::Command::new("git")
@@ -965,6 +1059,42 @@ fn clone_git_source(source: &str) -> std::io::Result<PathBuf> {
         return Err(std::io::Error::other("Unable to clone the Git repository"));
     }
     Ok(temp_dir)
+}
+
+fn download_github_archive(archive_url: &str) -> std::io::Result<PathBuf> {
+    let temp_dir = std::env::temp_dir().join(format!("asm-archive-{}", uuid_simple()));
+    let archive_path = temp_dir.join("source.zip");
+    let extract_dir = temp_dir.join("repository");
+    fs::create_dir_all(&temp_dir)?;
+
+    let result = (|| -> std::io::Result<PathBuf> {
+        let client = reqwest::blocking::Client::builder()
+            .user_agent("Agent Skill Manager")
+            .build()
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        let mut response = client
+            .get(archive_url)
+            .send()
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        if !response.status().is_success() {
+            return Err(std::io::Error::other(format!(
+                "GitHub archive download returned HTTP {}",
+                response.status()
+            )));
+        }
+        let mut archive_file = fs::File::create(&archive_path)?;
+        std::io::copy(&mut response, &mut archive_file)?;
+        extract_github_archive(&archive_path, &extract_dir)
+    })();
+
+    let _ = fs::remove_file(&archive_path);
+    match result {
+        Ok(path) => Ok(path),
+        Err(error) => {
+            let _ = fs::remove_dir_all(&temp_dir);
+            Err(error)
+        }
+    }
 }
 
 pub fn inspect_git_skills(source: &str) -> std::io::Result<Vec<GitSkillCandidate>> {
@@ -1420,6 +1550,86 @@ mod tests {
     fn test_master_repo_dir() {
         let dir = master_repo_dir();
         assert!(dir.to_string_lossy().contains(".asm"));
+    }
+
+    #[test]
+    fn github_archive_url_resolves_supported_public_repository_sources() {
+        assert_eq!(
+            github_archive_url("vercel-labs/skills").as_deref(),
+            Some("https://codeload.github.com/vercel-labs/skills/zip/HEAD")
+        );
+        assert_eq!(
+            github_archive_url("https://github.com/vercel-labs/skills.git").as_deref(),
+            Some("https://codeload.github.com/vercel-labs/skills/zip/HEAD")
+        );
+        assert_eq!(
+            github_archive_url("https://gitlab.com/example/skills"),
+            None
+        );
+    }
+
+    #[test]
+    fn github_archive_extraction_returns_the_repository_root() {
+        use std::io::Write;
+
+        let tmp = temp_dir();
+        let archive_path = tmp.join("source.zip");
+        let extract_dir = tmp.join("extract");
+        let archive_file = fs::File::create(&archive_path).unwrap();
+        let mut archive = zip::ZipWriter::new(archive_file);
+        archive
+            .start_file(
+                "skills-main/skills/find-skills/SKILL.md",
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+        archive.write_all(b"# Find Skills").unwrap();
+        archive.finish().unwrap();
+
+        let repository_root = extract_github_archive(&archive_path, &extract_dir).unwrap();
+
+        assert_eq!(repository_root, extract_dir.join("skills-main"));
+        assert!(repository_root.join("skills/find-skills/SKILL.md").is_file());
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn missing_git_uses_the_github_archive_fallback() {
+        let tmp = temp_dir();
+        let downloaded_repository = tmp.join("downloaded-repository");
+        fs::create_dir_all(&downloaded_repository).unwrap();
+
+        let result = clone_git_source_with_fallback(
+            "vercel-labs/skills",
+            |_| Err(std::io::Error::new(std::io::ErrorKind::NotFound, "git unavailable")),
+            |archive_url| {
+                assert_eq!(
+                    archive_url,
+                    "https://codeload.github.com/vercel-labs/skills/zip/HEAD"
+                );
+                Ok(downloaded_repository.clone())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result, downloaded_repository);
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    #[ignore = "requires network access"]
+    fn github_archive_downloads_find_skills_without_git() {
+        let repository_root = download_github_archive(
+            "https://codeload.github.com/vercel-labs/skills/zip/HEAD",
+        )
+        .unwrap();
+
+        assert!(repository_root.join("skills/find-skills/SKILL.md").is_file());
+        let temp_dir = repository_root
+            .ancestors()
+            .nth(2)
+            .expect("archive repository should be inside a temporary directory");
+        let _ = fs::remove_dir_all(temp_dir);
     }
 
     #[test]

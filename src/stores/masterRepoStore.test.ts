@@ -10,6 +10,7 @@ vi.mock("../ipc/commands", () => ({
   toggleAgentSkillsBatch: vi.fn(),
   unlinkAllAgentSkills: vi.fn(),
   importToMaster: vi.fn(),
+  installSkillToMaster: vi.fn(),
   deleteAgentSkill: vi.fn(),
 }));
 
@@ -169,6 +170,17 @@ describe("masterRepoStore", () => {
 
     expect(result).toEqual({ type: "error", message: "Error: Import failed" });
     expect(useMasterRepoStore.getState().error).toBe("Error: Import failed");
+  });
+
+  it("rethrows the native install error so the UI can show its actual cause", async () => {
+    vi.mocked(commands.installSkillToMaster).mockRejectedValueOnce(
+      new Error("Git executable was not found"),
+    );
+
+    await expect(
+      useMasterRepoStore.getState().installSkillToMaster("find-skills", "vercel-labs/skills"),
+    ).rejects.toThrow("Git executable was not found");
+    expect(useMasterRepoStore.getState().error).toBe("Error: Git executable was not found");
   });
 
   it("deletes an Agent skill and requests a fresh post-mutation scan", async () => {

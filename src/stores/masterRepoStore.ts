@@ -143,7 +143,7 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
       return result;
     } catch (err) {
       set({ error: String(err) });
-      return null;
+      throw err;
     }
   },
 
