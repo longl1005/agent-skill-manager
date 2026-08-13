@@ -600,15 +600,7 @@ pub fn delete_agent_skill(
         std::io::Error::new(std::io::ErrorKind::NotFound, format!("Unknown agent: {agent_id}"))
     })?;
     let target = agent_dir.join(skill_name);
-    let metadata = fs::symlink_metadata(&target)?;
-
-    if metadata.file_type().is_symlink() || metadata.is_file() {
-        fs::remove_file(&target)?;
-    } else if metadata.is_dir() {
-        fs::remove_dir_all(&target)?;
-    } else {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Unsupported skill entry"));
-    }
+    remove_agent_skill_entry(&target)?;
 
     if let Ok(conn) = crate::modules::db::open_db(None) {
         let _ = crate::modules::db::upsert_agent_symlink(&conn, agent_id, skill_name, "unlinked");
@@ -1100,6 +1092,24 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 use crate::modules::util::{compute_fingerprint, FingerprintInput};
 
+const IMPORT_COMPARABLE_EXTENSIONS: &[&str] = &["md", "txt", "json", "yaml", "yml"];
+const IMPORT_EXCLUDE_NAMES: &[&str] = &[".DS_Store"];
+
+fn validate_import_skill_name(skill_name: &str) -> std::io::Result<()> {
+    if skill_name.is_empty()
+        || skill_name == "."
+        || skill_name == ".."
+        || skill_name.contains('/')
+        || skill_name.contains('\\')
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid skill name",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImportResult {
@@ -1138,6 +1148,23 @@ pub fn import_skill_to_master_with_mode(
     mode: ImportMode,
     custom_paths: Option<&HashMap<String, String>>,
 ) -> std::io::Result<ImportResult> {
+    import_skill_to_master_from_path_with_mode(
+        agent_id,
+        skill_name,
+        None,
+        mode,
+        custom_paths,
+    )
+}
+
+pub fn import_skill_to_master_from_path_with_mode(
+    agent_id: &str,
+    skill_name: &str,
+    source_location: Option<&Path>,
+    mode: ImportMode,
+    custom_paths: Option<&HashMap<String, String>>,
+) -> std::io::Result<ImportResult> {
+    validate_import_skill_name(skill_name)?;
     let master_dir = ensure_master_dir_with_custom(custom_paths)?;
     let agent_dir = get_agent_skills_dir(agent_id, custom_paths).ok_or_else(|| {
         std::io::Error::new(
@@ -1146,7 +1173,9 @@ pub fn import_skill_to_master_with_mode(
         )
     })?;
 
-    let source_path = agent_dir.join(skill_name);
+    let source_path = source_location
+        .map(|path| expand_config_path(&path.to_string_lossy()))
+        .unwrap_or_else(|| agent_dir.join(skill_name));
     if !source_path.exists() && fs::symlink_metadata(&source_path).is_err() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -1156,11 +1185,18 @@ pub fn import_skill_to_master_with_mode(
             ),
         ));
     }
+    if source_location.is_some() && (!source_path.is_dir() || !source_path.join("SKILL.md").is_file()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Scanned Skill location is invalid: {}", source_path.display()),
+        ));
+    }
 
     let target_name = match &mode {
         ImportMode::RenameNew { new_name } => new_name.as_str(),
         _ => skill_name,
     };
+    validate_import_skill_name(target_name)?;
 
     let master_skill_path = master_dir.join(target_name);
 
@@ -1189,13 +1225,13 @@ pub fn import_skill_to_master_with_mode(
             if master_skill_path.exists() {
                 let fp_input_src = FingerprintInput {
                     root: source_path.clone(),
-                    comparable_extensions: &[],
-                    exclude_names: &[],
+                    comparable_extensions: IMPORT_COMPARABLE_EXTENSIONS,
+                    exclude_names: IMPORT_EXCLUDE_NAMES,
                 };
                 let fp_input_mst = FingerprintInput {
                     root: master_skill_path.clone(),
-                    comparable_extensions: &[],
-                    exclude_names: &[],
+                    comparable_extensions: IMPORT_COMPARABLE_EXTENSIONS,
+                    exclude_names: IMPORT_EXCLUDE_NAMES,
                 };
 
                 let src_fp = compute_fingerprint(&fp_input_src)
@@ -1605,6 +1641,28 @@ mod tests {
         let _ = fs::remove_dir_all(tmp);
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn delete_agent_skill_removes_a_windows_junction_without_deleting_its_target() {
+        let tmp = temp_dir();
+        let agent = tmp.join("agent");
+        let external_target = tmp.join("external-skill");
+        let junction = agent.join("junction-skill");
+        fs::create_dir_all(&agent).unwrap();
+        fs::create_dir_all(&external_target).unwrap();
+        fs::write(external_target.join("SKILL.md"), "external").unwrap();
+        create_junction(&external_target, &junction).unwrap();
+
+        let mut paths = HashMap::new();
+        paths.insert("claude-code".into(), agent.to_string_lossy().to_string());
+
+        assert!(delete_agent_skill("claude-code", "junction-skill", Some(&paths)).unwrap());
+        assert!(fs::symlink_metadata(&junction).is_err());
+        assert!(external_target.join("SKILL.md").exists());
+
+        let _ = fs::remove_dir_all(tmp);
+    }
+
     #[test]
     fn test_import_skill_to_master() {
         let tmp = temp_dir();
@@ -1635,6 +1693,123 @@ mod tests {
         let master_skill_path = master_dir.join("imported-skill");
         assert!(master_skill_path.exists());
         assert!(is_valid_symlink_to(&source_skill, &master_skill_path));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn import_uses_the_exact_scanned_location_from_a_secondary_root() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let primary_agent_dir = tmp.join("primary_skills");
+        let source_skill = tmp.join("secondary_skills").join("folder-name");
+        fs::create_dir_all(&source_skill).unwrap();
+        fs::write(
+            source_skill.join("SKILL.md"),
+            "---\nname: declared-skill\ndescription: Secondary root\n---\n",
+        )
+        .unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".into(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "claude-code".into(),
+            primary_agent_dir.to_string_lossy().to_string(),
+        );
+
+        let result = import_skill_to_master_from_path_with_mode(
+            "claude-code",
+            "declared-skill",
+            Some(&source_skill),
+            ImportMode::Auto,
+            Some(&custom_paths),
+        )
+        .unwrap();
+
+        let master_skill = master_dir.join("declared-skill");
+        assert_eq!(result, ImportResult::Success);
+        assert!(master_skill.join("SKILL.md").is_file());
+        assert!(is_valid_symlink_to(&source_skill, &master_skill));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn import_reports_a_real_conflict_without_replacing_different_content() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let master_skill = master_dir.join("same-name");
+        let source_skill = tmp.join("secondary_skills").join("source-folder");
+        fs::create_dir_all(&master_skill).unwrap();
+        fs::create_dir_all(&source_skill).unwrap();
+        fs::write(master_skill.join("SKILL.md"), "master content").unwrap();
+        fs::write(source_skill.join("SKILL.md"), "incoming content").unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".into(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "claude-code".into(),
+            tmp.join("primary_skills").to_string_lossy().to_string(),
+        );
+
+        let result = import_skill_to_master_from_path_with_mode(
+            "claude-code",
+            "same-name",
+            Some(&source_skill),
+            ImportMode::Auto,
+            Some(&custom_paths),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            result,
+            ImportResult::Conflict {
+                ref existing_fingerprint,
+                ref incoming_fingerprint,
+                ..
+            } if !existing_fingerprint.is_empty()
+                && !incoming_fingerprint.is_empty()
+                && existing_fingerprint != incoming_fingerprint
+        ));
+        assert_eq!(
+            fs::read_to_string(master_skill.join("SKILL.md")).unwrap(),
+            "master content",
+        );
+        assert_eq!(
+            fs::read_to_string(source_skill.join("SKILL.md")).unwrap(),
+            "incoming content",
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn import_rejects_a_skill_name_that_escapes_the_master_directory() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master_skills");
+        let source_skill = tmp.join("secondary_skills").join("source-folder");
+        fs::create_dir_all(&source_skill).unwrap();
+        fs::write(source_skill.join("SKILL.md"), "safe content").unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".into(), master_dir.to_string_lossy().to_string());
+        custom_paths.insert(
+            "claude-code".into(),
+            tmp.join("primary_skills").to_string_lossy().to_string(),
+        );
+
+        let error = import_skill_to_master_from_path_with_mode(
+            "claude-code",
+            "../escaped",
+            Some(&source_skill),
+            ImportMode::Auto,
+            Some(&custom_paths),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(!tmp.join("escaped").exists());
+        assert!(source_skill.join("SKILL.md").is_file());
 
         let _ = fs::remove_dir_all(&tmp);
     }

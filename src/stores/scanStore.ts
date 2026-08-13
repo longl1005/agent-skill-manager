@@ -6,18 +6,27 @@ import { useAgentConfigStore } from "./agentConfigStore";
 
 let inFlightScan: Promise<void> | null = null;
 
+interface ScanOptions {
+  fresh?: boolean;
+}
+
 interface ScanState {
   report: ScanReport | null;
   scanning: boolean;
   error: string | null;
-  scan: () => Promise<void>;
+  scan: (options?: ScanOptions) => Promise<void>;
 }
 
-export const useScanStore = create<ScanState>((set) => ({
+export const useScanStore = create<ScanState>((set, get) => ({
   report: null,
   scanning: false,
   error: null,
-  scan: () => {
+  scan: (options): Promise<void> => {
+    if (options?.fresh && inFlightScan) {
+      const currentScan = inFlightScan;
+      return currentScan.then(() => get().scan());
+    }
+
     if (inFlightScan) return inFlightScan;
 
     set({ scanning: true, error: null });

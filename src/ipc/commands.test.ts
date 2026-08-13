@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { inspectGitSkills, scanAgents } from "./commands";
+import { importToMaster, inspectGitSkills, scanAgents } from "./commands";
 
 describe("Git Skill commands", () => {
   it("requests Git Skill candidates from Tauri", async () => {
@@ -52,6 +52,35 @@ describe("performance diagnostic command context", () => {
     expect(invoke).toHaveBeenLastCalledWith("scan_agents", {
       customPaths: null,
       diagnosticContext: null,
+    });
+  });
+});
+
+describe("master library import command", () => {
+  it("sends the exact scanned source location to Tauri", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ type: "success" });
+    const importFromLocation = importToMaster as (
+      agentId: string,
+      skillName: string,
+      mode?: undefined,
+      customPaths?: Record<string, string>,
+      sourceLocation?: string,
+    ) => Promise<{ type: "success" }>;
+
+    await importFromLocation(
+      "antigravity",
+      "builtin-skill",
+      undefined,
+      {},
+      "C:\\Users\\tester\\.gemini\\antigravity\\builtin\\skills\\builtin-folder",
+    );
+
+    expect(invoke).toHaveBeenLastCalledWith("import_to_master", {
+      agentId: "antigravity",
+      skillName: "builtin-skill",
+      mode: null,
+      customPaths: {},
+      sourceLocation: "C:\\Users\\tester\\.gemini\\antigravity\\builtin\\skills\\builtin-folder",
     });
   });
 });

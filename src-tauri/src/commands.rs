@@ -666,13 +666,21 @@ pub fn replace_agent_local_skill_with_symlink(
 }
 
 #[tauri::command]
-pub fn delete_agent_skill(
+pub async fn delete_agent_skill(
     agent_id: String,
     skill_name: String,
     custom_paths: Option<std::collections::HashMap<String, String>>,
 ) -> Result<bool, String> {
-    crate::modules::master_repo::delete_agent_skill(&agent_id, &skill_name, custom_paths.as_ref())
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::modules::master_repo::delete_agent_skill(
+            &agent_id,
+            &skill_name,
+            custom_paths.as_ref(),
+        )
         .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -757,11 +765,13 @@ pub fn import_to_master(
     skill_name: String,
     mode: Option<crate::modules::master_repo::ImportMode>,
     custom_paths: Option<std::collections::HashMap<String, String>>,
+    source_location: Option<String>,
 ) -> Result<crate::modules::master_repo::ImportResult, String> {
     let mode = mode.unwrap_or(crate::modules::master_repo::ImportMode::Auto);
-    crate::modules::master_repo::import_skill_to_master_with_mode(
+    crate::modules::master_repo::import_skill_to_master_from_path_with_mode(
         &agent_id,
         &skill_name,
+        source_location.as_deref().map(std::path::Path::new),
         mode,
         custom_paths.as_ref(),
     )

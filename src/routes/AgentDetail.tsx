@@ -17,6 +17,14 @@ function BreadcrumbSeparator() {
   );
 }
 
+function FolderIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 7a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </svg>
+  );
+}
+
 function StatusWithDot({ status }: { status: string }) {
   return (
     <span className="agent-detail__status">
@@ -41,6 +49,25 @@ function rootLabel(rootId: string, lang: "zh" | "en") {
   return labels[rootId as keyof typeof labels]?.[lang === "zh" ? 0 : 1] ?? (lang === "zh" ? "主技能目录" : "Primary skills");
 }
 
+function DirectoryRootButton({ label, lang, location, single = false }: { label: string; lang: "zh" | "en"; location: string; single?: boolean }) {
+  const openDirectory = t("skillLibrary.openDirectory", lang);
+
+  return (
+    <button
+      aria-label={`${openDirectory}: ${label} · ${location}`}
+      className={`agent-detail__root-button${single ? " agent-detail__root-button--single" : ""}`}
+      onClick={() => void openSkillDirectory(location)}
+      title={`${openDirectory} · ${location}`}
+      type="button"
+    >
+      <FolderIcon />
+      {!single && <span>{label}</span>}
+      {!single && <span aria-hidden="true">·</span>}
+      <code>{location}</code>
+    </button>
+  );
+}
+
 export default function AgentDetail() {
   const { agentId } = useParams();
   const { report, error, scanning, scan } = useScanStore();
@@ -52,15 +79,21 @@ export default function AgentDetail() {
   const deleteAgentSkill = useMasterRepoStore((state) => state.deleteAgentSkill);
 
   const [importingSkill, setImportingSkill] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<{
     skillName: string;
+    sourceLocation: string;
     existingFp: string;
     incomingFp: string;
   } | null>(null);
   const [renameInput, setRenameInput] = useState<string>("");
-  const [externalImportConfirm, setExternalImportConfirm] = useState<string | null>(null);
+  const [externalImportConfirm, setExternalImportConfirm] = useState<{
+    skillName: string;
+    sourceLocation: string;
+  } | null>(null);
   const [unlinkConfirm, setUnlinkConfirm] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState(false);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [replaceConfirm, setReplaceConfirm] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
   const [skillSort, setSkillSort] = useState<SkillSort>("recent");
@@ -80,18 +113,22 @@ export default function AgentDetail() {
     });
   }, [agent?.skills, skillSort]);
 
-  const importSkill = async (skillName: string) => {
+  const importSkill = async (skillName: string, sourceLocation: string) => {
     if (!agent) return;
     setImportingSkill(skillName);
+    setImportError(null);
     try {
-      const res = await importToMaster(agent.agent_id, skillName);
+      const res = await importToMaster(agent.agent_id, skillName, undefined, sourceLocation);
       if (res.type === "conflict") {
         setConflictData({
           skillName: res.skill_name,
+          sourceLocation,
           existingFp: res.existing_fingerprint,
           incomingFp: res.incoming_fingerprint,
         });
         setRenameInput(`${res.skill_name}-${agent.agent_id}`);
+      } else if (res.type === "error") {
+        setImportError(res.message);
       }
     } finally {
       setImportingSkill(null);
@@ -104,7 +141,7 @@ export default function AgentDetail() {
     setConflictData(null);
     setImportingSkill(skillName);
     try {
-      await importToMaster(agent.agent_id, skillName, mode);
+      await importToMaster(agent.agent_id, skillName, mode, conflictData.sourceLocation);
     } finally {
       setImportingSkill(null);
     }
@@ -114,7 +151,24 @@ export default function AgentDetail() {
     await scan();
     await fetchMasterSkills();
   };
-  const handleUnlink = async () => { if (!agent || !unlinkConfirm) return; setUnlinking(true); try { await deleteAgentSkill(agent.agent_id, unlinkConfirm); } finally { setUnlinking(false); setUnlinkConfirm(null); } };
+  const handleUnlink = async () => {
+    if (!agent || !unlinkConfirm) return;
+    setUnlinking(true);
+    setUnlinkError(null);
+    try {
+      const deleted = await deleteAgentSkill(agent.agent_id, unlinkConfirm);
+      if (deleted) {
+        setUnlinkConfirm(null);
+      } else {
+        setUnlinkError(
+          useMasterRepoStore.getState().error
+            ?? (lang === "zh" ? "删除失败，请重试。" : "Deletion failed. Please try again."),
+        );
+      }
+    } finally {
+      setUnlinking(false);
+    }
+  };
   const handleReplace = async () => { if (!agent || !replaceConfirm) return; setReplacing(true); try { await replaceAgentLocalSkillWithSymlink(agent.agent_id, replaceConfirm); } finally { setReplacing(false); setReplaceConfirm(null); } };
 
   if (!agent) {
@@ -147,7 +201,7 @@ export default function AgentDetail() {
     );
   }
 
-  const primaryRoot = agent.roots[0]?.display_path ?? "No skill root detected";
+  const primaryRoot = agent.roots[0]?.display_path;
 
   return (
     <section className="page agent-detail">
@@ -168,12 +222,14 @@ export default function AgentDetail() {
         <AgentIdentityMark agentId={agent.agent_id} />
         <div className="agent-detail__identity">
           <h1>{agent.display_name}</h1>
-          {agent.roots.length <= 1 ? (
-            <code className="agent-detail__root agent-detail__root--truncate" title={primaryRoot}>{primaryRoot}</code>
+          {agent.roots.length === 1 && primaryRoot ? (
+            <DirectoryRootButton label={rootLabel(agent.roots[0].root_id, lang)} lang={lang} location={primaryRoot} single />
+          ) : agent.roots.length === 0 ? (
+            <code className="agent-detail__root agent-detail__root--truncate">No skill root detected</code>
           ) : (
             <div className="agent-detail__roots" aria-label={lang === "zh" ? "已扫描目录" : "Scanned directories"}>
               <span className="agent-detail__roots-label">{lang === "zh" ? `已扫描 ${agent.roots.length} 个目录` : `${agent.roots.length} scanned directories`}</span>
-              {agent.roots.map((root) => <button key={root.root_id} type="button" className="agent-detail__root-button" title={root.display_path} onClick={() => void openSkillDirectory(root.display_path)}>{rootLabel(root.root_id, lang)} · <code>{root.display_path}</code></button>)}
+              {agent.roots.map((root) => <DirectoryRootButton key={root.root_id} label={rootLabel(root.root_id, lang)} lang={lang} location={root.display_path} />)}
             </div>
           )}
           <StatusWithDot status={agent.detection_status} />
@@ -221,6 +277,13 @@ export default function AgentDetail() {
         </div>
       )}
 
+      {importError && (
+        <div className="agent-scan-error" role="alert">
+          <strong>{lang === "zh" ? "上传至主库失败。" : "Failed to import to the master library."}</strong>
+          <p className="agent-scan-error__detail">{importError}</p>
+        </div>
+      )}
+
       <section aria-labelledby="installed-skills-heading" className="agent-detail__skills">
         <div className="agent-detail__skills-header">
           <h2 id="installed-skills-heading">{t("agentDetail.installedSkills", lang)} ({agent.skills.length})</h2>
@@ -254,6 +317,7 @@ export default function AgentDetail() {
               return (
                 <li key={skill.location + skill.name}>
                   <Link className="agent-detail__skill-card" to={`/agents/${agent.agent_id}/skills/${encodeURIComponent(skill.name)}`}>
+                    <button type="button" className="agent-detail__skill-unlink-btn agent-detail__skill-unlink-btn--corner" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUnlinkError(null); setUnlinkConfirm(skill.name); }} aria-label={`Remove ${skill.name} from ${agent.display_name}`} title="Remove from this Agent"><svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg></button>
                     <div className="agent-detail__skill-card-header">
                       <div className="agent-detail__skill-badge-icon">
                         <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -261,7 +325,6 @@ export default function AgentDetail() {
                         </svg>
                       </div>
                       <h3 className="agent-detail__skill-name" title={skill.name}>{skill.name}</h3>
-                      <button type="button" className="agent-detail__skill-unlink-btn" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUnlinkConfirm(skill.name); }} aria-label={`Remove ${skill.name} from ${agent.display_name}`} title="Remove from this Agent"><svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
                     </div>
                     <p className="agent-detail__skill-description" title={skill.description || t("agentDetail.noDescription", lang)}>
                       {skill.description || t("agentDetail.noDescription", lang)}
@@ -292,7 +355,7 @@ export default function AgentDetail() {
                             className="agent-detail__skill-external-import-btn--compact"
                             disabled={isImporting}
                             aria-label={t("skillCard.upload", lang)}
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExternalImportConfirm(skill.name); }}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExternalImportConfirm({ skillName: skill.name, sourceLocation: skill.location }); }}
                           >
                             {isImporting ? t("skillCard.uploading", lang) : lang === "zh" ? "导入" : "Import"}
                           </button>
@@ -302,7 +365,7 @@ export default function AgentDetail() {
                           type="button"
                           className="agent-detail__skill-upload-btn"
                           disabled={isImporting}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void importSkill(skill.name); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void importSkill(skill.name, skill.location); }}
                           title="Import this skill to ~/.asm/skills"
                         >
                           <svg aria-hidden="true" fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -406,7 +469,7 @@ export default function AgentDetail() {
             <div className="delete-confirm-header">
               <div>
                 <h3>{lang === "zh" ? "导入外部软链接 Skill" : "Import external symlink"}</h3>
-                <p><code>{externalImportConfirm}</code></p>
+                <p><code>{externalImportConfirm.skillName}</code></p>
               </div>
             </div>
             <div className="delete-confirm-body">
@@ -414,12 +477,31 @@ export default function AgentDetail() {
             </div>
             <div className="delete-confirm-footer">
               <button type="button" className="btn secondary" onClick={() => setExternalImportConfirm(null)}>{lang === "zh" ? "取消" : "Cancel"}</button>
-              <button type="button" className="btn" onClick={() => { const skillName = externalImportConfirm; setExternalImportConfirm(null); void importSkill(skillName); }}>{lang === "zh" ? "确认导入" : "Import to Master"}</button>
+              <button type="button" className="btn" onClick={() => { const pendingImport = externalImportConfirm; setExternalImportConfirm(null); void importSkill(pendingImport.skillName, pendingImport.sourceLocation); }}>{lang === "zh" ? "确认导入" : "Import to Master"}</button>
             </div>
           </div>
         </div>
       )}
-      {unlinkConfirm && <div className="modal-overlay" onClick={() => !unlinking && setUnlinkConfirm(null)}><div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}><div className="delete-confirm-header"><div><h3>从当前 Agent 删除 Skill</h3><p><code>{unlinkConfirm}</code></p></div></div><div className="delete-confirm-body"><p>这会删除当前 Agent 中的该技能目录或软链接。若为外部软链接，只会删除链接本身，不会删除外部目标；主技能仓库和其他 Agent 不受影响。</p></div><div className="delete-confirm-footer"><button type="button" className="btn secondary" onClick={() => setUnlinkConfirm(null)}>取消</button><button type="button" className="btn danger" disabled={unlinking} onClick={() => void handleUnlink()}>{unlinking ? "删除中" : "确认删除"}</button></div></div></div>}
+      {unlinkConfirm && (
+        <div className="modal-overlay" onClick={() => { if (!unlinking) { setUnlinkConfirm(null); setUnlinkError(null); } }}>
+          <div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}>
+            <div className="delete-confirm-header">
+              <div>
+                <h3>从当前 Agent 删除 Skill</h3>
+                <p><code>{unlinkConfirm}</code></p>
+              </div>
+            </div>
+            <div className="delete-confirm-body">
+              <p>这会删除当前 Agent 中的该技能目录或软链接。若为外部软链接，只会删除链接本身，不会删除外部目标；主技能仓库和其他 Agent 不受影响。</p>
+            </div>
+            {unlinkError && <p className="delete-confirm-error" role="alert">{unlinkError}</p>}
+            <div className="delete-confirm-footer">
+              <button type="button" className="btn secondary" disabled={unlinking} onClick={() => { setUnlinkConfirm(null); setUnlinkError(null); }}>取消</button>
+              <button type="button" className="btn danger" disabled={unlinking} onClick={() => void handleUnlink()}>{unlinking ? "删除中" : "确认删除"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {replaceConfirm && <div className="modal-overlay" onClick={() => !replacing && setReplaceConfirm(null)}><div className="delete-confirm-card" onClick={(event) => event.stopPropagation()}><div className="delete-confirm-header"><div><h3>替换为软链接</h3><p><code>{replaceConfirm}</code></p></div></div><div className="delete-confirm-body"><p>这会永久删除当前 Agent 目录中的本地副本，并替换为指向主技能库的软链接。主技能库和其他 Agent 不受影响。</p></div><div className="delete-confirm-footer"><button type="button" className="btn secondary" disabled={replacing} onClick={() => setReplaceConfirm(null)}>取消</button><button type="button" className="btn danger" disabled={replacing} onClick={() => void handleReplace()}>{replacing ? t("skillCard.replacingSymlink", lang) : t("skillCard.replaceSymlink", lang)}</button></div></div></div>}
     </section>
   );

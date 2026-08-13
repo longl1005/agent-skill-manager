@@ -80,6 +80,7 @@ export type ImportMode =
 
 export type ImportResult =
   | { type: "success" }
+  | { type: "error"; message: string }
   | {
       type: "conflict";
       skill_name: string;

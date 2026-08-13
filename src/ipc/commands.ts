@@ -151,13 +151,15 @@ export async function importToMaster(
   agentId: string,
   skillName: string,
   mode?: ImportMode,
-  customPaths?: Record<string, string>
+  customPaths?: Record<string, string>,
+  sourceLocation?: string,
 ): Promise<ImportResult> {
   return invoke<ImportResult>("import_to_master", {
     agentId,
     skillName,
     mode: mode ?? null,
     customPaths: customPaths ?? null,
+    sourceLocation: sourceLocation ?? null,
   });
 }
 

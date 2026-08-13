@@ -10,6 +10,7 @@ vi.mock("../ipc/commands", () => ({
   toggleAgentSkillsBatch: vi.fn(),
   unlinkAllAgentSkills: vi.fn(),
   importToMaster: vi.fn(),
+  deleteAgentSkill: vi.fn(),
 }));
 
 vi.mock("./scanStore", () => {
@@ -136,20 +137,49 @@ describe("masterRepoStore", () => {
     vi.mocked(commands.importToMaster).mockResolvedValueOnce({ type: "success" });
     vi.mocked(commands.getMasterSkills).mockResolvedValueOnce([]);
 
-    const result = await useMasterRepoStore.getState().importToMaster("claude_code", "test-skill");
+    const importFromLocation = useMasterRepoStore.getState().importToMaster as (
+      agentId: string,
+      skillName: string,
+      mode?: undefined,
+      sourceLocation?: string,
+    ) => Promise<{ type: "success" }>;
+    const result = await importFromLocation(
+      "claude_code",
+      "test-skill",
+      undefined,
+      "C:\\Users\\tester\\.claude\\skills\\folder-name",
+    );
 
     expect(result).toEqual({ type: "success" });
-    expect(commands.importToMaster).toHaveBeenCalledWith("claude_code", "test-skill", undefined, {});
+    expect(commands.importToMaster).toHaveBeenCalledWith(
+      "claude_code",
+      "test-skill",
+      undefined,
+      {},
+      "C:\\Users\\tester\\.claude\\skills\\folder-name",
+    );
     expect(commands.getMasterSkills).toHaveBeenCalled();
     expect(useScanStore.getState().scan).toHaveBeenCalled();
   });
 
-  it("handles importToMaster failure", async () => {
+  it("preserves the native import error instead of reporting a false content conflict", async () => {
     vi.mocked(commands.importToMaster).mockRejectedValueOnce(new Error("Import failed"));
 
     const result = await useMasterRepoStore.getState().importToMaster("claude_code", "test-skill");
 
-    expect(result).toEqual({ type: "conflict", skill_name: "test-skill", existing_fingerprint: "", incoming_fingerprint: "" });
+    expect(result).toEqual({ type: "error", message: "Error: Import failed" });
     expect(useMasterRepoStore.getState().error).toBe("Error: Import failed");
+  });
+
+  it("deletes an Agent skill and requests a fresh post-mutation scan", async () => {
+    vi.mocked(commands.deleteAgentSkill).mockResolvedValueOnce(true);
+    vi.mocked(commands.getMasterSkills).mockResolvedValueOnce([]);
+
+    const result = await useMasterRepoStore.getState().deleteAgentSkill("codex", "test-skill");
+
+    expect(result).toBe(true);
+    expect(commands.deleteAgentSkill).toHaveBeenCalledWith("codex", "test-skill", {});
+    expect(commands.getMasterSkills).toHaveBeenCalledTimes(1);
+    expect(useScanStore.getState().scan).toHaveBeenCalledWith({ fresh: true });
   });
 });

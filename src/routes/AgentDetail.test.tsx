@@ -1,11 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import type { ScanReport } from "../ipc/types";
+import { openSkillDirectory } from "../ipc/commands";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
 import AgentDetail from "./AgentDetail";
+
+vi.mock("../ipc/commands", () => ({
+  openSkillDirectory: vi.fn(),
+}));
 
 const reportFixture: ScanReport = {
   scan_id: "scan-1",
@@ -50,6 +55,7 @@ beforeEach(() => {
   useI18nStore.setState({ lang: "en" });
   useScanStore.setState({ report: null, scanning: false, error: null });
   useMasterRepoStore.setState({ skills: [], fetchMasterSkills: vi.fn(), deleteAgentSkill: vi.fn().mockResolvedValue(true) });
+  vi.mocked(openSkillDirectory).mockReset();
 });
 
 describe("AgentDetail", () => {
@@ -59,8 +65,18 @@ describe("AgentDetail", () => {
     renderDetail("/agents/claude-code");
 
     expect(screen.getByRole("heading", { name: "Claude Code" })).toBeVisible();
-    expect(screen.getByTitle("~/.claude/skills")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Open Folder.*\.claude\/skills/ })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "All Agents" })).not.toBeInTheDocument();
+  });
+
+  it("opens the only scanned directory when its path tag is clicked", () => {
+    useScanStore.setState({ report: reportFixture });
+
+    renderDetail("/agents/claude-code");
+
+    fireEvent.click(screen.getByRole("button", { name: /Open Folder.*\.claude\/skills/ }));
+
+    expect(openSkillDirectory).toHaveBeenCalledWith("~/.claude/skills");
   });
 
   it("identifies Antigravity configuration and builtin roots by their real paths", () => {
@@ -83,6 +99,30 @@ describe("AgentDetail", () => {
     expect(screen.getByText("已扫描 2 个目录")).toBeVisible();
     expect(screen.getByRole("button", { name: /配置技能目录.*\.gemini\/config\/skills/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /内置技能目录.*antigravity\/builtin\/skills/ })).toBeVisible();
+  });
+
+  it("opens the directory represented by each multi-root path tag", () => {
+    useI18nStore.setState({ lang: "zh" });
+    useScanStore.setState({ report: {
+      ...reportFixture,
+      agents: [{
+        ...reportFixture.agents[0],
+        agent_id: "antigravity",
+        display_name: "Antigravity",
+        roots: [
+          { root_id: "config-skills", scope: "User", display_path: "~/.gemini/config/skills" },
+          { root_id: "builtin-skills", scope: "User", display_path: "~/.gemini/antigravity/builtin/skills" },
+        ],
+      }],
+    } });
+
+    renderDetail("/agents/antigravity");
+
+    fireEvent.click(screen.getByRole("button", { name: /配置技能目录.*\.gemini\/config\/skills/ }));
+    fireEvent.click(screen.getByRole("button", { name: /内置技能目录.*antigravity\/builtin\/skills/ }));
+
+    expect(openSkillDirectory).toHaveBeenNthCalledWith(1, "~/.gemini/config/skills");
+    expect(openSkillDirectory).toHaveBeenNthCalledWith(2, "~/.gemini/antigravity/builtin/skills");
   });
 
   it("rescans the Agent inventory and refreshes master skill status from the detail page", async () => {
@@ -218,5 +258,72 @@ describe("AgentDetail", () => {
     expect(skillNames()).toEqual(["zeta", "middle", "alpha"]);
     fireEvent.click(screen.getByRole("button", { name: "Name" }));
     expect(skillNames()).toEqual(["alpha", "middle", "zeta"]);
+  });
+
+  it("keeps the visible card delete action in the top-right corner without navigating", () => {
+    useScanStore.setState({ report: reportFixture });
+
+    renderDetail("/agents/claude-code");
+
+    const remove = screen.getByRole("button", { name: "Remove frontend-design from Claude Code" });
+    expect(remove).toHaveClass("agent-detail__skill-unlink-btn--corner");
+    expect(remove.parentElement).toHaveClass("agent-detail__skill-card");
+
+    fireEvent.click(remove);
+
+    expect(screen.getByRole("heading", { name: "从当前 Agent 删除 Skill" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /frontend-design/ })).toHaveAttribute("href", "/agents/claude-code/skills/frontend-design");
+  });
+
+  it("keeps the delete confirmation open and shows the native error when deletion fails", async () => {
+    const deleteAgentSkill = vi.fn().mockImplementation(async () => {
+      useMasterRepoStore.setState({ error: "Access is denied. (os error 5)" });
+      return false;
+    });
+    useScanStore.setState({ report: reportFixture });
+    useMasterRepoStore.setState({ deleteAgentSkill, error: null });
+
+    renderDetail("/agents/claude-code");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove frontend-design from Claude Code" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+
+    await waitFor(() => expect(deleteAgentSkill).toHaveBeenCalledWith("claude-code", "frontend-design"));
+    expect(screen.getByRole("alert")).toHaveTextContent("Access is denied. (os error 5)");
+    expect(screen.getByRole("button", { name: "确认删除" })).toBeVisible();
+  });
+
+  it("shows a native upload failure without opening the content conflict dialog", async () => {
+    useScanStore.setState({ report: reportFixture });
+    useMasterRepoStore.setState({
+      importToMaster: vi.fn().mockResolvedValue({
+        type: "error",
+        message: "Access is denied. (os error 5)",
+      } as never),
+    });
+
+    renderDetail("/agents/claude-code");
+
+    fireEvent.click(screen.getByRole("button", { name: "Import to Master" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Access is denied. (os error 5)");
+    expect(screen.queryByText("技能同名但内容冲突 / Conflict Detected")).not.toBeInTheDocument();
+  });
+
+  it("uploads from the exact scanned Skill location instead of reconstructing the Agent path", async () => {
+    const importToMaster = vi.fn().mockResolvedValue({ type: "success" });
+    useScanStore.setState({ report: reportFixture });
+    useMasterRepoStore.setState({ importToMaster });
+
+    renderDetail("/agents/claude-code");
+
+    fireEvent.click(screen.getByRole("button", { name: "Import to Master" }));
+
+    await waitFor(() => expect(importToMaster).toHaveBeenCalledWith(
+      "claude-code",
+      "frontend-design",
+      undefined,
+      "~/.claude/skills/frontend-design",
+    ));
   });
 });

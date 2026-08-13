@@ -17,7 +17,7 @@ export interface MasterRepoState {
   replaceAgentLocalSkillWithSymlink: (agentId: string, skillName: string) => Promise<boolean>;
   deleteAgentSkill: (agentId: string, skillName: string) => Promise<boolean>;
   unlinkAllAgentSkills: (agentId: string) => Promise<number | null>;
-  importToMaster: (agentId: string, skillName: string, mode?: ImportMode) => Promise<ImportResult>;
+  importToMaster: (agentId: string, skillName: string, mode?: ImportMode, sourceLocation?: string) => Promise<ImportResult>;
   installSkillToMaster: (skillName: string, source?: string, sourceSubdir?: string) => Promise<string | null>;
   deleteMasterSkill: (skillName: string) => Promise<string[]>;
 }
@@ -95,7 +95,10 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     set({ error: null });
     try {
       const result = await deleteAgentSkill(agentId, skillName, useAgentConfigStore.getState().customPaths);
-      if (result) await Promise.all([get().fetchMasterSkills(), useScanStore.getState().scan()]);
+      if (result) await Promise.all([
+        get().fetchMasterSkills(),
+        useScanStore.getState().scan({ fresh: true }),
+      ]);
       return result;
     } catch (err) {
       set({ error: String(err) });
@@ -111,19 +114,20 @@ export const useMasterRepoStore = create<MasterRepoState>((set, get) => ({
     } catch (err) { set({ error: String(err) }); return null; }
   },
 
-  importToMaster: async (agentId: string, skillName: string, mode?: ImportMode) => {
+  importToMaster: async (agentId: string, skillName: string, mode?: ImportMode, sourceLocation?: string) => {
     set({ error: null });
     try {
       const customPaths = useAgentConfigStore.getState().customPaths;
-      const result = await importToMaster(agentId, skillName, mode, customPaths);
+      const result = await importToMaster(agentId, skillName, mode, customPaths, sourceLocation);
       await Promise.all([
         get().fetchMasterSkills(),
         useScanStore.getState().scan(),
       ]);
       return result;
     } catch (err) {
-      set({ error: String(err) });
-      return { type: "conflict", skill_name: skillName, existing_fingerprint: "", incoming_fingerprint: "" };
+      const message = String(err);
+      set({ error: message });
+      return { type: "error", message };
     }
   },
 
