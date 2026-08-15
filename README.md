@@ -1,82 +1,234 @@
+<div align="center">
+
 # Agent Skill Manager
 
-Agent Skill Manager (ASM) is a Tauri desktop application for discovering AI-agent Skills on your machine, collecting them in a local master library, and linking the same Skill to the Agents you choose.
+**一个本地优先的 AI Agent Skills 管理器。一次整理，按需分发给你使用的每个 Agent。**
 
-> **中文简介：** Agent Skill Manager（ASM）是一款桌面应用，用于扫描本机 AI Agent 的 Skills，将它们统一管理在本地主技能库中，并通过软链接分发给选定的 Agent。
+**A local-first manager for AI Agent Skills. Organize once, then distribute to the agents you use.**
 
-## Features
+[![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/) [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev/) [![License](https://img.shields.io/badge/License-MIT-6B7280)](LICENSE)
 
-- Scan configured Skill directories for supported Agents and inspect discovered Skills, metadata, file counts, fingerprints, and symlink targets.
-- Compare discovered Skills in an Agent Matrix, including missing, present, conflict, and unknown states.
-- Maintain a local master Skill library, normally at `~/.asm/skills`, with search, sorting, per-Agent link status, and custom paths.
-- Import a local Agent Skill into the master library, resolve import conflicts, and redirect that Agent to the master copy.
-- Install a Skill into the master library from a local directory, ZIP archive, or Git repository source; distribute it to selected Agents with symlinks.
-- Export a master Skill as a ZIP archive, open its local directory, and remove the master Skill together with only ASM-managed links that point to it.
-- Configure language, appearance, and the visibility, order, and custom Skill paths of detected Agents.
+中文 · [English](#english)
 
-## Quick start
+</div>
 
-### Prerequisites
+## 为什么使用 ASM？
 
-- Rust 1.77 or newer
-- Node.js 22 or newer
-- pnpm 9 or newer
-- A supported desktop environment for Tauri 2. Linux users also need the [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/).
+当你同时使用 Claude Code、Codex、MiniMax Code、Cursor 等多个 AI Agent 时，Skills 往往散落在不同目录：难以发现、难以比较，也容易重复维护。Agent Skill Manager（ASM）将这些本地 Skills 汇集到一个主技能库中，并通过链接按需分发给各个 Agent。
 
-Install dependencies and start the desktop app:
+<table>
+  <tr>
+    <td width="33%">
+      <h3>🔎 找得到</h3>
+      <p>扫描本机 Agent 的 Skills 目录，集中查看已发现的 Skills、元数据、文件数量与链接状态。</p>
+    </td>
+    <td width="33%">
+      <h3>🗂️ 管得住</h3>
+      <p>使用本地主技能库统一收纳、安装、导出与整理 Skills，避免同一能力分散维护。</p>
+    </td>
+    <td width="33%">
+      <h3>🔗 发得准</h3>
+      <p>将一个 Skill 链接到你选择的多个 Agent；各 Agent 始终使用同一份主库内容。</p>
+    </td>
+  </tr>
+</table>
+
+## 功能
+
+### 发现与对比
+
+- 扫描已支持 Agent 的默认 Skills 目录，以及在设置中配置的自定义目录。
+- 按 Agent 浏览本机已安装的 Skills，并查看描述、文件数、指纹与链接目标。
+- 在 Agent Matrix 中对比同一 Skill 在不同 Agent 中的状态，包括缺失、已存在、冲突与未知。
+
+### 收纳与安装
+
+- 在默认位于 `~/.asm/skills` 的本地主技能库中统一管理 Skills。
+- 将 Agent 现有的本地 Skill 导入主库，并处理同名冲突。
+- 从本地文件夹、ZIP 压缩包或 Git 仓库安装 Skill；多 Skill 仓库可先选择要安装的 Skill。
+- 搜索、排序、查看详情、导出为 ZIP，或打开 Skill 的本地目录。
+
+### 分发与配置
+
+- 将主库中的 Skill 一键链接至一个或多个 Agent。
+- 设置 Agent 的显示顺序、显示/隐藏状态及自定义 Skills 目录。
+- 提供中英文界面、主题设置、托盘入口与应用更新能力。
+
+## 工作方式
+
+1. 启动 ASM，扫描已检测到的 Agent 及其 Skills 目录。
+2. 在 Agent 视图或 Agent Matrix 中了解已有 Skills 的分布情况。
+3. 将本地 Skill 导入主库，或从本地文件夹、ZIP、Git 仓库安装新 Skill。
+4. 从主库选择目标 Agent 分发；ASM 在对应 Skills 目录创建本地链接。
+
+## 支持的 Agent
+
+ASM 当前注册了 25 个 Agent 适配器：
+
+Claude Code、Cline、CodeBuddy、GitHub Copilot、Droid、Qoder、Qwen Code、Hermes Agent、OpenClaw、WorkBuddy、Kimi Code CLI、**MiniMax Code**、Augment、Roo Code、Windsurf、Codex、Antigravity、Pi Agent、Oh My Pi（OPM）、Grok、Kiro CLI、TRAE、TRAE CN、Open Code 和 Cursor。
+
+其中 MiniMax Code 是 ASM 支持管理的 Agent；它的 Skills 目录会和其他 Agent 一样被扫描与展示，并不是一个 Skill。
+
+检测以各 Agent 的本地 Skills 目录为依据。你可以在设置中为已检测到的 Agent 指定自定义目录。
+
+## 本地优先与文件安全
+
+ASM 在本地文件系统中管理 Skills，主技能库默认存放在 `~/.asm/skills`。它不提供云同步或分析服务。
+
+- 导入外部 Skill 链接时，ASM 会将目标内容复制到主库，只把当前 Agent 的链接改指向主库；外部目标不会被修改。
+- 删除主库 Skill 时，ASM 只删除指向该主库副本的受管理链接，不会删除无关的 Agent Skills 或外部链接目标。
+- 移除 Agent 的 Skill 链接时，只移除链接本身，不会跟随或删除其目标内容。
+- 通过 Git 来源安装时，ASM 会将仓库拉取到本地以准备主库副本。
+
+在导入、安装、分发或删除前，请确认界面中的来源与目标路径。
+
+## 从源码运行
+
+### 前置条件
+
+- Rust 1.77 或更高版本
+- Node.js 22 或更高版本
+- pnpm 9 或更高版本
+- 支持 Tauri 2 的桌面环境；Linux 还需安装 [Tauri 系统依赖](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
 pnpm install
 pnpm tauri:dev
 ```
 
-The development command starts the Vite frontend and the Tauri desktop window.
+该命令会启动 Vite 前端和 Tauri 桌面窗口。
 
-## Workflow
+### 开发命令
 
-1. Start ASM. It scans the supported Agent Skill locations, plus custom paths configured for detected Agents.
-2. Review discovered Skills by Agent or in the Agent Matrix.
-3. Import an existing Agent Skill into the master library, or install a new one from a local folder, ZIP archive, or Git source.
-4. In the master library, link a Skill to one or more detected Agents. ASM creates symlinks in their Skill directories.
-5. Use the library to inspect, export, unlink, or remove Skills, then rescan when local Skill directories change.
+| 命令 | 用途 |
+| --- | --- |
+| `pnpm dev` | 启动 Vite 前端开发服务器。 |
+| `pnpm tauri:dev` | 启动完整的 Tauri 桌面应用开发环境。 |
+| `pnpm test` | 运行 Vitest 前端测试。 |
+| `pnpm build` | 类型检查并构建生产前端资源。 |
+| `pnpm tauri:build` | 为当前平台构建 Tauri 应用包。 |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | 运行 Rust 库测试。 |
 
-## Supported Agents
+## 参与贡献
 
-ASM currently registers adapters for these Agents: Claude Code, Cline, CodeBuddy, GitHub Copilot, Droid, Qoder, Qwen Code, Hermes Agent, OpenClaw, WorkBuddy, Kimi Code CLI, Augment, Roo Code, Windsurf, Codex, Antigravity, Pi Agent, Oh My Pi (OPM), Grok, Kiro CLI, TRAE, TRAE CN, Open Code, and Cursor.
+欢迎提交 Issue 或 Pull Request。请保持改动聚焦、让文档与实际行为一致，并在提交前运行与改动相关的检查：
 
-Detection is based on each Agent's local Skill directory. You can configure a custom Skill path for a detected Agent in Settings.
+```bash
+pnpm test
+pnpm build
+cargo test --lib --manifest-path src-tauri/Cargo.toml
+```
 
-## Safety and privacy
+## 许可证
 
-ASM manages Skills on the local filesystem. The master library is stored at `~/.asm/skills`.
+本项目采用 [MIT License](LICENSE) 开源。
 
-- Importing an external Skill symlink copies its target into `~/.asm/skills` and redirects only the current Agent symlink. The external target remains unchanged.
-- Deleting a master Skill removes the master copy and only ASM-managed links that target that master copy. It does not remove unrelated Agent Skills or external symlink targets.
-- Removing an Agent Skill symlink removes the link itself; its target is never followed or deleted.
-- Installing from a Git source clones the repository locally to prepare the master-library copy. The app does not provide cloud synchronization or analytics.
+---
 
-Review the selected source and destination paths before importing, installing, linking, or deleting a Skill.
+<a id="english"></a>
 
-## Development commands
+# Agent Skill Manager — English
+
+## Why ASM?
+
+When you use several AI agents—such as Claude Code, Codex, MiniMax Code, and Cursor—Skills tend to end up in separate directories. They become difficult to discover, compare, and maintain. Agent Skill Manager (ASM) collects those local Skills in one master library and distributes them to the agents you choose through local links.
+
+<table>
+  <tr>
+    <td width="33%">
+      <h3>🔎 Discover</h3>
+      <p>Scan local Skill directories and inspect discovered Skills, their metadata, file counts, and link status in one place.</p>
+    </td>
+    <td width="33%">
+      <h3>🗂️ Organize</h3>
+      <p>Keep Skills in a local master library for consistent installation, export, and maintenance.</p>
+    </td>
+    <td width="33%">
+      <h3>🔗 Distribute</h3>
+      <p>Link one Skill to any number of selected agents, all backed by the same master copy.</p>
+    </td>
+  </tr>
+</table>
+
+## Features
+
+### Discover and compare
+
+- Scan the default Skill locations of supported agents, plus custom directories configured in Settings.
+- Browse the Skills installed for each agent, including their descriptions, file counts, fingerprints, and link targets.
+- Compare a Skill across agents in the Agent Matrix, with missing, present, conflict, and unknown states.
+
+### Collect and install
+
+- Maintain one local master Skill library, located at `~/.asm/skills` by default.
+- Import an existing local Skill from an agent into the master library and resolve naming conflicts.
+- Install a Skill from a local directory, ZIP archive, or Git repository; select a specific Skill when a repository contains more than one.
+- Search, sort, inspect, export, and open Skills locally.
+
+### Distribute and configure
+
+- Link a master Skill to one or more agents.
+- Control agent visibility and ordering, and configure custom Skill directories.
+- Use the application in English or Simplified Chinese, with theme settings, tray access, and app updates.
+
+## How it works
+
+1. Start ASM to scan detected agents and their Skill directories.
+2. Review the distribution of existing Skills in an agent view or the Agent Matrix.
+3. Import a local Skill into the master library, or install one from a local folder, ZIP archive, or Git repository.
+4. Choose target agents from the master library. ASM creates local links in their corresponding Skill directories.
+
+## Supported agents
+
+ASM currently registers adapters for 25 agents:
+
+Claude Code, Cline, CodeBuddy, GitHub Copilot, Droid, Qoder, Qwen Code, Hermes Agent, OpenClaw, WorkBuddy, Kimi Code CLI, **MiniMax Code**, Augment, Roo Code, Windsurf, Codex, Antigravity, Pi Agent, Oh My Pi (OPM), Grok, Kiro CLI, TRAE, TRAE CN, Open Code, and Cursor.
+
+MiniMax Code is a supported agent in ASM—not a Skill. ASM scans and displays its Skill directory in the same way as the directories of other agents.
+
+Detection is based on each agent's local Skill directory. You can configure a custom directory for every detected agent in Settings.
+
+## Local-first and safe by design
+
+ASM manages Skills on the local filesystem. The master library lives at `~/.asm/skills` by default; the app does not provide cloud synchronization or analytics.
+
+- When importing an external Skill link, ASM copies its target into the master library and redirects only the current agent link. The external target remains unchanged.
+- Deleting a master Skill removes only that master copy and ASM-managed links that point to it. Unrelated agent Skills and external link targets are preserved.
+- Removing an agent Skill link removes the link itself; ASM never follows or deletes its target.
+- Installing from Git clones the repository locally to prepare the master-library copy.
+
+Review the source and destination paths shown in the app before importing, installing, distributing, or deleting a Skill.
+
+## Run from source
+
+### Prerequisites
+
+- Rust 1.77 or newer
+- Node.js 22 or newer
+- pnpm 9 or newer
+- A desktop environment supported by Tauri 2. On Linux, also install the [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/).
+
+```bash
+pnpm install
+pnpm tauri:dev
+```
+
+This starts the Vite frontend and the Tauri desktop window.
+
+### Development commands
 
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Start the Vite frontend development server. |
-| `pnpm tauri:dev` | Start the full Tauri desktop app in development mode. |
-| `pnpm test` | Run the frontend test suite with Vitest. |
-| `pnpm build` | Type-check the frontend and create a production frontend bundle. |
-| `pnpm tauri:build` | Build a production Tauri bundle for the current platform. |
+| `pnpm tauri:dev` | Start the complete Tauri desktop app in development mode. |
+| `pnpm test` | Run the Vitest frontend suite. |
+| `pnpm build` | Type-check and build the production frontend bundle. |
+| `pnpm tauri:build` | Build a Tauri application bundle for the current platform. |
 | `cargo test --lib --manifest-path src-tauri/Cargo.toml` | Run the Rust library tests. |
-
-## Architecture
-
-- `src/` contains the React and TypeScript interface, application state, routes, and Tauri IPC client.
-- `src-tauri/src/` contains the Rust Tauri commands, Agent adapters, filesystem scanner, master-library operations, inventory projection, and SQLite-backed local activity data.
-- `src-tauri/tauri.conf.json` configures the Tauri 2 application, desktop window, development server, and bundles.
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request with a focused change, keep the documentation aligned with implemented behavior, and run the relevant checks before submitting:
+Issues and focused pull requests are welcome. Keep documentation aligned with implemented behavior, and run the checks relevant to your change before submitting:
 
 ```bash
 pnpm test
@@ -86,4 +238,4 @@ cargo test --lib --manifest-path src-tauri/Cargo.toml
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).
