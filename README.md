@@ -84,6 +84,8 @@ ASM 当前注册了 25 个 Agent 适配器：
 
 Claude Code、Cline、CodeBuddy、GitHub Copilot、Droid、Qoder、Qwen Code、Hermes Agent、OpenClaw、WorkBuddy、Kimi Code CLI、**MiniMax Code**、Augment、Roo Code、Windsurf、Codex、Antigravity、Pi Agent、Oh My Pi（OPM）、Grok、Kiro CLI、TRAE、TRAE CN、Open Code 和 Cursor。
 
+其中 MiniMax Code 是 ASM 支持管理的 Agent；它的 Skills 目录会和其他 Agent 一样被扫描与展示，并不是一个 Skill。
+
 检测以各 Agent 的本地 Skills 目录为依据。你可以在设置中为已检测到的 Agent 指定自定义目录。
 
 ## 本地优先与文件安全
@@ -204,6 +206,8 @@ When you use several AI agents—such as Claude Code, Codex, MiniMax Code, and C
 ASM currently registers adapters for 25 agents:
 
 Claude Code, Cline, CodeBuddy, GitHub Copilot, Droid, Qoder, Qwen Code, Hermes Agent, OpenClaw, WorkBuddy, Kimi Code CLI, **MiniMax Code**, Augment, Roo Code, Windsurf, Codex, Antigravity, Pi Agent, Oh My Pi (OPM), Grok, Kiro CLI, TRAE, TRAE CN, Open Code, and Cursor.
+
+MiniMax Code is a supported agent in ASM—not a Skill. ASM scans and displays its Skill directory in the same way as the directories of other agents.
 
 Detection is based on each agent's local Skill directory. You can configure a custom directory for every detected agent in Settings.
 
