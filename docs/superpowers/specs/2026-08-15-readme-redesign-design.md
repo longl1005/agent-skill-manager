@@ -23,13 +23,16 @@ The README will use a Chinese-first, English-mirror structure in one file:
    - source development prerequisites and commands;
    - contribution and license information.
 3. An English section with the same substantive information and structure, adapted for natural English rather than line-by-line translation.
+4. A three-image gallery placed after the product introduction. The images will be equal-width real application screenshots: dashboard, master Skill library, and MiniMax Code agent detail. Each image will have bilingual alt text and a short caption.
 
 ## Accuracy boundaries
 
 - Describe only implemented behavior verified in the repository.
 - State that the master library defaults to `~/.asm/skills` and that ASM uses local filesystem links for distribution.
-- Avoid claims about release installers, download counts, cloud sync, analytics, screenshots, or capabilities not present in the repository.
+- Avoid unverified claims about release installers, download counts, cloud sync, analytics, or capabilities not present in the repository.
 - Keep the existing source-development commands and MIT license reference.
+- Use only genuine Agent Skill Manager UI screenshots; do not use generated interface mockups as product screenshots.
+- Present the screenshots in a three-column GitHub-friendly layout, with each image linking to its full-size file.
 
 ## Verification
 
