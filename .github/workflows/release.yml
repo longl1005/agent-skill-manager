@@ -87,6 +87,12 @@ jobs:
           test "$(find release-artifacts -type f -name '*.dmg' | wc -l | tr -d ' ')" -eq 2
           test -f release-artifacts/latest.json
       - name: Create GitHub Release
-        run: gh release create "${{ github.ref_name }}" release-artifacts/*/* release-artifacts/latest.json --generate-notes
+        run: |
+          release_notes="release-notes/${{ github.ref_name }}.md"
+          if [[ -f "$release_notes" ]]; then
+            gh release create "${{ github.ref_name }}" release-artifacts/*/* release-artifacts/latest.json --notes-file "$release_notes"
+          else
+            gh release create "${{ github.ref_name }}" release-artifacts/*/* release-artifacts/latest.json --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ github.token }}

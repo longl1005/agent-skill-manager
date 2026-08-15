@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "asm-tmp"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "dirs 5.0.1",
  "reqwest",

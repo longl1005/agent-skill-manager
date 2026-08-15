@@ -25,4 +25,9 @@ describe("release workflow", () => {
     expect(workflow).toContain("release-artifacts/latest.json");
     expect(workflow).not.toContain("softprops/action-gh-release");
   });
+
+  it("uses a version-specific release note when one is provided", () => {
+    expect(workflow).toContain('release-notes/${{ github.ref_name }}.md');
+    expect(workflow).toContain("--notes-file");
+  });
 });
