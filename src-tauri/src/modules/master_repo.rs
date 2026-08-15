@@ -168,12 +168,19 @@ pub fn create_skill_symlink(
             match symlink_dir(master_skill_path, target_symlink) {
                 Ok(_) => return Ok(()),
                 Err(e) => {
-                    if e.raw_os_error() == Some(1314) {
-                        // ERROR_PRIVILEGE_NOT_HELD - try junction instead
-                        create_junction(master_skill_path, target_symlink)?;
-                    } else {
-                        return Err(e);
+                    // Try junction fallback for Windows without developer mode/admin
+                    if let Err(junction_err) = create_junction(master_skill_path, target_symlink) {
+                        // If junction also fails (e.g. cross-drive partition), fall back to directory copy
+                        if let Err(copy_err) = copy_dir_all(master_skill_path, target_symlink) {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!(
+                                    "Failed to link directory (symlink: {e}; junction: {junction_err}; copy: {copy_err})"
+                                ),
+                            ));
+                        }
                     }
+                    return Ok(());
                 }
             }
         } else {
@@ -194,10 +201,12 @@ pub fn create_skill_symlink(
 #[cfg(windows)]
 fn create_junction(source: &Path, junction: &Path) -> std::io::Result<()> {
     // Use Windows junction (directory symlink that doesn't require admin)
-    // Implemented via symlink_dir with specific flags
     use std::process::Command;
+    let junction_str = junction.to_string_lossy().replace('/', "\\");
+    let source_str = source.to_string_lossy().replace('/', "\\");
+    let cmd_line = format!("mklink /J \"{}\" \"{}\"", junction_str, source_str);
     let output = Command::new("cmd")
-        .args(["/C", "mklink", "/J", &junction.to_string_lossy(), &source.to_string_lossy()])
+        .args(["/C", &cmd_line])
         .output()?;
     if output.status.success() {
         Ok(())
@@ -206,7 +215,7 @@ fn create_junction(source: &Path, junction: &Path) -> std::io::Result<()> {
             std::io::ErrorKind::Other,
             format!(
                 "Failed to create junction: {}",
-                String::from_utf8_lossy(&output.stderr)
+                String::from_utf8_lossy(&output.stderr).trim()
             ),
         ))
     }
@@ -1026,25 +1035,27 @@ where
 {
     match clone(source) {
         Ok(path) => Ok(path),
-        Err(git_error) if git_error.kind() == std::io::ErrorKind::NotFound => {
-            let archive_url = github_archive_url(source).ok_or_else(|| {
-                std::io::Error::new(
+        Err(git_error) => {
+            if let Some(archive_url) = github_archive_url(source) {
+                download_archive(&archive_url).map_err(|download_error| {
+                    std::io::Error::new(
+                        download_error.kind(),
+                        format!(
+                            "Git clone failed ({git_error}); GitHub archive download failed: {download_error}"
+                        ),
+                    )
+                })
+            } else if git_error.kind() == std::io::ErrorKind::NotFound {
+                Err(std::io::Error::new(
                     std::io::ErrorKind::NotFound,
                     format!(
                         "Git is not available and this source cannot be downloaded without Git: {source}"
                     ),
-                )
-            })?;
-            download_archive(&archive_url).map_err(|download_error| {
-                std::io::Error::new(
-                    download_error.kind(),
-                    format!(
-                        "Git is not available ({git_error}); GitHub archive download failed: {download_error}"
-                    ),
-                )
-            })
+                ))
+            } else {
+                Err(git_error)
+            }
         }
-        Err(error) => Err(error),
     }
 }
 
@@ -1168,8 +1179,48 @@ pub fn install_skill_to_master(
                             let candidates = discover_skill_candidates(&temp_dir)?;
                             match candidates.as_slice() {
                                 [candidate] => selected_skill_dir(&temp_dir, &candidate.relative_path)?,
-                                [] => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Repository does not contain SKILL.md")),
-                                _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Repository contains multiple Skills; select one before installing")),
+                                [] => {
+                                    if skill_entry_exists(&temp_dir) {
+                                        temp_dir.clone()
+                                    } else {
+                                        return Err(std::io::Error::new(
+                                            std::io::ErrorKind::InvalidData,
+                                            "Repository does not contain SKILL.md",
+                                        ));
+                                    }
+                                }
+                                _ => {
+                                    let exact_match = candidates
+                                        .iter()
+                                        .find(|c| c.name.eq_ignore_ascii_case(skill_name));
+                                    let path_match = candidates.iter().find(|c| {
+                                        let p = Path::new(&c.relative_path);
+                                        p.file_name()
+                                            .and_then(|f| f.to_str())
+                                            .map(|f| f.eq_ignore_ascii_case(skill_name))
+                                            .unwrap_or(false)
+                                            || c.relative_path.eq_ignore_ascii_case(skill_name)
+                                    });
+
+                                    if let Some(matched) = exact_match.or(path_match) {
+                                        selected_skill_dir(&temp_dir, &matched.relative_path)?
+                                    } else if skill_entry_exists(&temp_dir) {
+                                        temp_dir.clone()
+                                    } else {
+                                        let available_names = candidates
+                                            .iter()
+                                            .map(|c| c.name.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        return Err(std::io::Error::new(
+                                            std::io::ErrorKind::InvalidInput,
+                                            format!(
+                                                "Repository contains multiple Skills ({}); select one before installing",
+                                                available_names
+                                            ),
+                                        ));
+                                    }
+                                }
                             }
                         }
                     };
@@ -2124,5 +2175,70 @@ mod tests {
         assert_eq!(fs::read_to_string(external_target.join("reference.md")).unwrap(), "keep this external copy");
 
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn git_clone_network_error_falls_back_to_archive_download() {
+        let tmp = temp_dir();
+        let downloaded_repository = tmp.join("downloaded-repository");
+        fs::create_dir_all(&downloaded_repository).unwrap();
+
+        let result = clone_git_source_with_fallback(
+            "vercel-labs/skills",
+            |_| Err(std::io::Error::other("fatal: unable to access 'https://github.com/vercel-labs/skills.git/': Failed to connect")),
+            |archive_url| {
+                assert_eq!(
+                    archive_url,
+                    "https://codeload.github.com/vercel-labs/skills/zip/HEAD"
+                );
+                Ok(downloaded_repository.clone())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result, downloaded_repository);
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn install_skill_from_multi_skill_repo_matches_by_name() {
+        let tmp = temp_dir();
+        let master_dir = tmp.join("master");
+        let repo = tmp.join("multi-repo");
+
+        let skill_a = repo.join("skills").join("find-skills");
+        fs::create_dir_all(&skill_a).unwrap();
+        fs::write(
+            skill_a.join("SKILL.md"),
+            "---\nname: find-skills\ndescription: Search skills\n---\n# Find Skills",
+        )
+        .unwrap();
+
+        let skill_b = repo.join("skills").join("frontend-design");
+        fs::create_dir_all(&skill_b).unwrap();
+        fs::write(
+            skill_b.join("SKILL.md"),
+            "---\nname: frontend-design\ndescription: UI design\n---\n# Frontend Design",
+        )
+        .unwrap();
+
+        let mut custom_paths = HashMap::new();
+        custom_paths.insert("master".to_string(), master_dir.to_string_lossy().to_string());
+
+        // Install "frontend-design" from repo directory without source_subdir
+        let installed = install_skill_to_master(
+            "frontend-design",
+            Some(&repo.to_string_lossy()),
+            None,
+            Some(&custom_paths),
+        )
+        .unwrap();
+
+        assert_eq!(installed, master_dir.join("frontend-design"));
+        assert!(master_dir.join("frontend-design").join("SKILL.md").is_file());
+        let content = fs::read_to_string(master_dir.join("frontend-design").join("SKILL.md")).unwrap();
+        assert!(content.contains("Frontend Design"));
+
+        let _ = fs::remove_dir_all(tmp);
     }
 }
