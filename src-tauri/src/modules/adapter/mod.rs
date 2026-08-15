@@ -19,6 +19,7 @@ mod github_copilot;
 mod hermes;
 mod kiro;
 mod kimi_code;
+mod minimax_code;
 mod oh_my_pi;
 mod openclaw;
 mod opencode;
@@ -324,6 +325,7 @@ pub use github_copilot::GitHubCopilotAdapter;
 pub use hermes::HermesAdapter;
 pub use kiro::KiroAdapter;
 pub use kimi_code::KimiCodeAdapter;
+pub use minimax_code::MiniMaxCodeAdapter;
 pub use oh_my_pi::OhMyPiAdapter;
 pub use openclaw::OpenClawAdapter;
 pub use opencode::OpenCodeAdapter;
@@ -343,7 +345,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        AgentAdapter, AugmentAdapter, CodeBuddyAdapter, DetectContext, DetectionStatus, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, RooCodeAdapter, WindsurfAdapter,
+        AgentAdapter, AugmentAdapter, CodeBuddyAdapter, DetectContext, DetectionStatus, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, MiniMaxCodeAdapter, RooCodeAdapter, WindsurfAdapter,
         OhMyPiAdapter, OpenClawAdapter, Platform, PlatformContext, QoderAdapter, QwenCodeAdapter, TraeAdapter, TraeCnAdapter, WorkBuddyAdapter,
     };
 
@@ -524,6 +526,23 @@ mod tests {
         let context = platform_context(&home);
 
         let detection = KimiCodeAdapter.detect(&DetectContext {
+            platform: &context,
+            custom_path: None,
+        });
+
+        assert_eq!(detection.status, DetectionStatus::Detected);
+        assert_eq!(detection.roots[0].display_path, root);
+        let _ = std::fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn minimax_code_detects_personal_skills_root() {
+        let home = tempdir();
+        let root = home.join(".minimax-code/skills");
+        std::fs::create_dir_all(&root).unwrap();
+        let context = platform_context(&home);
+
+        let detection = MiniMaxCodeAdapter.detect(&DetectContext {
             platform: &context,
             custom_path: None,
         });

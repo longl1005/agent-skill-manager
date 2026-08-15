@@ -51,6 +51,21 @@ export async function setTrayStatistics(language: "zh" | "en", masterSkills: num
   return invoke<void>("set_tray_statistics", { language, masterSkills, connectedAgents });
 }
 
+/** Set system tray icon visibility. */
+export async function setTrayVisible(visible: boolean): Promise<void> {
+  return invoke<void>("set_tray_visible", { visible });
+}
+
+/** Hide the main window to background or tray. */
+export async function hideMainWindow(): Promise<void> {
+  return invoke<void>("hide_main_window");
+}
+
+/** Exit the application. */
+export async function exitApp(): Promise<void> {
+  return invoke<void>("exit_app");
+}
+
 /**
  * 与 Rust 端 `commands::get_master_skills` 对应。
  * 获取主仓库 (`~/.asm/skills`) 中所有的 Master Skill 及与各 Agent 的关联 link 状态。
@@ -221,3 +236,20 @@ export async function getDbSummary(): Promise<import("./types").DbSummaryReport>
 export async function getActivityLogs(limit?: number): Promise<import("./types").DbActivityLog[]> {
   return invoke<import("./types").DbActivityLog[]>("get_activity_logs", { limit: limit ?? 20 });
 }
+
+/**
+ * 与 Rust 端 `commands::get_network_proxy` 对应。
+ * 获取当前保存的网络代理配置（如 "http://127.0.0.1:7890"），未配置时返回 null。
+ */
+export async function getNetworkProxy(): Promise<string | null> {
+  return invoke<string | null>("get_network_proxy");
+}
+
+/**
+ * 与 Rust 端 `commands::set_network_proxy` 对应。
+ * 设置或清除网络代理配置。传入 null 或空字符串将清除代理。
+ */
+export async function setNetworkProxy(proxy: string | null): Promise<void> {
+  return invoke<void>("set_network_proxy", { proxy: proxy && proxy.trim() ? proxy.trim() : null });
+}
+

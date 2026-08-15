@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useNavigate } from "react-router-dom";
-import { setTrayLanguage, setTrayStatistics } from "../ipc/commands";
+import { exitApp, hideMainWindow, setTrayLanguage, setTrayStatistics } from "../ipc/commands";
 import { isDiscoveredAgent } from "../agentDiscovery";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
+import { useGeneralSettingsStore } from "../stores/generalSettingsStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { useScanStore } from "../stores/scanStore";
@@ -19,7 +20,7 @@ export function TrayEventBridge(): null {
   ).length ?? 0;
 
   useEffect(() => {
-    const registerTrayListener = (eventName: "tray:open-library", handler: () => void) => {
+    const registerListener = (eventName: string, handler: () => void) => {
       let disposed = false;
       let unlisten: (() => void) | undefined;
 
@@ -44,10 +45,21 @@ export function TrayEventBridge(): null {
       };
     };
 
-    const stopOpenLibrary = registerTrayListener("tray:open-library", () => navigate("/library"));
+    const stopOpenLibrary = registerListener("tray:open-library", () => navigate("/library"));
+    const stopCloseRequested = registerListener("window:close-requested", () => {
+      const closeAction = useGeneralSettingsStore.getState().closeAction;
+      if (closeAction === "minimize") {
+        void hideMainWindow();
+      } else if (closeAction === "quit") {
+        void exitApp();
+      } else {
+        useGeneralSettingsStore.getState().openCloseConfirm();
+      }
+    });
 
     return () => {
       stopOpenLibrary();
+      stopCloseRequested();
     };
   }, [navigate]);
 

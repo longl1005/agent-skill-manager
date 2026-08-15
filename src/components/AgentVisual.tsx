@@ -73,6 +73,7 @@ import piAgentWebp from "../assets/icons/agents/pi-agent.webp";
 import ohMyPiWebp from "../assets/icons/agents/oh-my-pi.webp";
 import grokWebp from "../assets/icons/agents/grok.webp";
 import kiroWebp from "../assets/icons/agents/kiro.webp";
+import miniMaxCodeWebp from "../assets/icons/agents/minimax-code.webp";
 import openCodeWebp from "../assets/icons/agents/opencode.webp";
 import cursorWebp from "../assets/icons/agents/cursor.webp";
 
@@ -146,6 +147,11 @@ export function HermesMark({ size = 32 }: { size?: number }): JSX.Element {
 export function KimiCodeMark({ size = 32 }: { size?: number }): JSX.Element {
   const borderRadius = Math.round(size * 0.25);
   return <img className="agent-icon-img" src={kimiWebp} alt="kimi-code identity mark" aria-label="kimi-code identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
+}
+
+export function MiniMaxCodeMark({ size = 32 }: { size?: number }): JSX.Element {
+  const borderRadius = Math.round(size * 0.25);
+  return <img className="agent-icon-img" src={miniMaxCodeWebp} alt="minimax-code identity mark" aria-label="minimax-code identity mark" width={size} height={size} style={{ borderRadius, display: "block" }} />;
 }
 
 export function OpenClawMark({ size = 32 }: { size?: number }): JSX.Element {
@@ -298,6 +304,9 @@ export function AgentIdentityMark({ agentId, size = 32 }: { agentId: string; siz
   }
   if (agentId.toLowerCase() === "kimi-code") {
     return <KimiCodeMark size={size} />;
+  }
+  if (agentId.toLowerCase() === "minimax-code" || agentId.toLowerCase() === "minimax") {
+    return <MiniMaxCodeMark size={size} />;
   }
   if (agentId.toLowerCase() === "openclaw") {
     return <OpenClawMark size={size} />;

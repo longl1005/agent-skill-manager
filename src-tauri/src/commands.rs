@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::modules::adapter::{
     AgentAdapter, AgentId, AntigravityAdapter, AugmentAdapter, ClaudeCodeAdapter, ClineAdapter, CodeBuddyAdapter, CodexAdapter, CursorAdapter,
-    DetectContext, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, OhMyPiAdapter, OpenClawAdapter, OpenCodeAdapter, PiAgentAdapter,
+    DetectContext, DroidAdapter, GitHubCopilotAdapter, GrokAdapter, HermesAdapter, KimiCodeAdapter, KiroAdapter, MiniMaxCodeAdapter, OhMyPiAdapter, OpenClawAdapter, OpenCodeAdapter, PiAgentAdapter,
     Platform, PlatformContext, QoderAdapter, QwenCodeAdapter, RooCodeAdapter, ScanContext, ScanId, ScanIssue, ScanResult, TraeAdapter,
     SkillRoot, TraeCnAdapter, WindsurfAdapter, WorkBuddyAdapter,
 };
@@ -330,6 +330,7 @@ fn scan_agents_with_recorder(
         Box::new(OpenClawAdapter),
         Box::new(WorkBuddyAdapter),
         Box::new(KimiCodeAdapter),
+        Box::new(MiniMaxCodeAdapter),
         Box::new(AugmentAdapter),
         Box::new(RooCodeAdapter),
         Box::new(WindsurfAdapter),
@@ -592,6 +593,44 @@ pub fn set_tray_statistics(
     connected_agents: usize,
 ) -> Result<(), String> {
     crate::tray::update_tray_statistics(&app, &language, master_skills, connected_agents)
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tauri::command]
+pub fn set_tray_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> {
+    crate::tray::set_tray_visible(&app, visible)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[tauri::command]
+pub fn set_tray_visible(_app: tauri::AppHandle, _visible: bool) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+pub fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
+pub fn get_network_proxy() -> Result<Option<String>, String> {
+    let conn = crate::modules::db::open_db(None).map_err(|error| error.to_string())?;
+    crate::modules::db::get_network_proxy(&conn).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_network_proxy(proxy: Option<String>) -> Result<(), String> {
+    let conn = crate::modules::db::open_db(None).map_err(|error| error.to_string())?;
+    crate::modules::db::set_network_proxy(&conn, proxy.as_deref()).map_err(|error| error.to_string())
 }
 
 // 简易 uuid 包装, 避免在 commands.rs 引入 uuid::Uuid 的额外 import
@@ -877,7 +916,7 @@ mod tests {
         let mut custom_paths = HashMap::new();
         for adapter_id in [
             "claude-code", "cline", "codebuddy", "github-copilot", "droid", "qoder",
-            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "augment",
+            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "minimax-code", "augment",
             "roo-code", "windsurf", "codex", "antigravity", "pi-agent", "oh-my-pi",
             "grok", "kiro", "trae", "trae-cn", "opencode", "cursor",
         ] {
@@ -925,7 +964,7 @@ mod tests {
                 .iter()
                 .filter(|event| event["phase"] == "adapter_detect")
                 .count(),
-            24
+            25
         );
         assert!(events
             .iter()
@@ -935,7 +974,7 @@ mod tests {
                 .iter()
                 .filter(|event| event["phase"] == "adapter_scan")
                 .count(),
-            24
+            25
         );
         let serialization_events: Vec<_> = events
             .iter()

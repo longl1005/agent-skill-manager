@@ -47,6 +47,11 @@ pub fn run() {
             commands::set_tray_language,
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             commands::set_tray_statistics,
+            commands::set_tray_visible,
+            commands::hide_main_window,
+            commands::exit_app,
+            commands::get_network_proxy,
+            commands::set_network_proxy,
             commands::get_master_skills,
             commands::toggle_agent_skill,
             commands::toggle_agent_skills_batch,
@@ -68,6 +73,11 @@ pub fn run() {
         ])
         .setup(|app| {
             use tauri::Manager;
+            if let Ok(conn) = crate::modules::db::open_db(None) {
+                if let Ok(Some(proxy)) = crate::modules::db::get_network_proxy(&conn) {
+                    crate::modules::db::apply_network_proxy_to_env(Some(&proxy));
+                }
+            }
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             tray::setup(app)?;
             if let Some(window) = app.get_webview_window("main") {

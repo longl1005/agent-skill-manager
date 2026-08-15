@@ -88,6 +88,12 @@ describe("AgentIdentityMark", () => {
     expect(screen.getByLabelText("kimi-code identity mark")).toHaveAttribute("src", expect.stringContaining("kimi.webp"));
   });
 
+  it("renders the MiniMax Code identity mark", () => {
+    render(<AgentIdentityMark agentId="minimax-code" />);
+
+    expect(screen.getByLabelText("minimax-code identity mark")).toHaveAttribute("src", expect.stringContaining("minimax-code.webp"));
+  });
+
   it("renders the Augment identity mark", () => {
     render(<AgentIdentityMark agentId="augment" />);
 

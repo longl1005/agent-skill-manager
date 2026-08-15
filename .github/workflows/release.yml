@@ -47,7 +47,16 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
       - run: npm ci
-      - run: npm run tauri build -- --target ${{ matrix.rust_target }}
+      - name: Build macOS with ad-hoc signing
+        if: runner.os == 'macOS'
+        run: npm run tauri build -- --target ${{ matrix.rust_target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: "-"
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        run: npm run tauri build -- --target ${{ matrix.rust_target }}
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -75,6 +84,7 @@ jobs:
         run: |
           test "$(find release-artifacts -type f -name '*.sig' | wc -l | tr -d ' ')" -eq 3
           test "$(find release-artifacts -type f \( -name '*.app.tar.gz' -o -name '*-setup.exe' \) | wc -l | tr -d ' ')" -eq 3
+          test "$(find release-artifacts -type f -name '*.dmg' | wc -l | tr -d ' ')" -eq 2
           test -f release-artifacts/latest.json
       - name: Create GitHub Release
         run: gh release create "${{ github.ref_name }}" release-artifacts/*/* release-artifacts/latest.json --generate-notes

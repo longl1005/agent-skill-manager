@@ -92,6 +92,23 @@ pub fn get_agent_skills_dir(
         "openclaw" => Some(home.join(".openclaw").join("skills")),
         "workbuddy" => Some(home.join(".workbuddy").join("skills")),
         "kimi-code" => Some(home.join(".kimi-code").join("skills")),
+        "minimax-code" => {
+            let primary = home.join(".minimax-code").join("skills");
+            let alt = home.join(".minimax").join("skills");
+            let repo = home.join(".minimax-skills").join("skills");
+            let shared = home.join(".agents").join("skills");
+            if primary.exists() {
+                Some(primary)
+            } else if alt.exists() {
+                Some(alt)
+            } else if repo.exists() {
+                Some(repo)
+            } else if shared.exists() {
+                Some(shared)
+            } else {
+                Some(primary)
+            }
+        },
         "augment" => Some(home.join(".augment").join("skills")),
         "roo-code" => Some(home.join(".roo").join("skills")),
         "windsurf" => Some(home.join(".codeium").join("windsurf").join("skills")),
@@ -376,6 +393,7 @@ pub fn scan_master_repo(
         "openclaw",
         "workbuddy",
         "kimi-code",
+        "minimax-code",
         "augment",
         "roo-code",
         "windsurf",
@@ -728,6 +746,7 @@ const ALL_AGENT_IDS: &[&str] = &[
     "openclaw",
     "workbuddy",
     "kimi-code",
+    "minimax-code",
     "augment",
     "roo-code",
     "windsurf",
@@ -1062,7 +1081,18 @@ where
 fn clone_git_repository(source: &str) -> std::io::Result<PathBuf> {
     let temp_dir = std::env::temp_dir().join(format!("asm-clone-{}", uuid_simple()));
     let _ = fs::remove_dir_all(&temp_dir);
-    let status = std::process::Command::new("git")
+    let mut cmd = std::process::Command::new("git");
+    if let Ok(proxy) = std::env::var("HTTP_PROXY").or_else(|_| std::env::var("http_proxy")) {
+        if !proxy.trim().is_empty() {
+            cmd.args([
+                "-c",
+                &format!("http.proxy={}", proxy.trim()),
+                "-c",
+                &format!("https.proxy={}", proxy.trim()),
+            ]);
+        }
+    }
+    let status = cmd
         .args(["clone", "--depth", "1", &parse_git_url(source), temp_dir.to_str().unwrap()])
         .status()?;
     if !status.success() {
@@ -1079,8 +1109,16 @@ fn download_github_archive(archive_url: &str) -> std::io::Result<PathBuf> {
     fs::create_dir_all(&temp_dir)?;
 
     let result = (|| -> std::io::Result<PathBuf> {
-        let client = reqwest::blocking::Client::builder()
-            .user_agent("Agent Skill Manager")
+        let mut builder = reqwest::blocking::Client::builder()
+            .user_agent("Agent Skill Manager");
+        if let Ok(proxy_val) = std::env::var("HTTP_PROXY").or_else(|_| std::env::var("http_proxy")) {
+            if !proxy_val.trim().is_empty() {
+                if let Ok(proxy) = reqwest::Proxy::all(proxy_val.trim()) {
+                    builder = builder.proxy(proxy);
+                }
+            }
+        }
+        let client = builder
             .build()
             .map_err(|error| std::io::Error::other(error.to_string()))?;
         let mut response = client
@@ -1541,7 +1579,7 @@ mod tests {
         custom_paths.insert("master".to_string(), root.join("master").to_string_lossy().into_owned());
         for agent_id in [
             "claude-code", "cline", "codebuddy", "github-copilot", "droid", "qoder",
-            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "augment",
+            "qwen-code", "hermes", "openclaw", "workbuddy", "kimi-code", "minimax-code", "augment",
             "roo-code", "windsurf", "codex", "antigravity", "pi-agent", "oh-my-pi",
             "grok", "kiro", "trae", "trae-cn", "opencode", "cursor",
         ] {
@@ -1773,7 +1811,7 @@ mod tests {
             .find(|event| event["phase"] == "link_reconciliation")
             .unwrap();
         assert_eq!(link_event["counters"]["masterSkills"], 1);
-        assert_eq!(link_event["counters"]["agentLinkChecks"], 24);
+        assert_eq!(link_event["counters"]["agentLinkChecks"], 25);
         assert!(events.iter().all(|event| event["phase"] != "sqlite_sync"));
     }
 

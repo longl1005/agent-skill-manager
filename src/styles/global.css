@@ -2715,6 +2715,247 @@ a.agent-detail__skill-card,
   transform: rotate(90deg);
 }
 
+.settings-segmented-group {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface) 65%, var(--canvas));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+}
+
+.settings-segmented-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 6px 14px;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.settings-segmented-btn:hover {
+  color: var(--text);
+}
+
+.settings-segmented-btn.is-active {
+  background: color-mix(in srgb, var(--surface-hover) 85%, var(--canvas));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent);
+  color: var(--text);
+  font-weight: 550;
+}
+
+.settings-segmented-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.font-size-sample {
+  display: inline-block;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.font-size-sample--sm {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.font-size-sample--md {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.font-size-sample--lg {
+  font-size: 15px;
+  opacity: 0.95;
+}
+
+.font-size-sample--xl {
+  font-size: 17.5px;
+  opacity: 1;
+}
+
+.settings-proxy-card {
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: auto;
+  padding: 20px 22px;
+}
+
+.settings-proxy-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-proxy-card__header h3 {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.settings-proxy-card__header p {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.settings-proxy-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.settings-proxy-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 0 14px;
+  transition: border-color .15s ease, background-color .15s ease;
+  outline: none;
+}
+
+.settings-proxy-input:focus,
+.settings-proxy-input:focus-visible {
+  outline: none !important;
+  border-color: var(--accent);
+  box-shadow: none !important;
+}
+
+.settings-proxy-save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--surface-hover) 75%, var(--canvas));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 40px;
+  padding: 0 18px;
+  transition: all .15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.settings-proxy-save-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.settings-proxy-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-proxy-save-btn.is-saved {
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  border-color: var(--success);
+  color: var(--success);
+}
+
+
+.close-action-modal {
+  max-width: 460px;
+}
+
+.close-action-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.close-action-option {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--surface) 50%, var(--canvas));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.close-action-option:hover {
+  background: color-mix(in srgb, var(--surface-hover) 65%, var(--canvas));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.close-action-option.is-selected {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: var(--accent);
+}
+
+.close-action-option input[type="radio"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin-top: 3px;
+}
+
+.close-action-option__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.close-action-option__text strong {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.close-action-option__text small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.close-action-remember {
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  font-size: 12.5px;
+  margin-top: 4px;
+  user-select: none;
+}
+
+.close-action-remember input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .settings-agent-group-header {
   align-items: baseline;
   display: flex;
@@ -3202,6 +3443,54 @@ a.agent-detail__skill-card,
   letter-spacing: .04em;
 }
 
+.settings-about-title-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.settings-about-title-row h3 {
+  margin: 0;
+}
+
+.settings-about-links {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-about-link-btn {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface-hover) 75%, var(--canvas));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  gap: 6px;
+  padding: 4px 10px;
+  transition: all .15s ease;
+  user-select: none;
+}
+
+.settings-about-link-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-about-link-btn .settings-icon:last-child {
+  opacity: 0.6;
+}
+
+.settings-github-action-btn {
+  gap: 6px;
+  margin-left: auto;
+}
+
 .settings-version {
   background: var(--surface-hover);
   border: 1px solid var(--line);
@@ -3209,8 +3498,7 @@ a.agent-detail__skill-card,
   color: var(--muted);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
-  margin-left: auto;
-  padding: 4px 9px;
+  padding: 3px 8px;
 }
 
 .settings-disable-dialog {

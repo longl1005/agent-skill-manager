@@ -2,11 +2,14 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TrayEventBridge } from "./useTrayEvents";
+import { useGeneralSettingsStore } from "../stores/generalSettingsStore";
 
-const { listenMock, setTrayLanguageMock, setTrayStatisticsMock } = vi.hoisted(() => ({
+const { listenMock, setTrayLanguageMock, setTrayStatisticsMock, hideMainWindowMock, exitAppMock } = vi.hoisted(() => ({
   listenMock: vi.fn(),
   setTrayLanguageMock: vi.fn(),
   setTrayStatisticsMock: vi.fn(),
+  hideMainWindowMock: vi.fn().mockResolvedValue(undefined),
+  exitAppMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 let trayHandlers: Record<string, () => void> = {};
@@ -56,6 +59,8 @@ vi.mock("../stores/agentConfigStore", () => ({
 vi.mock("../ipc/commands", () => ({
   setTrayLanguage: setTrayLanguageMock,
   setTrayStatistics: setTrayStatisticsMock,
+  hideMainWindow: hideMainWindowMock,
+  exitApp: exitAppMock,
 }));
 
 function renderBridge() {
@@ -129,4 +134,35 @@ describe("TrayEventBridge", () => {
     );
     consoleError.mockRestore();
   });
+
+  it("handles window:close-requested by opening confirmation when closeAction is ask", async () => {
+    useGeneralSettingsStore.setState({ closeAction: "ask", isCloseConfirmOpen: false });
+    renderBridge();
+
+    await waitFor(() => expect(trayHandlers["window:close-requested"]).toBeDefined());
+    trayHandlers["window:close-requested"]();
+
+    expect(useGeneralSettingsStore.getState().isCloseConfirmOpen).toBe(true);
+  });
+
+  it("handles window:close-requested by minimizing when closeAction is minimize", async () => {
+    useGeneralSettingsStore.setState({ closeAction: "minimize", isCloseConfirmOpen: false });
+    renderBridge();
+
+    await waitFor(() => expect(trayHandlers["window:close-requested"]).toBeDefined());
+    trayHandlers["window:close-requested"]();
+
+    expect(hideMainWindowMock).toHaveBeenCalled();
+  });
+
+  it("handles window:close-requested by exiting when closeAction is quit", async () => {
+    useGeneralSettingsStore.setState({ closeAction: "quit", isCloseConfirmOpen: false });
+    renderBridge();
+
+    await waitFor(() => expect(trayHandlers["window:close-requested"]).toBeDefined());
+    trayHandlers["window:close-requested"]();
+
+    expect(exitAppMock).toHaveBeenCalled();
+  });
 });
+

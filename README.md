@@ -12,6 +12,23 @@
 
 </div>
 
+<table>
+  <tr>
+    <td width="33.33%" align="center">
+      <a href="docs/images/dashboard.png"><img src="docs/images/dashboard.png" alt="ASM Dashboard / ASM 仪表盘" /></a><br />
+      <sub><b>Dashboard / 仪表盘</b><br />Monitor every Agent at a glance / 跨 Agent 运行状态一目了然</sub>
+    </td>
+    <td width="33.33%" align="center">
+      <a href="docs/images/skill-library.png"><img src="docs/images/skill-library.png" alt="Master Skill Library / 主技能库" /></a><br />
+      <sub><b>Master Skill Library / 主技能库</b><br />Manage and distribute Skills centrally / 集中管理并分发 Skills</sub>
+    </td>
+    <td width="33.33%" align="center">
+      <a href="docs/images/antigravity.png"><img src="docs/images/antigravity.png" alt="Antigravity Agent / Antigravity 智能体" /></a><br />
+      <sub><b>Antigravity Agent / Antigravity 智能体</b><br />Browse installed Skills by Agent / 按 Agent 查看已安装 Skills</sub>
+    </td>
+  </tr>
+</table>
+
 ## 为什么使用 ASM？
 
 当你同时使用 Claude Code、Codex、MiniMax Code、Cursor 等多个 AI Agent 时，Skills 往往散落在不同目录：难以发现、难以比较，也容易重复维护。Agent Skill Manager（ASM）将这些本地 Skills 汇集到一个主技能库中，并通过链接按需分发给各个 Agent。
@@ -67,8 +84,6 @@ ASM 当前注册了 25 个 Agent 适配器：
 
 Claude Code、Cline、CodeBuddy、GitHub Copilot、Droid、Qoder、Qwen Code、Hermes Agent、OpenClaw、WorkBuddy、Kimi Code CLI、**MiniMax Code**、Augment、Roo Code、Windsurf、Codex、Antigravity、Pi Agent、Oh My Pi（OPM）、Grok、Kiro CLI、TRAE、TRAE CN、Open Code 和 Cursor。
 
-其中 MiniMax Code 是 ASM 支持管理的 Agent；它的 Skills 目录会和其他 Agent 一样被扫描与展示，并不是一个 Skill。
-
 检测以各 Agent 的本地 Skills 目录为依据。你可以在设置中为已检测到的 Agent 指定自定义目录。
 
 ## 本地优先与文件安全
@@ -108,6 +123,12 @@ pnpm tauri:dev
 | `pnpm build` | 类型检查并构建生产前端资源。 |
 | `pnpm tauri:build` | 为当前平台构建 Tauri 应用包。 |
 | `cargo test --lib --manifest-path src-tauri/Cargo.toml` | 运行 Rust 库测试。 |
+
+## macOS 临时安装说明
+
+Release 同时提供 Apple Silicon（`darwin-aarch64.dmg`）和 Intel（`darwin-x86_64.dmg`）安装包。下载与芯片架构相符的 DMG，将应用拖入“应用程序”目录即可安装。
+
+当前版本使用临时 ad-hoc 签名，尚未接入 Apple Developer ID 签名与公证。因此如果 Gatekeeper 提示无法验证开发者，请按住 Control 点击应用，选择“打开”，再在确认窗口中选择“打开”；也可前往“系统设置 → 隐私与安全性”允许打开。正式签名与公证接入后，该手动步骤将被移除。
 
 ## 参与贡献
 
@@ -184,8 +205,6 @@ ASM currently registers adapters for 25 agents:
 
 Claude Code, Cline, CodeBuddy, GitHub Copilot, Droid, Qoder, Qwen Code, Hermes Agent, OpenClaw, WorkBuddy, Kimi Code CLI, **MiniMax Code**, Augment, Roo Code, Windsurf, Codex, Antigravity, Pi Agent, Oh My Pi (OPM), Grok, Kiro CLI, TRAE, TRAE CN, Open Code, and Cursor.
 
-MiniMax Code is a supported agent in ASM—not a Skill. ASM scans and displays its Skill directory in the same way as the directories of other agents.
-
 Detection is based on each agent's local Skill directory. You can configure a custom directory for every detected agent in Settings.
 
 ## Local-first and safe by design
@@ -225,6 +244,12 @@ This starts the Vite frontend and the Tauri desktop window.
 | `pnpm build` | Type-check and build the production frontend bundle. |
 | `pnpm tauri:build` | Build a Tauri application bundle for the current platform. |
 | `cargo test --lib --manifest-path src-tauri/Cargo.toml` | Run the Rust library tests. |
+
+## Temporary macOS installation instructions
+
+Each release provides installers for Apple Silicon (`darwin-aarch64.dmg`) and Intel (`darwin-x86_64.dmg`) Macs. Download the DMG matching your Mac, then drag the app into Applications.
+
+The current release uses temporary ad-hoc signing and is not yet signed with an Apple Developer ID or notarized. If Gatekeeper cannot verify the developer, Control-click the app, select **Open**, then confirm **Open** again. You can also allow it in **System Settings → Privacy & Security**. This manual step will be removed after Developer ID signing and notarization are added.
 
 ## Contributing
 

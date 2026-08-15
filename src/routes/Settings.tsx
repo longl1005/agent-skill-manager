@@ -4,18 +4,21 @@ import appPackage from "../../package.json";
 import { AgentIdentityMark } from "../components/AgentVisual";
 import { SettingsIcon, type SettingsIconName } from "../components/SettingsIcon";
 import { SettingsSelect } from "../components/SettingsSelect";
+import { SettingsSegmentedControl } from "../components/SettingsSegmentedControl";
 import { isDiscoveredAgent } from "../agentDiscovery";
-import { migrateAgentSkillsDir, resetAgentSkillsDir } from "../ipc/commands";
+import { migrateAgentSkillsDir, openExternalUrl, resetAgentSkillsDir } from "../ipc/commands";
 import { t, type Language, type TranslationKey } from "../locales/dict";
 import { orderAgents, useAgentConfigStore } from "../stores/agentConfigStore";
+import { useGeneralSettingsStore, type CloseAction, type FontSize } from "../stores/generalSettingsStore";
 import { useI18nStore } from "../stores/i18nStore";
 import { useMasterRepoStore } from "../stores/masterRepoStore";
 import { usePerformanceDiagnosticsStore } from "../stores/performanceDiagnosticsStore";
 import { useScanStore } from "../stores/scanStore";
 import { useThemeStore, type ThemeMode, type ThemeStyle } from "../stores/themeStore";
 import { useUpdateStore } from "../stores/updateStore";
+import { useProxyStore } from "../stores/proxyStore";
 
-type SettingsSectionId = "general" | "agents" | "diagnostics" | "updates";
+type SettingsSectionId = "general" | "agents" | "diagnostics" | "proxy" | "updates";
 
 interface ThemeOption {
   id: ThemeMode;
@@ -49,6 +52,40 @@ const langOptions: LangOption[] = [
   { id: "en", titleKey: "settings.lang.en" },
 ];
 
+interface FontSizeOption {
+  id: FontSize;
+  titleKey: TranslationKey;
+  sampleClass: string;
+}
+
+const fontSizeOptions: FontSizeOption[] = [
+  { id: "small", titleKey: "settings.fontSize.small", sampleClass: "font-size-sample--sm" },
+  { id: "medium", titleKey: "settings.fontSize.medium", sampleClass: "font-size-sample--md" },
+  { id: "large", titleKey: "settings.fontSize.large", sampleClass: "font-size-sample--lg" },
+  { id: "xlarge", titleKey: "settings.fontSize.xlarge", sampleClass: "font-size-sample--xl" },
+];
+
+interface CloseActionOption {
+  id: CloseAction;
+  titleKey: TranslationKey;
+}
+
+const closeActionOptions: CloseActionOption[] = [
+  { id: "ask", titleKey: "settings.closeAction.ask" },
+  { id: "minimize", titleKey: "settings.closeAction.minimize" },
+  { id: "quit", titleKey: "settings.closeAction.quit" },
+];
+
+interface TrayIconOption {
+  id: "show" | "hide";
+  titleKey: TranslationKey;
+}
+
+const trayIconOptions: TrayIconOption[] = [
+  { id: "show", titleKey: "settings.trayIcon.show" },
+  { id: "hide", titleKey: "settings.trayIcon.hide" },
+];
+
 interface AgentPathItem {
   id: string;
   name: string;
@@ -67,6 +104,7 @@ const knownAgents: AgentPathItem[] = [
   { id: "openclaw", name: "OpenClaw", defaultPath: "~/.openclaw/skills" },
   { id: "workbuddy", name: "WorkBuddy", defaultPath: "~/.workbuddy/skills" },
   { id: "kimi-code", name: "Kimi Code CLI", defaultPath: "~/.kimi-code/skills" },
+  { id: "minimax-code", name: "MiniMax Code", defaultPath: "~/.minimax-code/skills" },
   { id: "augment", name: "Augment", defaultPath: "~/.augment/skills" },
   { id: "roo-code", name: "Roo Code", defaultPath: "~/.roo/skills" },
   { id: "windsurf", name: "Windsurf", defaultPath: "~/.codeium/windsurf/skills" },
@@ -85,6 +123,7 @@ const knownAgents: AgentPathItem[] = [
 export default function Settings() {
   const { themeMode, themeStyle, setThemeMode, setThemeStyle } = useThemeStore();
   const { lang, setLanguage } = useI18nStore();
+  const { closeAction, showTrayIcon, fontSize, setCloseAction, setShowTrayIcon, setFontSize } = useGeneralSettingsStore();
   const {
     customPaths,
     setCustomPath,
@@ -123,11 +162,32 @@ export default function Settings() {
   const [diagnosticsAction, setDiagnosticsAction] = useState<"export" | "clear" | null>(null);
   const [diagnosticsError, setDiagnosticsError] = useState(false);
   const [isClearDiagnosticsDialogOpen, setIsClearDiagnosticsDialogOpen] = useState(false);
+  const { proxy, fetchProxy, saveProxy, saving: proxySaving } = useProxyStore();
+  const [proxyInput, setProxyInput] = useState("");
+  const [proxySaved, setProxySaved] = useState(false);
+  const [proxyError, setProxyError] = useState<string | null>(null);
   const draggedAgentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void refreshDiagnosticsSummary().catch(() => undefined);
-  }, [refreshDiagnosticsSummary]);
+    void fetchProxy().catch(() => undefined);
+  }, [refreshDiagnosticsSummary, fetchProxy]);
+
+  useEffect(() => {
+    setProxyInput(proxy);
+  }, [proxy]);
+
+  const handleSaveProxy = async () => {
+    setProxySaved(false);
+    setProxyError(null);
+    try {
+      await saveProxy(proxyInput);
+      setProxySaved(true);
+      setTimeout(() => setProxySaved(false), 2000);
+    } catch {
+      setProxyError(t("settings.proxy.error", lang));
+    }
+  };
 
   const handleInputChange = (agentId: string, value: string) => {
     setInputPaths((previous) => ({ ...previous, [agentId]: value }));
@@ -424,6 +484,7 @@ export default function Settings() {
     { id: "general", label: lang === "zh" ? "通用设置" : "General", icon: "general" },
     { id: "agents", label: lang === "zh" ? "Agent 管理" : "Agent management", icon: "agents" },
     { id: "diagnostics", label: t("settings.performanceDiagnostics.title", lang), icon: "diagnostics" },
+    { id: "proxy", label: t("settings.nav.proxy", lang), icon: "proxy" },
     { id: "updates", label: lang === "zh" ? "更新与关于" : "Updates & about", icon: "updates" },
   ];
 
@@ -495,6 +556,57 @@ export default function Settings() {
                     value={lang}
                     options={langOptions.map((option) => ({ value: option.id, label: t(option.titleKey, lang) }))}
                     onChange={setLanguage}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-row__copy">
+                    <h3 id="settings-font-size-label">{t("settings.fontSize.title", lang)}</h3>
+                    <p>{t("settings.fontSize.desc", lang)}</p>
+                  </div>
+                  <SettingsSegmentedControl
+                    labelId="settings-font-size-label"
+                    value={fontSize}
+                    options={fontSizeOptions.map((option) => ({
+                      value: option.id,
+                      label: (
+                        <>
+                          <span className={`font-size-sample ${option.sampleClass}`} aria-hidden="true">T</span>
+                          {t(option.titleKey, lang)}
+                        </>
+                      ),
+                      ariaLabel: t(option.titleKey, lang),
+                    }))}
+                    onChange={setFontSize}
+                    dataTestId="settings-font-size"
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-row__copy">
+                    <h3 id="settings-close-action-label">{t("settings.closeAction.title", lang)}</h3>
+                    <p>{t("settings.closeAction.desc", lang)}</p>
+                  </div>
+                  <SettingsSegmentedControl
+                    labelId="settings-close-action-label"
+                    value={closeAction}
+                    options={closeActionOptions.map((option) => ({ value: option.id, label: t(option.titleKey, lang) }))}
+                    onChange={setCloseAction}
+                    dataTestId="settings-close-action"
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-row__copy">
+                    <h3 id="settings-tray-icon-label">{t("settings.trayIcon.title", lang)}</h3>
+                    <p>{t("settings.trayIcon.desc", lang)}</p>
+                  </div>
+                  <SettingsSegmentedControl
+                    labelId="settings-tray-icon-label"
+                    value={showTrayIcon ? "show" : "hide"}
+                    options={trayIconOptions.map((option) => ({ value: option.id, label: t(option.titleKey, lang) }))}
+                    onChange={(value) => setShowTrayIcon(value === "show")}
+                    dataTestId="settings-tray-icon"
                   />
                 </div>
               </div>
@@ -618,6 +730,62 @@ export default function Settings() {
             </section>
           )}
 
+          {activeSection === "proxy" && (
+            <section aria-labelledby="settings-proxy-title">
+              <div className="settings-panel-header">
+                <div>
+                  <h2 id="settings-proxy-title">{t("settings.proxy.title", lang)}</h2>
+                  <p>{lang === "zh" ? "配置外部网络访问与 Git 代理。" : "Configure outbound network access and Git proxy."}</p>
+                </div>
+              </div>
+
+              {proxyError && <div className="settings-alert-banner" role="alert">{proxyError}</div>}
+
+              <div className="settings-list">
+                <div className="settings-proxy-card">
+                  <div className="settings-proxy-card__header">
+                    <h3 id="settings-proxy-address-label">{t("settings.proxy.addressTitle", lang)}</h3>
+                    <p>{t("settings.proxy.desc", lang)}</p>
+                  </div>
+
+                  <div className="settings-proxy-form">
+                    <input
+                      type="text"
+                      className="settings-proxy-input"
+                      aria-labelledby="settings-proxy-address-label"
+                      placeholder={t("settings.proxy.placeholder", lang)}
+                      value={proxyInput}
+                      onChange={(e) => setProxyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          void handleSaveProxy();
+                        }
+                      }}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                    />
+                    <button
+                      type="button"
+                      className={`settings-proxy-save-btn ${proxySaved ? "is-saved" : ""}`}
+                      disabled={proxySaving}
+                      onClick={() => void handleSaveProxy()}
+                    >
+                      <SettingsIcon name="link" size={14} />
+                      <span>
+                        {proxySaved
+                          ? t("settings.proxy.saved", lang)
+                          : proxySaving
+                          ? t("settings.proxy.saving", lang)
+                          : t("settings.proxy.save", lang)}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
           {activeSection === "updates" && (
             <section aria-labelledby="settings-updates-title">
               <div className="settings-panel-header">
@@ -643,10 +811,21 @@ export default function Settings() {
                 <div className="settings-row settings-row--about">
                   <div className="settings-about-mark" aria-hidden="true">ASM</div>
                   <div className="settings-row__copy">
-                    <h3>Agent Skill Manager</h3>
+                    <div className="settings-about-title-row">
+                      <h3>Agent Skill Manager</h3>
+                      <span className="settings-version">v{appPackage.version}</span>
+                    </div>
                     <p>{lang === "zh" ? "集中管理主技能仓库与 Agent 分发关系。" : "Centralized management for master skills and Agent distribution."}</p>
                   </div>
-                  <span className="settings-version">v{appPackage.version}</span>
+                  <button
+                    type="button"
+                    className="settings-secondary-btn settings-github-action-btn"
+                    onClick={() => void openExternalUrl("https://github.com/longl1005/agent-skill-manager")}
+                  >
+                    <SettingsIcon name="github" size={14} />
+                    <span>{lang === "zh" ? "访问仓库" : "View on GitHub"}</span>
+                    <SettingsIcon name="external" size={12} />
+                  </button>
                 </div>
               </div>
             </section>

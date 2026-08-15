@@ -13,6 +13,12 @@ describe("release workflow", () => {
     expect(workflow).not.toContain("- os: macos-13");
   });
 
+  it("ad-hoc signs macOS builds and verifies user-facing DMG installers", () => {
+    expect(workflow).toContain('APPLE_SIGNING_IDENTITY: "-"');
+    expect(workflow).toContain("-name '*.dmg'");
+    expect(workflow).toContain("-eq 2");
+  });
+
   it("publishes release assets with the runner-provided GitHub CLI", () => {
     expect(workflow).toContain('gh release create "${{ github.ref_name }}"');
     expect(workflow).toContain("release-artifacts/*/*");

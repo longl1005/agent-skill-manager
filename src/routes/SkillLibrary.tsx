@@ -23,6 +23,7 @@ export const SUPPORTED_AGENTS = [
   { id: "openclaw", name: "OpenClaw" },
   { id: "workbuddy", name: "WorkBuddy" },
   { id: "kimi-code", name: "Kimi Code CLI" },
+  { id: "minimax-code", name: "MiniMax Code" },
   { id: "augment", name: "Augment" },
   { id: "roo-code", name: "Roo Code" },
   { id: "windsurf", name: "Windsurf" },

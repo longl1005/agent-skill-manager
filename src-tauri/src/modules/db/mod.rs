@@ -159,6 +159,54 @@ pub fn set_performance_diagnostics_enabled(conn: &Connection, enabled: bool) -> 
     Ok(())
 }
 
+pub fn get_network_proxy(conn: &Connection) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT value FROM app_settings WHERE key = 'network_proxy'",
+        [],
+        |row| row.get(0),
+    )
+    .or_else(|err| match err {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other),
+    })
+}
+
+pub fn set_network_proxy(conn: &Connection, proxy: Option<&str>) -> Result<()> {
+    match proxy.filter(|s| !s.trim().is_empty()) {
+        Some(val) => {
+            let trimmed = val.trim();
+            conn.execute(
+                "INSERT INTO app_settings (key, value) VALUES ('network_proxy', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [trimmed],
+            )?;
+            apply_network_proxy_to_env(Some(trimmed));
+        }
+        None => {
+            conn.execute(
+                "DELETE FROM app_settings WHERE key = 'network_proxy'",
+                [],
+            )?;
+            apply_network_proxy_to_env(None);
+        }
+    }
+    Ok(())
+}
+
+pub fn apply_network_proxy_to_env(proxy: Option<&str>) {
+    let vars = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"];
+    if let Some(proxy_val) = proxy.filter(|s| !s.trim().is_empty()) {
+        let trimmed = proxy_val.trim();
+        for var in vars {
+            std::env::set_var(var, trimmed);
+        }
+    } else {
+        for var in vars {
+            std::env::remove_var(var);
+        }
+    }
+}
+
 pub fn get_agent_configs(conn: &Connection) -> Result<Vec<DbAgentConfig>> {
     let mut stmt = conn.prepare("SELECT agent_id, custom_path, disabled, sort_order FROM agent_config ORDER BY sort_order IS NULL, sort_order, agent_id")?;
     let configs = stmt
@@ -424,5 +472,19 @@ mod tests {
 
         assert_eq!(unlinked, 2);
         assert_eq!(activities, 2);
+    }
+
+    #[test]
+    fn application_setting_network_proxy_can_be_stored_and_retrieved() {
+        let conn = open_db(Some(Path::new(":memory:"))).unwrap();
+        assert_eq!(get_network_proxy(&conn).unwrap(), None);
+
+        set_network_proxy(&conn, Some("http://127.0.0.1:7890")).unwrap();
+        assert_eq!(get_network_proxy(&conn).unwrap(), Some("http://127.0.0.1:7890".to_string()));
+        assert_eq!(std::env::var("HTTP_PROXY").unwrap(), "http://127.0.0.1:7890");
+
+        set_network_proxy(&conn, None).unwrap();
+        assert_eq!(get_network_proxy(&conn).unwrap(), None);
+        assert!(std::env::var("HTTP_PROXY").is_err());
     }
 }

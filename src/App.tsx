@@ -16,12 +16,15 @@ import { useScanStore } from "./stores/scanStore";
 import { useMasterRepoStore } from "./stores/masterRepoStore";
 import { useAgentConfigStore } from "./stores/agentConfigStore";
 import { TrayEventBridge } from "./hooks/useTrayEvents";
+import { CloseActionModal } from "./components/CloseActionModal";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { useUpdateStore } from "./stores/updateStore";
 import { usePerformanceDiagnosticsStore } from "./stores/performanceDiagnosticsStore";
+import { useGeneralSettingsStore } from "./stores/generalSettingsStore";
 
 export default function App() {
   const initTheme = useThemeStore((s) => s.initTheme);
+  const initGeneralSettings = useGeneralSettingsStore((s) => s.initSettings);
   const scan = useScanStore((s) => s.scan);
   const fetchMasterSkills = useMasterRepoStore((s) => s.fetchMasterSkills);
   const hydrateAgentConfig = useAgentConfigStore((s) => s.hydrate);
@@ -30,18 +33,20 @@ export default function App() {
 
   useEffect(() => {
     initTheme();
+    initGeneralSettings();
     void Promise.allSettled([hydrateAgentConfig(), hydratePerformanceDiagnostics()])
       .finally(() => {
         void scan();
         void fetchMasterSkills();
       });
     void checkForUpdates(true);
-  }, [initTheme, scan, fetchMasterSkills, hydrateAgentConfig, hydratePerformanceDiagnostics, checkForUpdates]);
+  }, [initTheme, initGeneralSettings, scan, fetchMasterSkills, hydrateAgentConfig, hydratePerformanceDiagnostics, checkForUpdates]);
 
   return (
     <HashRouter>
       <TrayEventBridge />
       <UpdateDialog />
+      <CloseActionModal />
       <div className="app-shell">
         <AppSidebar />
         <main className="content">

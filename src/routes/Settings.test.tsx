@@ -6,10 +6,13 @@ import { useI18nStore } from "../stores/i18nStore";
 import { useAgentConfigStore } from "../stores/agentConfigStore";
 import { useScanStore } from "../stores/scanStore";
 import { usePerformanceDiagnosticsStore } from "../stores/performanceDiagnosticsStore";
+import { useGeneralSettingsStore } from "../stores/generalSettingsStore";
+import { useProxyStore } from "../stores/proxyStore";
 import {
   clearPerformanceDiagnostics,
   exportPerformanceDiagnostics,
   getPerformanceDiagnosticsSummary,
+  openExternalUrl,
   setPerformanceDiagnosticsEnabled,
 } from "../ipc/commands";
 
@@ -26,6 +29,12 @@ vi.mock("../ipc/commands", () => ({
   getPerformanceDiagnosticsSummary: vi.fn(),
   exportPerformanceDiagnostics: vi.fn(),
   clearPerformanceDiagnostics: vi.fn(),
+  setTrayVisible: vi.fn().mockResolvedValue(undefined),
+  hideMainWindow: vi.fn().mockResolvedValue(undefined),
+  exitApp: vi.fn().mockResolvedValue(undefined),
+  getNetworkProxy: vi.fn().mockResolvedValue(null),
+  setNetworkProxy: vi.fn().mockResolvedValue(undefined),
+  openExternalUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
 const reportSummaryFixture = {
@@ -146,10 +155,113 @@ describe("Settings route & i18n / Theme Switcher", () => {
     expect(screen.getByText("Agent Skills Directory Configurations")).toBeInTheDocument();
   });
 
+  it("allows selecting close behavior from segmented control", () => {
+    useGeneralSettingsStore.setState({ closeAction: "ask" });
+    render(<Settings />);
+
+    expect(screen.getByText("关闭行为")).toBeInTheDocument();
+    expect(screen.getByText("选择点击窗口关闭按钮后的应用行为。")).toBeInTheDocument();
+
+    const askBtn = screen.getByRole("radio", { name: "每次询问" });
+    const minimizeBtn = screen.getByRole("radio", { name: "最小化到托盘" });
+    const quitBtn = screen.getByRole("radio", { name: "退出应用" });
+
+    expect(askBtn).toHaveAttribute("aria-checked", "true");
+    expect(minimizeBtn).toHaveAttribute("aria-checked", "false");
+    expect(quitBtn).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(minimizeBtn);
+    expect(useGeneralSettingsStore.getState().closeAction).toBe("minimize");
+    expect(minimizeBtn).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(quitBtn);
+    expect(useGeneralSettingsStore.getState().closeAction).toBe("quit");
+    expect(quitBtn).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("allows selecting tray icon visibility from segmented control", () => {
+    useGeneralSettingsStore.setState({ showTrayIcon: true });
+    render(<Settings />);
+
+    expect(screen.getByText("托盘图标")).toBeInTheDocument();
+    expect(screen.getByText("在系统托盘中显示图标，便于快速执行显示和退出操作。")).toBeInTheDocument();
+
+    const showBtn = screen.getByRole("radio", { name: "显示" });
+    const hideBtn = screen.getByRole("radio", { name: "隐藏" });
+
+    expect(showBtn).toHaveAttribute("aria-checked", "true");
+    expect(hideBtn).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(hideBtn);
+    expect(useGeneralSettingsStore.getState().showTrayIcon).toBe(false);
+    expect(hideBtn).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("allows selecting font size from segmented control", () => {
+    useGeneralSettingsStore.setState({ fontSize: "medium" });
+    render(<Settings />);
+
+    expect(screen.getByText("文字大小")).toBeInTheDocument();
+    expect(screen.getByText("调整应用的基础字号。")).toBeInTheDocument();
+
+    const smallBtn = screen.getByRole("radio", { name: "小" });
+    const mediumBtn = screen.getByRole("radio", { name: "默认" });
+    const largeBtn = screen.getByRole("radio", { name: "大" });
+    const xlargeBtn = screen.getByRole("radio", { name: "特大" });
+
+    expect(smallBtn).toHaveAttribute("aria-checked", "false");
+    expect(mediumBtn).toHaveAttribute("aria-checked", "true");
+    expect(largeBtn).toHaveAttribute("aria-checked", "false");
+    expect(xlargeBtn).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(largeBtn);
+    expect(useGeneralSettingsStore.getState().fontSize).toBe("large");
+    expect(largeBtn).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(xlargeBtn);
+    expect(useGeneralSettingsStore.getState().fontSize).toBe("xlarge");
+    expect(xlargeBtn).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("allows configuring and saving network proxy", async () => {
+    useProxyStore.setState({ proxy: "http://127.0.0.1:7890", loading: false, saving: false, error: null });
+    render(<Settings />);
+
+    openSection("网络代理");
+
+    expect(screen.getByRole("heading", { level: 2, name: "网络代理" })).toBeInTheDocument();
+    expect(screen.getByText("代理地址")).toBeInTheDocument();
+    expect(screen.getByText("设置后，所有 Git 拉取和网络请求均通过此代理出口。留空则直连。")).toBeInTheDocument();
+
+    const proxyInput = screen.getByRole("textbox", { name: "代理地址" });
+    expect(proxyInput).toHaveValue("http://127.0.0.1:7890");
+
+    fireEvent.change(proxyInput, { target: { value: "http://127.0.0.1:8888" } });
+    expect(proxyInput).toHaveValue("http://127.0.0.1:8888");
+
+    const saveBtn = screen.getByRole("button", { name: /保存/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(useProxyStore.getState().proxy).toBe("http://127.0.0.1:8888");
+    });
+  });
+
   it("renders a manual update-check control", () => {
     render(<Settings />);
     openSection("更新与关于");
     expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
+  });
+
+  it("renders GitHub repository link button and allows opening it", () => {
+    render(<Settings />);
+    openSection("更新与关于");
+
+    const viewRepoBtn = screen.getByRole("button", { name: "访问仓库" });
+    expect(viewRepoBtn).toBeInTheDocument();
+
+    fireEvent.click(viewRepoBtn);
+    expect(openExternalUrl).toHaveBeenCalledWith("https://github.com/longl1005/agent-skill-manager");
   });
 
   it("keeps undetected Agents collapsed and read-only until they are detected", () => {

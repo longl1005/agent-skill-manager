@@ -116,6 +116,13 @@ pub fn update_tray_statistics(
     update_menu_language(app, language)
 }
 
+pub fn set_tray_visible(app: &tauri::AppHandle, visible: bool) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        tray.set_visible(visible).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayAction {
     ShowWindow,
@@ -277,8 +284,9 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                if let Err(error) = window_for_events.hide() {
-                    eprintln!("Failed to hide main window after close request: {error}");
+                if let Err(error) = window_for_events.emit("window:close-requested", ()) {
+                    eprintln!("Failed to emit close request: {error}");
+                    let _ = window_for_events.hide();
                 }
             }
         });
